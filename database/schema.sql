@@ -1,0 +1,398 @@
+-- =====================================================================
+--  ShoeAR — AR-Based Sport Shoe Virtual Try-On with ML Recommendation
+--  MySQL Database Schema (Data Layer)
+-- ---------------------------------------------------------------------
+--  Derived from the Data Dictionary (Section 4) of the project report.
+--  This single database is the shared source of truth for BOTH the
+--  web portal (admin + supplier) and the mobile apps (customer +
+--  delivery), accessed only through the PHP REST API (three-tier
+--  client-server architecture).
+--
+--  Conventions:
+--    * Human-readable string IDs with prefixes (USR0001, PRD0001 ...)
+--      exactly as in the report's Data Dictionary.
+--    * InnoDB engine + utf8mb4 -> required for transactions, foreign
+--      keys, and atomic stock decrement (the "last pair" problem).
+--    * Every status field uses an ENUM so invalid states are impossible.
+--    * created_at / updated_at added for auditing and reporting.
+-- =====================================================================
+
+CREATE DATABASE IF NOT EXISTS shoear
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+USE shoear;
+
+-- Drop in reverse-dependency order so the script is re-runnable.
+DROP TABLE IF EXISTS commission;
+DROP TABLE IF EXISTS refund;
+DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS delivery;
+DROP TABLE IF EXISTS receipt;
+DROP TABLE IF EXISTS payment;
+DROP TABLE IF EXISTS order_item;
+DROP TABLE IF EXISTS `order`;
+DROP TABLE IF EXISTS wishlist_item;
+DROP TABLE IF EXISTS wishlist;
+DROP TABLE IF EXISTS cart_item;
+DROP TABLE IF EXISTS cart;
+DROP TABLE IF EXISTS product_model;
+DROP TABLE IF EXISTS product_image;
+DROP TABLE IF EXISTS product_variant;
+DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS category;
+DROP TABLE IF EXISTS delivery_personnel;
+DROP TABLE IF EXISTS customer;
+DROP TABLE IF EXISTS supplier;
+DROP TABLE IF EXISTS admin;
+DROP TABLE IF EXISTS `user`;
+
+-- =====================================================================
+--  1. USER & ROLE TABLES
+--  One base `user` row per account; one role-specific row extends it.
+-- =====================================================================
+
+CREATE TABLE `user` (
+    userId        VARCHAR(10)  NOT NULL,                 -- USR0001
+    username      VARCHAR(50)  NOT NULL,
+    password      VARCHAR(255) NOT NULL,                 -- store a HASH only (bcrypt/argon2)
+    email         VARCHAR(120) NOT NULL,
+    fullName      VARCHAR(120) NOT NULL,
+    phoneNumber   VARCHAR(20)  NOT NULL,
+    role          ENUM('Admin','Supplier','Customer','DeliveryPersonnel') NOT NULL,
+    -- Pending  : supplier/delivery awaiting admin approval
+    -- Active    : approved & usable (customers are Active immediately)
+    -- Rejected  : registration rejected by admin
+    -- Suspended : disabled by admin
+    -- Deleted   : soft-deleted account
+    status        ENUM('Pending','Active','Rejected','Suspended','Deleted') NOT NULL DEFAULT 'Pending',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (userId),
+    UNIQUE KEY uq_user_username (username),
+    UNIQUE KEY uq_user_email (email)
+) ENGINE=InnoDB;
+
+CREATE TABLE admin (
+    adminId   VARCHAR(10) NOT NULL,                       -- ADM0001
+    userId    VARCHAR(10) NOT NULL,
+    PRIMARY KEY (adminId),
+    UNIQUE KEY uq_admin_user (userId),
+    CONSTRAINT fk_admin_user FOREIGN KEY (userId) REFERENCES `user`(userId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE supplier (
+    supplierId      VARCHAR(10)  NOT NULL,                -- SUP0001
+    userId          VARCHAR(10)  NOT NULL,
+    companyName     VARCHAR(150) NOT NULL,
+    companyAddress  VARCHAR(255) NOT NULL,
+    PRIMARY KEY (supplierId),
+    UNIQUE KEY uq_supplier_user (userId),
+    CONSTRAINT fk_supplier_user FOREIGN KEY (userId) REFERENCES `user`(userId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE customer (
+    customerId       VARCHAR(10)  NOT NULL,               -- CUS0001
+    userId           VARCHAR(10)  NOT NULL,
+    shippingAddress  VARCHAR(255) NULL,
+    PRIMARY KEY (customerId),
+    UNIQUE KEY uq_customer_user (userId),
+    CONSTRAINT fk_customer_user FOREIGN KEY (userId) REFERENCES `user`(userId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE delivery_personnel (
+    deliveryPersonnelId VARCHAR(10)  NOT NULL,            -- DEL0001
+    userId              VARCHAR(10)  NOT NULL,
+    vehicleInfo         VARCHAR(100) NULL,
+    PRIMARY KEY (deliveryPersonnelId),
+    UNIQUE KEY uq_delivery_user (userId),
+    CONSTRAINT fk_delivery_user FOREIGN KEY (userId) REFERENCES `user`(userId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  2. CATALOG TABLES
+-- =====================================================================
+
+CREATE TABLE category (
+    categoryId    VARCHAR(10)  NOT NULL,                  -- CAT0001
+    categoryName  VARCHAR(80)  NOT NULL,
+    PRIMARY KEY (categoryId),
+    UNIQUE KEY uq_category_name (categoryName)
+) ENGINE=InnoDB;
+
+CREATE TABLE product (
+    productId           VARCHAR(10)   NOT NULL,           -- PRD0001
+    supplierId          VARCHAR(10)   NOT NULL,
+    categoryId          VARCHAR(10)   NOT NULL,
+    productName         VARCHAR(150)  NOT NULL,
+    productDescription  TEXT          NULL,
+    productPrice        DECIMAL(10,2) NOT NULL,
+    -- NOTE: stock is NOT stored here. It is tracked PER SIZE in
+    -- product_variant (Option B). A product's total stock is the sum of
+    -- its variants' stock. See database/NOTES.md.
+    -- Pending  : just uploaded, awaiting admin approval
+    -- Approved : visible on the platform
+    -- Rejected : rejected by admin
+    -- Removed  : taken down by supplier/admin (soft delete)
+    productStatus       ENUM('Pending','Approved','Rejected','Removed') NOT NULL DEFAULT 'Pending',
+    virtualTryOnEnable  BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (productId),
+    KEY idx_product_supplier (supplierId),
+    KEY idx_product_category (categoryId),
+    KEY idx_product_status (productStatus),
+    CONSTRAINT fk_product_supplier FOREIGN KEY (supplierId) REFERENCES supplier(supplierId)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_product_category FOREIGN KEY (categoryId) REFERENCES category(categoryId)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_product_price CHECK (productPrice >= 0)
+) ENGINE=InnoDB;
+
+-- Per-size stock (Option B). Each (product, size) is one sellable variant.
+-- The atomic stock decrement at payment runs on THIS table's row:
+--   UPDATE product_variant SET stockQuantity = stockQuantity - :qty
+--   WHERE productVariantId = :id AND stockQuantity >= :qty;
+CREATE TABLE product_variant (
+    productVariantId VARCHAR(10) NOT NULL,                -- VAR0001
+    productId        VARCHAR(10) NOT NULL,
+    size             VARCHAR(10) NOT NULL,                -- e.g. "UK8", "EU42"
+    stockQuantity    INT         NOT NULL DEFAULT 0,
+    PRIMARY KEY (productVariantId),
+    UNIQUE KEY uq_variant_product_size (productId, size), -- a size appears once per product
+    KEY idx_variant_product (productId),
+    CONSTRAINT fk_variant_product FOREIGN KEY (productId) REFERENCES product(productId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT chk_variant_stock CHECK (stockQuantity >= 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE product_image (
+    productImageId  VARCHAR(10)  NOT NULL,                -- IMG0001
+    productId       VARCHAR(10)  NOT NULL,
+    productImageUrl VARCHAR(255) NOT NULL,                -- path / Firebase URL
+    PRIMARY KEY (productImageId),
+    KEY idx_image_product (productId),
+    CONSTRAINT fk_image_product FOREIGN KEY (productId) REFERENCES product(productId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE product_model (
+    productModelId  VARCHAR(10)  NOT NULL,                -- MOD0001
+    productId       VARCHAR(10)  NOT NULL,
+    productModelUrl VARCHAR(255) NOT NULL,                -- .glb/.gltf in Firebase Storage
+    PRIMARY KEY (productModelId),
+    KEY idx_model_product (productId),
+    CONSTRAINT fk_model_product FOREIGN KEY (productId) REFERENCES product(productId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  3. CART & WISHLIST TABLES
+-- =====================================================================
+
+CREATE TABLE cart (
+    cartId         VARCHAR(10) NOT NULL,                  -- CRT0001
+    customerId     VARCHAR(10) NOT NULL,
+    cartCreatedAt  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (cartId),
+    UNIQUE KEY uq_cart_customer (customerId),             -- one active cart per customer
+    CONSTRAINT fk_cart_customer FOREIGN KEY (customerId) REFERENCES customer(customerId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE cart_item (
+    cartItemId        VARCHAR(10)   NOT NULL,             -- CIT0001
+    cartId            VARCHAR(10)   NOT NULL,
+    productVariantId  VARCHAR(10)   NOT NULL,             -- the specific size chosen
+    cartItemQuantity  INT           NOT NULL DEFAULT 1,
+    cartItemSubtotal  DECIMAL(10,2) NOT NULL,
+    PRIMARY KEY (cartItemId),
+    UNIQUE KEY uq_cart_variant (cartId, productVariantId), -- same size once per cart
+    KEY idx_cartitem_variant (productVariantId),
+    CONSTRAINT fk_cartitem_cart FOREIGN KEY (cartId) REFERENCES cart(cartId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_cartitem_variant FOREIGN KEY (productVariantId) REFERENCES product_variant(productVariantId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT chk_cartitem_qty CHECK (cartItemQuantity > 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE wishlist (
+    wishlistId         VARCHAR(10) NOT NULL,              -- WLT0001
+    customerId         VARCHAR(10) NOT NULL,
+    wishlistCreatedAt  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (wishlistId),
+    UNIQUE KEY uq_wishlist_customer (customerId),
+    CONSTRAINT fk_wishlist_customer FOREIGN KEY (customerId) REFERENCES customer(customerId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE wishlist_item (
+    wishlistItemId  VARCHAR(10) NOT NULL,                 -- WLI0001
+    wishlistId      VARCHAR(10) NOT NULL,
+    productId       VARCHAR(10) NOT NULL,
+    wishlistAddedAt DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (wishlistItemId),
+    UNIQUE KEY uq_wishlist_product (wishlistId, productId),
+    KEY idx_wishlistitem_product (productId),
+    CONSTRAINT fk_wishlistitem_wishlist FOREIGN KEY (wishlistId) REFERENCES wishlist(wishlistId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_wishlistitem_product FOREIGN KEY (productId) REFERENCES product(productId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  4. ORDER, PAYMENT & RECEIPT TABLES
+-- =====================================================================
+
+CREATE TABLE `order` (
+    orderId              VARCHAR(10)   NOT NULL,          -- ORD0001
+    customerId           VARCHAR(10)   NOT NULL,
+    orderDate            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    orderStatus          ENUM('Placed','Paid','Processing','Shipped',
+                              'OutForDelivery','Delivered','Completed','Cancelled')
+                              NOT NULL DEFAULT 'Placed',
+    orderTotalAmount     DECIMAL(10,2) NOT NULL,
+    orderDeliveryAddress VARCHAR(255)  NOT NULL,
+    PRIMARY KEY (orderId),
+    KEY idx_order_customer (customerId),
+    KEY idx_order_status (orderStatus),
+    CONSTRAINT fk_order_customer FOREIGN KEY (customerId) REFERENCES customer(customerId)
+        ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE order_item (
+    orderItemId      VARCHAR(10)   NOT NULL,              -- OIT0001
+    orderId          VARCHAR(10)   NOT NULL,
+    productVariantId VARCHAR(10)   NOT NULL,              -- the size that was bought
+    orderSize        VARCHAR(10)   NOT NULL,              -- size snapshot (kept even if variant changes)
+    orderQuantity    INT           NOT NULL,
+    orderUnitPrice   DECIMAL(10,2) NOT NULL,              -- price snapshot at purchase time
+    orderSubtotal    DECIMAL(10,2) NOT NULL,
+    PRIMARY KEY (orderItemId),
+    KEY idx_orderitem_order (orderId),
+    KEY idx_orderitem_variant (productVariantId),
+    CONSTRAINT fk_orderitem_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_orderitem_variant FOREIGN KEY (productVariantId) REFERENCES product_variant(productVariantId)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_orderitem_qty CHECK (orderQuantity > 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE payment (
+    paymentId      VARCHAR(10)   NOT NULL,                -- PAY0001
+    orderId        VARCHAR(10)   NOT NULL,
+    transactionId  VARCHAR(100)  NULL,                    -- gateway reference (Stripe/PayPal)
+    paymentMethod  ENUM('Stripe','PayPal') NOT NULL,
+    paymentAmount  DECIMAL(10,2) NOT NULL,
+    paymentDate    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    paymentStatus  ENUM('Pending','Successful','Failed','Refunded') NOT NULL DEFAULT 'Pending',
+    PRIMARY KEY (paymentId),
+    UNIQUE KEY uq_payment_order (orderId),
+    CONSTRAINT fk_payment_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE receipt (
+    receiptId            VARCHAR(10) NOT NULL,            -- RCP0001
+    orderId              VARCHAR(10) NOT NULL,
+    receiptGeneratedDate DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (receiptId),
+    UNIQUE KEY uq_receipt_order (orderId),
+    CONSTRAINT fk_receipt_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  5. DELIVERY TABLE
+-- =====================================================================
+
+CREATE TABLE delivery (
+    deliveryId          VARCHAR(10)  NOT NULL,            -- DLV0001
+    orderId             VARCHAR(10)  NOT NULL,
+    deliveryPersonnelId VARCHAR(10)  NULL,                -- assigned later by admin
+    deliveryStatus      ENUM('Pending','Assigned','PickedUp',
+                            'OutForDelivery','Delivered','Failed')
+                            NOT NULL DEFAULT 'Pending',
+    deliveryDate        DATETIME     NULL,
+    estimatedDeliveryTime DATETIME   NULL,
+    otpCode             VARCHAR(10)  NULL,                -- customer confirmation OTP
+    proofOfDelivery     VARCHAR(255) NULL,                -- photo path / URL
+    PRIMARY KEY (deliveryId),
+    UNIQUE KEY uq_delivery_order (orderId),
+    KEY idx_delivery_personnel (deliveryPersonnelId),
+    KEY idx_delivery_status (deliveryStatus),
+    CONSTRAINT fk_delivery_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_delivery_personnel FOREIGN KEY (deliveryPersonnelId) REFERENCES delivery_personnel(deliveryPersonnelId)
+        ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  6. REVIEW & RATING TABLE
+-- =====================================================================
+
+CREATE TABLE review (
+    reviewId      VARCHAR(10) NOT NULL,                   -- REV0001
+    customerId    VARCHAR(10) NOT NULL,
+    productId     VARCHAR(10) NOT NULL,
+    ratingScore   TINYINT     NOT NULL,                   -- 1..5
+    reviewComment TEXT        NULL,
+    reviewDate    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewStatus  ENUM('Published','Removed') NOT NULL DEFAULT 'Published',
+    PRIMARY KEY (reviewId),
+    UNIQUE KEY uq_review_customer_product (customerId, productId), -- one review per product
+    KEY idx_review_product (productId),
+    CONSTRAINT fk_review_customer FOREIGN KEY (customerId) REFERENCES customer(customerId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_review_product FOREIGN KEY (productId) REFERENCES product(productId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT chk_review_rating CHECK (ratingScore BETWEEN 1 AND 5)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  7. REFUND TABLE
+-- =====================================================================
+
+CREATE TABLE refund (
+    refundId     VARCHAR(10)   NOT NULL,                  -- REF0001
+    orderId      VARCHAR(10)   NOT NULL,
+    customerId   VARCHAR(10)   NOT NULL,
+    refundReason VARCHAR(255)  NOT NULL,
+    refundAmount DECIMAL(10,2) NOT NULL,
+    refundStatus ENUM('Pending','Approved','Rejected','Completed') NOT NULL DEFAULT 'Pending',
+    requestDate  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    refundProof  VARCHAR(255)  NULL,                      -- supporting evidence photo
+    PRIMARY KEY (refundId),
+    KEY idx_refund_order (orderId),
+    KEY idx_refund_customer (customerId),
+    KEY idx_refund_status (refundStatus),
+    CONSTRAINT fk_refund_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_refund_customer FOREIGN KEY (customerId) REFERENCES customer(customerId)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  8. COMMISSION TABLE
+--  Admin-configured commission rate applied to supplier sales.
+-- =====================================================================
+
+CREATE TABLE commission (
+    commissionId        VARCHAR(10)   NOT NULL,           -- COM0001
+    adminId             VARCHAR(10)   NOT NULL,
+    commissionRateValue DECIMAL(5,2)  NOT NULL,           -- percentage, e.g. 10.00
+    effectiveDate       DATETIME      NOT NULL,
+    commissionStatus    ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+    PRIMARY KEY (commissionId),
+    KEY idx_commission_admin (adminId),
+    CONSTRAINT fk_commission_admin FOREIGN KEY (adminId) REFERENCES admin(adminId)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_commission_rate CHECK (commissionRateValue >= 0 AND commissionRateValue <= 100)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  END OF SCHEMA
+-- =====================================================================
