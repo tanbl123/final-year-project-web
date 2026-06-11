@@ -35,7 +35,7 @@ function LoginPage() {
     <div className="container py-5" style={{ maxWidth: '420px' }}>
       <h1 className="mb-4 text-center">👟 Supplier Login</h1>
 
-      <form onSubmit={handleSubmit} className="card card-body shadow-sm">
+      <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start">
         {error && <div className="alert alert-danger py-2">{error}</div>}
 
         <div className="mb-3">
@@ -60,7 +60,7 @@ function LoginPage() {
           />
         </div>
 
-        <button type="submit" className="btn btn-primary w-100" disabled={isSubmitting}>
+        <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting}>
           {isSubmitting ? 'Logging in...' : 'Login'}
         </button>
       </form>

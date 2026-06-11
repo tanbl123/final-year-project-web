@@ -61,7 +61,7 @@ function RegisterPage() {
   return (
     <div className="container py-5" style={{ maxWidth: '440px' }}>
       <h1 className="mb-4 text-center">👟 Supplier Registration</h1>
-      <form onSubmit={handleSubmit} className="card card-body shadow-sm">
+      <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start">
         {error && <div className="alert alert-danger py-2">{error}</div>}
 
         <div className="mb-3">
@@ -85,16 +85,16 @@ function RegisterPage() {
           <input name="companyAddress" className="form-control" value={form.companyAddress} onChange={handleChange} required />
         </div>
         <div className="mb-3">
-          <label className="form-label">Password</label>
+          <label className="form-label mb-1">Password</label>
+          <div className="form-text mt-0 mb-1">At least 8 characters.</div>
           <input type="password" name="password" className="form-control" value={form.password} onChange={handleChange} required />
-          <div className="form-text">At least 8 characters.</div>
         </div>
         <div className="mb-3">
           <label className="form-label">Confirm password</label>
           <input type="password" name="confirm" className="form-control" value={form.confirm} onChange={handleChange} required />
         </div>
 
-        <button type="submit" className="btn btn-primary w-100" disabled={isSubmitting}>
+        <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting}>
           {isSubmitting ? 'Registering...' : 'Register'}
         </button>
       </form>
