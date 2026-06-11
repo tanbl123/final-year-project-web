@@ -1,0 +1,41 @@
+// ─────────────────────────────────────────────────────────────
+// Central place that talks to the PHP API.
+// Change API_BASE here when moving to a different server (local → cloud).
+// ─────────────────────────────────────────────────────────────
+export const API_BASE = 'http://localhost/shoear/api/v1';
+
+// Low-level request: calls the API, unwraps the {success,data,error} envelope.
+async function request(path, options = {}) {
+  const res = await fetch(API_BASE + path, options);
+
+  let json;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error('Server did not return valid JSON.');
+  }
+
+  if (!json.success) {
+    throw new Error(json.error?.message || 'Request failed.');
+  }
+  return json.data;
+}
+
+// GET request (optionally with a JWT token for protected endpoints).
+export function apiGet(path, token) {
+  return request(path, {
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
+  });
+}
+
+// POST request with a JSON body (optionally with a token).
+export function apiPost(path, body, token) {
+  return request(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: 'Bearer ' + token } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}

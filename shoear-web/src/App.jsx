@@ -30,7 +30,7 @@ function App() {
         <div className="navbar-nav">
           {user ? (
             <>
-              <span className="navbar-text text-light me-3">Hi, {user.name}</span>
+              <span className="navbar-text text-light me-3">Hi, {user.fullName}</span>
               <button className="btn btn-outline-light btn-sm" onClick={handleLogout}>
                 Logout
               </button>

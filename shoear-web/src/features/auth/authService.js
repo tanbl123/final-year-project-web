@@ -1,25 +1,19 @@
-// Fake authentication. Later these call your real PHP API.
+import { apiPost } from '../../api/client';
+
+// REAL login against the PHP API (POST /auth/login).
+// Returns { token, user } on success, or throws with the server's error message.
 export function login(email, password) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      // pretend the backend checked the credentials
-      if (email === 'supplier@shoear.com' && password === 'password123') {
-        resolve({
-          token: 'fake-jwt-token-abc123',
-          user: { id: 'USR0001', name: 'Demo Supplier', role: 'Supplier' },
-        });
-      } else {
-        reject(new Error('Invalid email or password.'));
-      }
-    }, 800);
-  });
+  return apiPost('/auth/login', { email, password });
 }
 
+// Logout is client-side: just discard the saved token + user.
 export function logout() {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
 }
 
+// TODO: wire to POST /auth/register once that backend endpoint exists.
+// Kept mocked for now so the Register page still works.
 export function register(data) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
