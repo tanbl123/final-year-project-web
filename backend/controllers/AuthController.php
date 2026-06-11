@@ -1,6 +1,72 @@
 <?php
 // Handles authentication endpoints.
 
+// POST /auth/register — create a new SUPPLIER account (status Pending,
+// awaiting admin approval). Creates a `user` row + a `supplier` row together.
+function handleRegister(PDO $pdo): void {
+  $body           = getJsonBody();
+  $fullName       = trim($body['fullName'] ?? '');
+  $username       = trim($body['username'] ?? '');
+  $email          = trim($body['email'] ?? '');
+  $phoneNumber    = trim($body['phoneNumber'] ?? '');
+  $companyName    = trim($body['companyName'] ?? '');
+  $companyAddress = trim($body['companyAddress'] ?? '');
+  $password       = $body['password'] ?? '';
+
+  // every field is required (all NOT NULL in the schema)
+  if ($fullName === '' || $username === '' || $email === '' || $phoneNumber === ''
+      || $companyName === '' || $companyAddress === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields are required.']);
+  }
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
+  }
+  if (strlen($password) < 6) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must be at least 6 characters.']);
+  }
+
+  // friendly duplicate check (the UNIQUE keys also protect us)
+  $chk = $pdo->prepare('SELECT email, username FROM `user` WHERE email = :e OR username = :u');
+  $chk->execute(['e' => $email, 'u' => $username]);
+  foreach ($chk->fetchAll() as $row) {
+    if (strcasecmp($row['email'], $email) === 0) {
+      sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That email is already registered.']);
+    }
+    if (strcasecmp($row['username'], $username) === 0) {
+      sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That username is already taken.']);
+    }
+  }
+
+  // create user + supplier together (roll back if either fails)
+  $pdo->beginTransaction();
+  try {
+    $userId = nextId($pdo, 'user', 'userId', 'USR');
+    $hash   = password_hash($password, PASSWORD_BCRYPT);
+    $pdo->prepare(
+      'INSERT INTO `user` (userId, username, password, email, fullName, phoneNumber, role, status)
+       VALUES (:id, :un, :pw, :em, :fn, :ph, "Supplier", "Pending")'
+    )->execute([
+      'id' => $userId, 'un' => $username, 'pw' => $hash, 'em' => $email,
+      'fn' => $fullName, 'ph' => $phoneNumber,
+    ]);
+
+    $supplierId = nextId($pdo, 'supplier', 'supplierId', 'SUP');
+    $pdo->prepare(
+      'INSERT INTO supplier (supplierId, userId, companyName, companyAddress)
+       VALUES (:sid, :uid, :cn, :ca)'
+    )->execute([
+      'sid' => $supplierId, 'uid' => $userId, 'cn' => $companyName, 'ca' => $companyAddress,
+    ]);
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    sendJson(500, false, null, ['code' => 'SERVER', 'message' => 'Could not create the account. Please try again.']);
+  }
+
+  sendJson(201, true, ['message' => 'Registration submitted. Your account is pending admin approval.']);
+}
+
 // POST /auth/login  — verify email + password, return a JWT + basic profile.
 function handleLogin(PDO $pdo, string $secret): void {
   $body = getJsonBody();

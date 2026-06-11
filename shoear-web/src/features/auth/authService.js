@@ -12,16 +12,8 @@ export function logout() {
   localStorage.removeItem('user');
 }
 
-// TODO: wire to POST /auth/register once that backend endpoint exists.
-// Kept mocked for now so the Register page still works.
+// REAL supplier registration (POST /auth/register).
+// Creates a Pending account; resolves with a { message } on success.
 export function register(data) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (!data.email.includes('@')) {
-        reject(new Error('Please enter a valid email.'));
-      } else {
-        resolve({ message: 'Registration successful. Please log in.' });
-      }
-    }, 800);
-  });
+  return apiPost('/auth/register', data);
 }

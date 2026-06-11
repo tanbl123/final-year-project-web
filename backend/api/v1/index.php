@@ -36,6 +36,11 @@ if ($method === 'GET' && $path === '/db-test') {
   sendJson(200, true, ['productCount' => (int) $row['total']]);
 }
 
+if ($method === 'POST' && $path === '/auth/register') {
+  $pdo = getPDO();
+  handleRegister($pdo);
+}
+
 if ($method === 'POST' && $path === '/auth/login') {
   $pdo = getPDO();
   handleLogin($pdo, $secret);
