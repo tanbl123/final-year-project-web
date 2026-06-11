@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 function ProductCard(props) {
   return (
     <div className="card h-100 shadow-sm">
@@ -6,7 +8,9 @@ function ProductCard(props) {
         <h6 className="card-subtitle mb-2 text-muted">{props.brand}</h6>
         <p className="card-text fs-4 fw-bold text-primary">RM {props.price}</p>
 
-        <button className="btn btn-outline-primary btn-sm me-2">View</button>
+        <Link to={'/products/' + props.id} className="btn btn-outline-primary btn-sm me-2">
+          View
+        </Link>
 
         <button
           className="btn btn-outline-danger btn-sm"
