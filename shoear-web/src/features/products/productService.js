@@ -1,19 +1,19 @@
-const PRODUCTS = [
-  { id: 'PRD0001', name: 'Air Zoom Pegasus', brand: 'Nike',   price: 399 },
-  { id: 'PRD0002', name: 'UltraBoost 22',    brand: 'Adidas', price: 549 },
-  { id: 'PRD0003', name: 'Gel-Kayano',       brand: 'Asics',  price: 459 },
-];
+import { apiGet, apiPost, apiDelete, getToken } from '../../api/client';
+
+// All product data now comes from the real PHP API (with the JWT token).
 
 export function fetchProducts() {
-  return new Promise((resolve) => setTimeout(() => resolve(PRODUCTS), 1000));
+  return apiGet('/products', getToken());
 }
 
 export function fetchProductById(id) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const found = PRODUCTS.find((p) => p.id === id);
-      if (found) resolve(found);
-      else reject(new Error('Product not found.'));
-    }, 500);
-  });
+  return apiGet('/products/' + id, getToken());
+}
+
+export function createProduct(data) {
+  return apiPost('/products', data, getToken());
+}
+
+export function deleteProduct(id) {
+  return apiDelete('/products/' + id, getToken());
 }

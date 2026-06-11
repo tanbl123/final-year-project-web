@@ -128,6 +128,7 @@ CREATE TABLE product (
     supplierId          VARCHAR(10)   NOT NULL,
     categoryId          VARCHAR(10)   NOT NULL,
     productName         VARCHAR(150)  NOT NULL,
+    productBrand        VARCHAR(80)   NOT NULL,            -- e.g. Nike, Adidas (the shoe's brand, not the supplier)
     productDescription  TEXT          NULL,
     productPrice        DECIMAL(10,2) NOT NULL,
     -- NOTE: stock is NOT stored here. It is tracked PER SIZE in

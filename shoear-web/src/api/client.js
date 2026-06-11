@@ -4,6 +4,11 @@
 // ─────────────────────────────────────────────────────────────
 export const API_BASE = 'http://localhost/shoear/api/v1';
 
+// The saved JWT (set at login), used to authenticate protected requests.
+export function getToken() {
+  return localStorage.getItem('token');
+}
+
 // Low-level request: calls the API, unwraps the {success,data,error} envelope.
 async function request(path, options = {}) {
   const res = await fetch(API_BASE + path, options);
@@ -37,5 +42,13 @@ export function apiPost(path, body, token) {
       ...(token ? { Authorization: 'Bearer ' + token } : {}),
     },
     body: JSON.stringify(body),
+  });
+}
+
+// DELETE request (optionally with a token).
+export function apiDelete(path, token) {
+  return request(path, {
+    method: 'DELETE',
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
   });
 }

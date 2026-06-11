@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import ProductCard from '../components/ProductCard';
 import AddProductForm from '../components/AddProductForm';
 import ConfirmDialog from '../../../components/ConfirmDialog';
-import { fetchProducts } from '../productService';
+import { fetchProducts, createProduct, deleteProduct } from '../productService';
 
 function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [dialog, setDialog] = useState({
     isOpen: false, title: '', message: '',
@@ -17,16 +18,22 @@ function ProductsPage() {
     setDialog((d) => ({ ...d, isOpen: false }));
   }
 
+  // load this supplier's products from the API on first render
   useEffect(() => {
-    fetchProducts().then((data) => {
-      setProducts(data);
-      setIsLoading(false);
-    });
+    fetchProducts()
+      .then((data) => setProducts(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  function addProduct(newProductData) {
-    const newShoe = { id: 'PRD' + Date.now(), ...newProductData };
-    setProducts((prev) => [...prev, newShoe]);
+  // create on the server, then add the returned product to the list
+  async function addProduct(newProductData) {
+    try {
+      const created = await createProduct(newProductData);
+      setProducts((prev) => [created, ...prev]);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   function askDelete(id) {
@@ -36,8 +43,13 @@ function ProductsPage() {
       message: 'Are you sure you want to delete this product?',
       confirmText: 'Delete',
       confirmColor: 'danger',
-      onConfirm: () => {
-        setProducts((prev) => prev.filter((shoe) => shoe.id !== id));
+      onConfirm: async () => {
+        try {
+          await deleteProduct(id);                                   // remove on the server
+          setProducts((prev) => prev.filter((shoe) => shoe.id !== id)); // then in the UI
+        } catch (err) {
+          setError(err.message);
+        }
         closeDialog();
       },
     });
@@ -46,6 +58,8 @@ function ProductsPage() {
   return (
     <div className="container py-4">
       <h1 className="mb-4">👟 Supplier Products</h1>
+
+      {error && <div className="alert alert-danger">{error}</div>}
 
       <AddProductForm onAdd={addProduct} />
 

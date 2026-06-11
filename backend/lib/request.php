@@ -8,10 +8,17 @@ function getJsonBody(): array {
   return is_array($data) ? $data : [];
 }
 
-// Extract the token from an "Authorization: Bearer <token>" header, or null.
+// Extract the token from "Authorization: Bearer <token>", or null.
+// Apache can deliver this header in different places, so we check several.
 function getBearerToken(): ?string {
-  $headers = function_exists('getallheaders') ? getallheaders() : [];
-  $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+  $auth = '';
+  if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+    $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+  }
+  if (!$auth) {
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+  }
   if (preg_match('/Bearer\s+(.+)/i', $auth, $m)) {
     return trim($m[1]);
   }
