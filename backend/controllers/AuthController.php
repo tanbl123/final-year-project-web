@@ -5,7 +5,6 @@
 // awaiting admin approval). Creates a `user` row + a `supplier` row together.
 function handleRegister(PDO $pdo): void {
   $body           = getJsonBody();
-  $fullName       = trim($body['fullName'] ?? '');
   $username       = trim($body['username'] ?? '');
   $email          = trim($body['email'] ?? '');
   $phoneNumber    = trim($body['phoneNumber'] ?? '');
@@ -13,16 +12,19 @@ function handleRegister(PDO $pdo): void {
   $companyAddress = trim($body['companyAddress'] ?? '');
   $password       = $body['password'] ?? '';
 
+  // the supplier's display name IS their company name (no separate contact name)
+  $fullName = $companyName;
+
   // every field is required (all NOT NULL in the schema)
-  if ($fullName === '' || $username === '' || $email === '' || $phoneNumber === ''
+  if ($username === '' || $email === '' || $phoneNumber === ''
       || $companyName === '' || $companyAddress === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields are required.']);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
   }
-  if (strlen($password) < 6) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must be at least 6 characters.']);
+  if (strlen($password) < 8) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must be at least 8 characters.']);
   }
 
   // friendly duplicate check (the UNIQUE keys also protect us)

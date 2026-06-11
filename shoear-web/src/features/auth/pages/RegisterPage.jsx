@@ -4,8 +4,8 @@ import { register } from '../authService';
 
 function RegisterPage() {
   const [form, setForm] = useState({
-    fullName: '', username: '', email: '', phoneNumber: '',
-    companyName: '', companyAddress: '', password: '', confirm: '',
+    companyName: '', username: '', email: '', phoneNumber: '',
+    companyAddress: '', password: '', confirm: '',
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,14 +21,13 @@ function RegisterPage() {
     event.preventDefault();
     setError('');
 
-    if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
 
     setIsSubmitting(true);
     try {
       // send everything the backend needs (not the confirm field)
       await register({
-        fullName: form.fullName.trim(),
         username: form.username.trim(),
         email: form.email.trim(),
         phoneNumber: form.phoneNumber.trim(),
@@ -60,46 +59,39 @@ function RegisterPage() {
   }
 
   return (
-    <div className="container py-5" style={{ maxWidth: '520px' }}>
+    <div className="container py-5" style={{ maxWidth: '440px' }}>
       <h1 className="mb-4 text-center">👟 Supplier Registration</h1>
       <form onSubmit={handleSubmit} className="card card-body shadow-sm">
         {error && <div className="alert alert-danger py-2">{error}</div>}
 
         <div className="mb-3">
-          <label className="form-label">Full name</label>
-          <input name="fullName" className="form-control" value={form.fullName} onChange={handleChange} required />
+          <label className="form-label">Company name</label>
+          <input name="companyName" className="form-control" value={form.companyName} onChange={handleChange} required />
         </div>
-        <div className="row">
-          <div className="col-md-6 mb-3">
-            <label className="form-label">Username</label>
-            <input name="username" className="form-control" value={form.username} onChange={handleChange} required />
-          </div>
-          <div className="col-md-6 mb-3">
-            <label className="form-label">Phone number</label>
-            <input name="phoneNumber" className="form-control" value={form.phoneNumber} onChange={handleChange} required />
-          </div>
+        <div className="mb-3">
+          <label className="form-label">Username</label>
+          <input name="username" className="form-control" value={form.username} onChange={handleChange} required />
         </div>
         <div className="mb-3">
           <label className="form-label">Email</label>
           <input type="email" name="email" className="form-control" value={form.email} onChange={handleChange} required />
         </div>
         <div className="mb-3">
-          <label className="form-label">Company name</label>
-          <input name="companyName" className="form-control" value={form.companyName} onChange={handleChange} required />
+          <label className="form-label">Phone number</label>
+          <input name="phoneNumber" className="form-control" value={form.phoneNumber} onChange={handleChange} required />
         </div>
         <div className="mb-3">
           <label className="form-label">Company address</label>
           <input name="companyAddress" className="form-control" value={form.companyAddress} onChange={handleChange} required />
         </div>
-        <div className="row">
-          <div className="col-md-6 mb-3">
-            <label className="form-label">Password</label>
-            <input type="password" name="password" className="form-control" value={form.password} onChange={handleChange} required />
-          </div>
-          <div className="col-md-6 mb-3">
-            <label className="form-label">Confirm password</label>
-            <input type="password" name="confirm" className="form-control" value={form.confirm} onChange={handleChange} required />
-          </div>
+        <div className="mb-3">
+          <label className="form-label">Password</label>
+          <input type="password" name="password" className="form-control" value={form.password} onChange={handleChange} required />
+          <div className="form-text">At least 8 characters.</div>
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Confirm password</label>
+          <input type="password" name="confirm" className="form-control" value={form.confirm} onChange={handleChange} required />
         </div>
 
         <button type="submit" className="btn btn-primary w-100" disabled={isSubmitting}>
