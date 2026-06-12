@@ -1,23 +1,72 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import EyeIcon from '../../../components/EyeIcon';
+
+// Validate the login fields, returning a { field: message } object.
+function validateForm(form) {
+  const errors = {};
+  if (form.email.trim() === '') {
+    errors.email = 'Email is required.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = 'Please enter a valid email.';
+  }
+  if (form.password === '') errors.password = 'Password is required.';
+  return errors;
+}
 
 function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});       // per-field messages
+  const [formError, setFormError] = useState(''); // server/auth error (not field-specific)
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
-  const { login } = useAuth();  // get the login function from context
-  const navigate = useNavigate();   // lets us redirect in code
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  // update the changed field; re-check it live once it's already erroring
+  function handleChange(event) {
+    const { name, value } = event.target;
+    const nextForm = { ...form, [name]: value };
+    setForm(nextForm);
+    setFormError('');
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      const msg = validateForm(nextForm)[name];
+      if (msg) next[name] = msg;
+      else delete next[name];
+      return next;
+    });
+  }
+
+  // validate a single field when the user leaves it
+  function handleBlur(event) {
+    const { name } = event.target;
+    setErrors((prev) => {
+      const next = { ...prev };
+      const msg = validateForm(form)[name];
+      if (msg) next[name] = msg;
+      else delete next[name];
+      return next;
+    });
+  }
 
   async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setIsSubmitting(true);
+    event.preventDefault();   // AJAX submit — no page reload
+    setFormError('');
 
+    const found = validateForm(form);
+    if (Object.keys(found).length > 0) {
+      setErrors(found);
+      return;
+    }
+    setErrors({});
+
+    setIsSubmitting(true);
     try {
-      const result = await login(email.trim(), password);   // wait for the "server"
+      const result = await login(form.email.trim(), form.password);
 
       // save the token + user so we stay logged in
       localStorage.setItem('token', result.token);
@@ -25,9 +74,10 @@ function LoginPage() {
 
       navigate('/products');   // success → go to the products page
     } catch (err) {
-      setError(err.message);   // login failed → show the error
+      // auth failures aren't tied to one field — show a general message
+      setFormError(err.message || 'Could not log in. Please try again.');
     } finally {
-      setIsSubmitting(false);  // re-enable the button either way
+      setIsSubmitting(false);
     }
   }
 
@@ -35,30 +85,46 @@ function LoginPage() {
     <div className="container py-5" style={{ maxWidth: '420px' }}>
       <h1 className="mb-4 text-center">👟 Supplier Login</h1>
 
-      <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start">
-        {error && <div className="alert alert-danger py-2">{error}</div>}
-
+      <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
         <div className="mb-3">
           <label className="form-label">Email</label>
           <input
             type="email"
-            className="form-control"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
+            name="email"
+            className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+            value={form.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
           />
+          {errors.email && <div className="invalid-feedback">{errors.email}</div>}
         </div>
 
         <div className="mb-3">
           <label className="form-label">Password</label>
-          <input
-            type="password"
-            className="form-control"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="input-group has-validation">
+            <input
+              type={showPw ? 'text' : 'password'}
+              name="password"
+              className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+              value={form.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              style={{ backgroundImage: 'none' }}
+            />
+            <button
+              type="button"
+              className="btn btn-outline-secondary d-flex align-items-center"
+              onClick={() => setShowPw((v) => !v)}
+              tabIndex={-1}
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+            >
+              <EyeIcon off={showPw} />
+            </button>
+            {errors.password && <div className="invalid-feedback">{errors.password}</div>}
+          </div>
         </div>
+
+        {formError && <div className="text-danger small mb-3">{formError}</div>}
 
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting}>
           {isSubmitting ? 'Logging in...' : 'Login'}
