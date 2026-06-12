@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { homePathFor } from '../ProtectedRoute';
 import EyeIcon from '../../../components/EyeIcon';
 
 // Validate the login fields, returning a { field: message } object.
@@ -72,7 +73,7 @@ function LoginPage() {
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
 
-      navigate('/products');   // success → go to the products page
+      navigate(homePathFor(result.user));   // success → admin or supplier home
     } catch (err) {
       // auth failures aren't tied to one field — show a general message
       setFormError(err.message || 'Could not log in. Please try again.');

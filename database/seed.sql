@@ -20,7 +20,22 @@ INSERT INTO supplier (supplierId, userId, companyName, companyAddress)
 VALUES
   ('SUP0001', 'USR0001', 'Demo Shoe Co.', '12 Jalan Sukan, Kuala Lumpur');
 
--- 2) Categories for products
+-- 2) An admin account (status Active). Password is also "password123".
+--    Log in at the supplier portal with these credentials to reach the
+--    admin approvals dashboard.
+--      email:    admin@shoear.com
+--      password: password123
+INSERT INTO `user`
+  (userId, username, password, email, fullName, phoneNumber, role, status)
+VALUES
+  ('USR0002', 'admin',
+   '$2y$12$vmauRgZFXPo8McWGHLFdIOGkZiPPnRReu5ChzCouUQdVohlUAhghS',
+   'admin@shoear.com', 'Administrator', '0100000000', 'Admin', 'Active');
+
+INSERT INTO admin (adminId, userId)
+VALUES ('ADM0001', 'USR0002');
+
+-- 3) Categories for products
 INSERT INTO category (categoryId, categoryName)
 VALUES
   ('CAT0001', 'Running'),

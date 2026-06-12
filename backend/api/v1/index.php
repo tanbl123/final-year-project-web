@@ -6,6 +6,7 @@ require __DIR__ . '/../../lib/request.php';
 require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
 require __DIR__ . '/../../controllers/AuthController.php';
+require __DIR__ . '/../../controllers/AdminController.php';
 require __DIR__ . '/../../controllers/ProductController.php';
 require __DIR__ . '/../../controllers/CategoryController.php';
 
@@ -44,6 +45,28 @@ if ($method === 'POST' && $path === '/auth/register') {
 if ($method === 'POST' && $path === '/auth/login') {
   $pdo = getPDO();
   handleLogin($pdo, $secret);
+}
+
+// ── admin routes (require an Admin token) ──
+if ($method === 'GET' && $path === '/admin/suppliers/pending') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListPendingSuppliers($pdo);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/approve$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleApproveSupplier($pdo, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/reject$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleRejectSupplier($pdo, $m[1]);
 }
 
 // ── category routes (require a valid token) ──

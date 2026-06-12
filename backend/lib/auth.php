@@ -14,6 +14,13 @@ function requireAuth(string $secret): array {
   return $payload;   // ['userId' => ..., 'role' => ..., 'exp' => ...]
 }
 
+// Ensure the caller is an Admin (or 403).
+function requireAdmin(array $auth): void {
+  if (($auth['role'] ?? '') !== 'Admin') {
+    sendJson(403, false, null, ['code' => 'FORBIDDEN', 'message' => 'Admin access only.']);
+  }
+}
+
 // Ensure the caller is a Supplier and return their supplierId (or 403).
 function requireSupplierId(PDO $pdo, array $auth): string {
   if (($auth['role'] ?? '') !== 'Supplier') {

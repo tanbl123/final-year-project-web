@@ -1,15 +1,18 @@
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './features/auth/AuthContext';
 import ProductsPage from './features/products/pages/ProductsPage';
 import ReportsPage from './features/reports/pages/ReportsPage';
 import LoginPage from './features/auth/pages/LoginPage';
-import ProtectedRoute from './features/auth/ProtectedRoute';
+import ProtectedRoute, { homePathFor } from './features/auth/ProtectedRoute';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import ProductDetailPage from './features/products/pages/ProductDetailPage';
+import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 
 function App() {
   const { user, logout } = useAuth();   // 👈 tune in to the auth broadcast
   const navigate = useNavigate();
+
+  const isAdmin = user?.role === 'Admin';
 
   function handleLogout() {
     logout();
@@ -19,11 +22,18 @@ function App() {
   return (
     <>
       <nav className="navbar navbar-expand navbar-dark bg-dark px-4">
-        <span className="navbar-brand">👟 ShoeAR Supplier</span>
+        <span className="navbar-brand">👟 ShoeAR {isAdmin ? 'Admin' : 'Supplier'}</span>
 
+        {/* admins manage approvals; suppliers manage their catalogue */}
         <div className="navbar-nav me-auto">
-          <Link className="nav-link" to="/products">Products</Link>
-          <Link className="nav-link" to="/reports">Reports</Link>
+          {isAdmin ? (
+            <Link className="nav-link" to="/admin">Approvals</Link>
+          ) : (
+            <>
+              <Link className="nav-link" to="/products">Products</Link>
+              <Link className="nav-link" to="/reports">Reports</Link>
+            </>
+          )}
         </div>
 
         {/* show different things depending on login status */}
@@ -44,18 +54,26 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        
+
+        {/* "/" sends each user to their own home */}
         <Route path="/" element={
-          <ProtectedRoute><ProductsPage /></ProtectedRoute>
+          <ProtectedRoute><Navigate to={homePathFor(user)} replace /></ProtectedRoute>
         } />
+
+        {/* admin */}
+        <Route path="/admin" element={
+          <ProtectedRoute role="Admin"><AdminDashboardPage /></ProtectedRoute>
+        } />
+
+        {/* supplier */}
         <Route path="/products" element={
-          <ProtectedRoute><ProductsPage /></ProtectedRoute>
+          <ProtectedRoute role="Supplier"><ProductsPage /></ProtectedRoute>
         } />
         <Route path="/products/:id" element={
-          <ProtectedRoute><ProductDetailPage /></ProtectedRoute>
+          <ProtectedRoute role="Supplier"><ProductDetailPage /></ProtectedRoute>
         } />
         <Route path="/reports" element={
-          <ProtectedRoute><ReportsPage /></ProtectedRoute>
+          <ProtectedRoute role="Supplier"><ReportsPage /></ProtectedRoute>
         } />
       </Routes>
     </>
