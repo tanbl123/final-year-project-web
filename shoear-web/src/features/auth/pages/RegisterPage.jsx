@@ -13,28 +13,73 @@ function validatePassword(pw) {
   return '';
 }
 
+// Validate the whole form, returning a { field: message } object.
+// An empty object means everything passed.
+function validateForm(form) {
+  const errors = {};
+
+  if (form.companyName.trim() === '') errors.companyName = 'Company name is required.';
+  if (form.username.trim() === '') errors.username = 'Username is required.';
+
+  if (form.email.trim() === '') {
+    errors.email = 'Email is required.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = 'Please enter a valid email.';
+  }
+
+  // E.164: optional leading +, country code, up to 15 digits total
+  if (form.phoneNumber.trim() === '') {
+    errors.phoneNumber = 'Phone number is required.';
+  } else if (!/^\+?[1-9]\d{7,14}$/.test(form.phoneNumber.trim())) {
+    errors.phoneNumber = 'Enter a valid phone number in international format, e.g. +60123456789.';
+  }
+
+  if (form.companyAddress.trim() === '') errors.companyAddress = 'Company address is required.';
+
+  const pwError = validatePassword(form.password);
+  if (pwError) errors.password = pwError;
+
+  if (form.confirm === '') {
+    errors.confirm = 'Please confirm your password.';
+  } else if (form.password !== form.confirm) {
+    errors.confirm = 'Passwords do not match.';
+  }
+
+  return errors;
+}
+
 function RegisterPage() {
   const [form, setForm] = useState({
     companyName: '', username: '', email: '', phoneNumber: '',
     companyAddress: '', password: '', confirm: '',
   });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});       // per-field messages
+  const [formError, setFormError] = useState(''); // general/server fallback
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [done, setDone] = useState(false);   // show the "pending approval" screen
+  const [done, setDone] = useState(false);        // show the "pending approval" screen
 
-  // one handler updates whichever field changed (by its name)
+  // update the changed field and clear its error as the user fixes it
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   }
 
   async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
+    event.preventDefault();   // AJAX submit — no page reload
+    setFormError('');
 
-    const pwError = validatePassword(form.password);
-    if (pwError) { setError(pwError); return; }
-    if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
+    const found = validateForm(form);
+    if (Object.keys(found).length > 0) {
+      setErrors(found);
+      return;
+    }
+    setErrors({});
 
     setIsSubmitting(true);
     try {
@@ -49,7 +94,11 @@ function RegisterPage() {
       });
       setDone(true);   // success → show pending-approval message
     } catch (err) {
-      setError(err.message);
+      // map known duplicate errors back onto the offending field
+      const msg = err.message || 'Something went wrong. Please try again.';
+      if (/email/i.test(msg)) setErrors({ email: msg });
+      else if (/username/i.test(msg)) setErrors({ username: msg });
+      else setFormError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -70,40 +119,36 @@ function RegisterPage() {
     );
   }
 
+  // small helper so every field renders the same way (input + inline error)
+  function field(name, label, type = 'text') {
+    return (
+      <div className="mb-3">
+        <label className="form-label">{label}</label>
+        <input
+          type={type}
+          name={name}
+          className={`form-control ${errors[name] ? 'is-invalid' : ''}`}
+          value={form[name]}
+          onChange={handleChange}
+        />
+        {errors[name] && <div className="invalid-feedback">{errors[name]}</div>}
+      </div>
+    );
+  }
+
   return (
     <div className="container py-5" style={{ maxWidth: '440px' }}>
       <h1 className="mb-4 text-center">👟 Supplier Registration</h1>
-      <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start">
-        {error && <div className="alert alert-danger py-2">{error}</div>}
+      <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
+        {formError && <div className="alert alert-danger py-2">{formError}</div>}
 
-        <div className="mb-3">
-          <label className="form-label">Company name</label>
-          <input name="companyName" className="form-control" value={form.companyName} onChange={handleChange} required />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Username</label>
-          <input name="username" className="form-control" value={form.username} onChange={handleChange} required />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Email</label>
-          <input type="email" name="email" className="form-control" value={form.email} onChange={handleChange} required />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Phone number</label>
-          <input name="phoneNumber" className="form-control" value={form.phoneNumber} onChange={handleChange} required />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Company address</label>
-          <input name="companyAddress" className="form-control" value={form.companyAddress} onChange={handleChange} required />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Password</label>
-          <input type="password" name="password" className="form-control" value={form.password} onChange={handleChange} required />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Confirm password</label>
-          <input type="password" name="confirm" className="form-control" value={form.confirm} onChange={handleChange} required />
-        </div>
+        {field('companyName', 'Company name')}
+        {field('username', 'Username')}
+        {field('email', 'Email', 'email')}
+        {field('phoneNumber', 'Phone number', 'tel')}
+        {field('companyAddress', 'Company address')}
+        {field('password', 'Password', 'password')}
+        {field('confirm', 'Confirm password', 'password')}
 
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting}>
           {isSubmitting ? 'Registering...' : 'Register'}

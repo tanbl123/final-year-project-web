@@ -23,6 +23,10 @@ function handleRegister(PDO $pdo): void {
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
   }
+  // E.164: optional leading +, country code, up to 15 digits total
+  if (!preg_match('/^\+?[1-9]\d{7,14}$/', $phoneNumber)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid phone number in international format, e.g. +60123456789.']);
+  }
   // password policy: 8+ chars with lower, upper, digit and special char
   if (strlen($password) < 8) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must be at least 8 characters.']);
