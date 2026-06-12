@@ -65,6 +65,11 @@ function RegisterPage() {
   const [formError, setFormError] = useState(''); // general/server fallback
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);        // show the "pending approval" screen
+  const [shown, setShown] = useState({ password: false, confirm: false }); // show/hide toggles
+
+  function toggleShown(name) {
+    setShown((prev) => ({ ...prev, [name]: !prev[name] }));
+  }
 
   // update the changed field; if it (or the linked confirm field) is already
   // showing an error, re-check it live so the message updates as you fix it
@@ -159,6 +164,39 @@ function RegisterPage() {
     );
   }
 
+  // password fields get our own Show/Hide toggle (the browser's native reveal
+  // icon is inconsistent and clashes with the validation icon). has-validation
+  // lets Bootstrap show the inline error correctly inside an input-group.
+  function passwordField(name, label) {
+    const isShown = shown[name];
+    return (
+      <div className="mb-3">
+        <label className="form-label">{label}</label>
+        <div className="input-group has-validation">
+          <input
+            type={isShown ? 'text' : 'password'}
+            name={name}
+            className={`form-control ${errors[name] ? 'is-invalid' : ''}`}
+            value={form[name]}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            style={{ backgroundImage: 'none' }}
+          />
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => toggleShown(name)}
+            tabIndex={-1}
+            aria-label={isShown ? 'Hide password' : 'Show password'}
+          >
+            {isShown ? 'Hide' : 'Show'}
+          </button>
+          {errors[name] && <div className="invalid-feedback">{errors[name]}</div>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container py-5" style={{ maxWidth: '440px' }}>
       <h1 className="mb-4 text-center">👟 Supplier Registration</h1>
@@ -170,8 +208,8 @@ function RegisterPage() {
         {field('email', 'Email', 'email')}
         {field('phoneNumber', 'Phone number', 'tel')}
         {field('companyAddress', 'Company address')}
-        {field('password', 'Password', 'password')}
-        {field('confirm', 'Confirm password', 'password')}
+        {passwordField('password', 'Password')}
+        {passwordField('confirm', 'Confirm password')}
 
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting}>
           {isSubmitting ? 'Registering...' : 'Register'}
