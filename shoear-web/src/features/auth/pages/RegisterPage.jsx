@@ -2,6 +2,17 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { register } from '../authService';
 
+// Password policy: 8+ chars with at least one lowercase, uppercase, digit
+// and special character. Returns an error string, or '' when it's valid.
+function validatePassword(pw) {
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[a-z]/.test(pw)) return 'Password must include a lowercase letter.';
+  if (!/[A-Z]/.test(pw)) return 'Password must include an uppercase letter.';
+  if (!/[0-9]/.test(pw)) return 'Password must include a number.';
+  if (!/[^a-zA-Z0-9]/.test(pw)) return 'Password must include a special character.';
+  return '';
+}
+
 function RegisterPage() {
   const [form, setForm] = useState({
     companyName: '', username: '', email: '', phoneNumber: '',
@@ -21,7 +32,8 @@ function RegisterPage() {
     event.preventDefault();
     setError('');
 
-    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    const pwError = validatePassword(form.password);
+    if (pwError) { setError(pwError); return; }
     if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
 
     setIsSubmitting(true);
@@ -85,8 +97,7 @@ function RegisterPage() {
           <input name="companyAddress" className="form-control" value={form.companyAddress} onChange={handleChange} required />
         </div>
         <div className="mb-3">
-          <label className="form-label mb-1">Password</label>
-          <div className="form-text mt-0 mb-1">At least 8 characters.</div>
+          <label className="form-label">Password</label>
           <input type="password" name="password" className="form-control" value={form.password} onChange={handleChange} required />
         </div>
         <div className="mb-3">

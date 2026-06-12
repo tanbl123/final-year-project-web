@@ -23,8 +23,21 @@ function handleRegister(PDO $pdo): void {
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
   }
+  // password policy: 8+ chars with lower, upper, digit and special char
   if (strlen($password) < 8) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must be at least 8 characters.']);
+  }
+  if (!preg_match('/[a-z]/', $password)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include a lowercase letter.']);
+  }
+  if (!preg_match('/[A-Z]/', $password)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include an uppercase letter.']);
+  }
+  if (!preg_match('/[0-9]/', $password)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include a number.']);
+  }
+  if (!preg_match('/[^a-zA-Z0-9]/', $password)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include a special character.']);
   }
 
   // friendly duplicate check (the UNIQUE keys also protect us)
