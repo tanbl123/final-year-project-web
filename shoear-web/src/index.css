@@ -66,6 +66,13 @@ body {
   box-sizing: border-box;
 }
 
+/* hide the browser's native password reveal/clear icons (Edge/IE) —
+   we provide our own Show/Hide toggle instead */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 h1,
 h2 {
   font-family: var(--heading);
