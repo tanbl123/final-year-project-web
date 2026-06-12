@@ -16,14 +16,30 @@ function validateForm(form) {
   return errors;
 }
 
-function LoginPage() {
+// Per-variant config so one component serves both the supplier and admin
+// login pages (same form, different branding + which role may sign in here).
+const VARIANTS = {
+  supplier: {
+    title: '👟 Supplier Login',
+    allowedRole: 'Supplier',
+    wrongRole: 'This is the supplier login. Please use the admin login page.',
+  },
+  admin: {
+    title: '🛡️ Admin Login',
+    allowedRole: 'Admin',
+    wrongRole: 'This is the admin login. Please use the supplier login page.',
+  },
+};
+
+function LoginPage({ variant = 'supplier' }) {
+  const config = VARIANTS[variant];
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});       // per-field messages
   const [formError, setFormError] = useState(''); // server/auth error (not field-specific)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
 
   // update the changed field; re-check it live once it's already erroring
@@ -69,9 +85,12 @@ function LoginPage() {
     try {
       const result = await login(form.email.trim(), form.password);
 
-      // save the token + user so we stay logged in
-      localStorage.setItem('token', result.token);
-      localStorage.setItem('user', JSON.stringify(result.user));
+      // each login page only accepts its own role — bounce the wrong one
+      if (result.user.role !== config.allowedRole) {
+        logout();   // undo the session login() just established
+        setFormError(config.wrongRole);
+        return;
+      }
 
       navigate(homePathFor(result.user));   // success → admin or supplier home
     } catch (err) {
@@ -84,7 +103,7 @@ function LoginPage() {
 
   return (
     <div className="container py-5" style={{ maxWidth: '420px' }}>
-      <h1 className="mb-4 text-center">👟 Supplier Login</h1>
+      <h1 className="mb-4 text-center">{config.title}</h1>
 
       <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
         <div className="mb-3">
@@ -132,7 +151,11 @@ function LoginPage() {
         </button>
       </form>
       <p className="text-center mt-3">
-        New supplier? <Link to="/register">Create an account</Link>
+        {variant === 'admin' ? (
+          <Link to="/login">Supplier login</Link>
+        ) : (
+          <>New supplier? <Link to="/register">Create an account</Link></>
+        )}
       </p>
     </div>
   );

@@ -52,7 +52,8 @@ function App() {
       </nav>
 
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage variant="supplier" />} />
+        <Route path="/admin/login" element={<LoginPage variant="admin" />} />
         <Route path="/register" element={<RegisterPage />} />
 
         {/* "/" sends each user to their own home */}

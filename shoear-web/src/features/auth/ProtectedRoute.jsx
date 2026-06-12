@@ -9,9 +9,9 @@ export function homePathFor(user) {
 function ProtectedRoute({ children, role }) {
   const { user } = useAuth();
 
-  // not logged in? bounce to login.
+  // not logged in? bounce to the matching login page.
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={role === 'Admin' ? '/admin/login' : '/login'} replace />;
   }
 
   // logged in but wrong role? send them to their own home.
