@@ -126,7 +126,7 @@ function AdminCategoriesPage() {
               <tr>
                 <th>Category</th>
                 <th className="text-center">Products</th>
-                <th className="text-end">Actions</th>
+                <th className="text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -147,7 +147,7 @@ function AdminCategoriesPage() {
                   <td className="text-center">
                     <span className="badge text-bg-light">{cat.productCount}</span>
                   </td>
-                  <td className="text-end text-nowrap">
+                  <td className="text-center text-nowrap">
                     {editingId === cat.id ? (
                       <>
                         <button className="btn btn-success btn-sm me-2"
