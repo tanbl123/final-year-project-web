@@ -4,6 +4,9 @@ import { fetchCategories, uploadFile } from '../productService';
 // A blank size row. Suppliers add one row per size they sell.
 const emptyVariant = () => ({ size: '', stock: '' });
 
+// Letters, numbers, spaces and a little punctuation — blocks junk like "??".
+const NAME_RE = /^[\p{L}\p{N} .,&'\/+-]+$/u;
+
 function ProductForm({ onAdd, onCancel }) {
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
@@ -19,13 +22,90 @@ function ProductForm({ onAdd, onCancel }) {
   const [categories, setCategories] = useState([]);
   const [uploading, setUploading] = useState(false);  // an upload is in flight
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState('');             // server / upload errors
+
+  // Per-field validation state. `touched` decides when an error is shown
+  // (after the field is blurred, or once submit is attempted).
+  const [touched, setTouched] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [variantTouched, setVariantTouched] = useState({});
 
   useEffect(() => {
     fetchCategories()
       .then((data) => setCategories(data))
       .catch((err) => setError(err.message));
   }, []);
+
+  // ── field validators ─────────────────────────────────────────────
+  // Returns an error string ('' when valid). `over` lets callers validate a
+  // not-yet-committed value (so onChange can re-check the field live).
+  function validateField(field, over = {}) {
+    const v = { name, brand, price, categoryId, ...over };
+    switch (field) {
+      case 'name': {
+        const s = v.name.trim();
+        if (!s) return 'Shoe name is required.';
+        if (s.length > 150) return 'Keep it under 150 characters.';
+        if (!NAME_RE.test(s)) return 'Use letters, numbers and basic punctuation only.';
+        return '';
+      }
+      case 'brand': {
+        const s = v.brand.trim();
+        if (!s) return 'Brand is required.';
+        if (s.length > 80) return 'Keep it under 80 characters.';
+        if (!NAME_RE.test(s)) return 'Use letters, numbers and basic punctuation only.';
+        return '';
+      }
+      case 'price': {
+        if (v.price === '' || v.price === null) return 'Price is required.';
+        const n = Number(v.price);
+        if (Number.isNaN(n)) return 'Price must be a number.';
+        if (n <= 0) return 'Price must be greater than 0.';
+        if (n > 100000) return 'Price looks too high — please check.';
+        return '';
+      }
+      case 'categoryId':
+        return v.categoryId ? '' : 'Please choose a category.';
+      default:
+        return '';
+    }
+  }
+
+  // Validate one size row. Returns { size?, stock? } error messages.
+  function validateVariant(index, list = variants) {
+    const row = list[index];
+    const size = row.size.trim();
+    const stock = row.stock;
+    if (size === '' && stock === '') return {};        // a blank row is fine (ignored)
+
+    const errs = {};
+    if (size === '') {
+      errs.size = 'Enter a size.';
+    } else if (list.some((o, j) =>
+      j !== index && o.size.trim().toLowerCase() === size.toLowerCase())) {
+      errs.size = 'Duplicate size.';
+    }
+    if (stock === '') {
+      errs.stock = 'Enter stock.';
+    } else {
+      const n = Number(stock);
+      if (Number.isNaN(n) || n < 0 || !Number.isInteger(n)) errs.stock = 'Whole number, 0 or more.';
+    }
+    return errs;
+  }
+
+  // onChange that also re-validates the field once it has been touched.
+  function changeField(field, setter, value) {
+    setter(value);
+    if (touched[field]) {
+      setFieldErrors((e) => ({ ...e, [field]: validateField(field, { [field]: value }) }));
+    }
+  }
+  function blurField(field) {
+    setTouched((t) => ({ ...t, [field]: true }));
+    setFieldErrors((e) => ({ ...e, [field]: validateField(field) }));
+  }
+  const showError = (field) => (touched[field] && fieldErrors[field]) || '';
 
   // ── sizes ────────────────────────────────────────────────────────
   function updateVariant(index, field, value) {
@@ -36,6 +116,13 @@ function ProductForm({ onAdd, onCancel }) {
   }
   function removeVariantRow(index) {
     setVariants((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  }
+  function blurVariant(index, field) {
+    setVariantTouched((t) => ({ ...t, [`${index}-${field}`]: true }));
+  }
+  function variantError(index, field) {
+    if (!variantTouched[`${index}-${field}`]) return '';
+    return validateVariant(index)[field] || '';
   }
 
   // ── image uploads ────────────────────────────────────────────────
@@ -89,51 +176,50 @@ function ProductForm({ onAdd, onCancel }) {
   function resetForm() {
     setName(''); setBrand(''); setPrice(''); setCategoryId('');
     setDescription(''); setVariants([emptyVariant()]); setImages([]);
-    setModelUrl(''); setModelName(''); setTryOn(false); setError('');
+    setModelUrl(''); setModelName(''); setTryOn(false);
+    setError(''); setTouched({}); setFieldErrors({}); setVariantTouched({});
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    setError('');
 
-    const cleanName = name.trim();
-    const cleanBrand = brand.trim();
-    const priceNumber = Number(price);
+    // validate the base fields and mark them all touched
+    const base = ['name', 'brand', 'price', 'categoryId'];
+    const baseErrors = {};
+    base.forEach((f) => { baseErrors[f] = validateField(f); });
+    setFieldErrors((e) => ({ ...e, ...baseErrors }));
+    setTouched((t) => ({ ...t, name: true, brand: true, price: true, categoryId: true }));
+    const hasBaseError = base.some((f) => baseErrors[f]);
 
-    if (cleanName === '' || cleanBrand === '') {
-      setError('Name and brand cannot be empty.'); return;
-    }
-    if (cleanName.length > 150) { setError('Shoe name is too long (max 150 characters).'); return; }
-    if (cleanBrand.length > 80) { setError('Brand is too long (max 80 characters).'); return; }
-    if (Number.isNaN(priceNumber) || priceNumber <= 0) {
-      setError('Price must be a number greater than 0.'); return;
-    }
-    if (priceNumber > 100000) { setError('Price seems too high. Please check.'); return; }
-    if (categoryId === '') { setError('Please choose a category.'); return; }
-
-    // keep only fully-filled size rows; validate the ones in progress
+    // validate size rows; collect the non-blank, valid ones
     const cleanVariants = [];
-    const seen = new Set();
-    for (const v of variants) {
-      const size = v.size.trim();
-      if (size === '' && v.stock === '') continue;       // ignore a fully-blank row
-      if (size === '') { setError('Every size row needs a size (or clear the row).'); return; }
-      if (seen.has(size.toLowerCase())) { setError(`Duplicate size: ${size}.`); return; }
-      const stockNum = Number(v.stock);
-      if (v.stock === '' || Number.isNaN(stockNum) || stockNum < 0 || !Number.isInteger(stockNum)) {
-        setError(`Stock for size ${size} must be a whole number (0 or more).`); return;
-      }
-      seen.add(size.toLowerCase());
-      cleanVariants.push({ size, stock: stockNum });
+    let hasSizeError = false;
+    variants.forEach((row, i) => {
+      const size = row.size.trim();
+      if (size === '' && row.stock === '') return;     // ignore a fully-blank row
+      const errs = validateVariant(i);
+      if (Object.keys(errs).length > 0) { hasSizeError = true; return; }
+      cleanVariants.push({ size, stock: Number(row.stock) });
+    });
+    if (hasSizeError) {
+      const allTouched = {};
+      variants.forEach((_, i) => { allTouched[`${i}-size`] = true; allTouched[`${i}-stock`] = true; });
+      setVariantTouched((t) => ({ ...t, ...allTouched }));
     }
 
+    if (hasBaseError || hasSizeError) {
+      setError('Please fix the highlighted fields before saving.');
+      return;
+    }
     if (uploading) { setError('Please wait for uploads to finish.'); return; }
 
     setSubmitting(true);
     try {
       await onAdd({
-        name: cleanName,
-        brand: cleanBrand,
-        price: Math.round(priceNumber * 100) / 100,
+        name: name.trim(),
+        brand: brand.trim(),
+        price: Math.round(Number(price) * 100) / 100,
         categoryId,
         description: description.trim(),
         virtualTryOnEnable: tryOn,
@@ -142,7 +228,7 @@ function ProductForm({ onAdd, onCancel }) {
         modelUrl,
       });
       resetForm();
-      if (onCancel) onCancel();          // close the panel after a successful add
+      if (onCancel) onCancel();          // leave the form after a successful add
     } catch (err) {
       setError(err.message);
     } finally {
@@ -151,7 +237,7 @@ function ProductForm({ onAdd, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card card-body mb-4 bg-light">
+    <form onSubmit={handleSubmit} className="card card-body mb-4 bg-light" noValidate>
       <h5 className="mb-3">New product</h5>
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
@@ -160,28 +246,40 @@ function ProductForm({ onAdd, onCancel }) {
       <div className="row g-3">
         <div className="col-md-6">
           <label className="form-label">Shoe name</label>
-          <input type="text" maxLength="150" className="form-control" placeholder="e.g. Air Zoom Pegasus 40"
-            value={name} onChange={(e) => setName(e.target.value)} required />
+          <input type="text" maxLength="150" placeholder="e.g. Air Zoom Pegasus 40"
+            className={'form-control' + (showError('name') ? ' is-invalid' : '')}
+            value={name} onChange={(e) => changeField('name', setName, e.target.value)}
+            onBlur={() => blurField('name')} />
+          {showError('name') && <div className="invalid-feedback">{fieldErrors.name}</div>}
         </div>
         <div className="col-md-3">
           <label className="form-label">Brand</label>
-          <input type="text" maxLength="80" className="form-control" placeholder="e.g. Nike"
-            value={brand} onChange={(e) => setBrand(e.target.value)} required />
+          <input type="text" maxLength="80" placeholder="e.g. Nike"
+            className={'form-control' + (showError('brand') ? ' is-invalid' : '')}
+            value={brand} onChange={(e) => changeField('brand', setBrand, e.target.value)}
+            onBlur={() => blurField('brand')} />
+          {showError('brand') && <div className="invalid-feedback">{fieldErrors.brand}</div>}
         </div>
         <div className="col-md-3">
           <label className="form-label">Price (RM)</label>
-          <input type="number" min="0.01" max="100000" step="0.01" className="form-control"
-            placeholder="0.00" value={price} onChange={(e) => setPrice(e.target.value)} required />
+          <input type="number" min="0.01" max="100000" step="0.01" placeholder="0.00"
+            className={'form-control' + (showError('price') ? ' is-invalid' : '')}
+            value={price} onChange={(e) => changeField('price', setPrice, e.target.value)}
+            onBlur={() => blurField('price')} />
+          {showError('price') && <div className="invalid-feedback">{fieldErrors.price}</div>}
         </div>
         <div className="col-md-6">
           <label className="form-label">Category</label>
-          <select className="form-select" value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)} required>
+          <select value={categoryId}
+            className={'form-select' + (showError('categoryId') ? ' is-invalid' : '')}
+            onChange={(e) => changeField('categoryId', setCategoryId, e.target.value)}
+            onBlur={() => blurField('categoryId')}>
             <option value="">Choose category…</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
+          {showError('categoryId') && <div className="invalid-feedback">{fieldErrors.categoryId}</div>}
         </div>
         <div className="col-12">
           <label className="form-label">Description</label>
@@ -202,14 +300,20 @@ function ProductForm({ onAdd, onCancel }) {
       </div>
       <p className="text-muted small">Stock is tracked per size. Add a row for each size you sell.</p>
       {variants.map((v, i) => (
-        <div className="row g-2 mb-2 align-items-center" key={i}>
+        <div className="row g-2 mb-2 align-items-start" key={i}>
           <div className="col-5 col-md-3">
-            <input type="text" className="form-control" placeholder="Size (e.g. UK8)"
-              value={v.size} onChange={(e) => updateVariant(i, 'size', e.target.value)} />
+            <input type="text" placeholder="Size (e.g. UK8)"
+              className={'form-control' + (variantError(i, 'size') ? ' is-invalid' : '')}
+              value={v.size} onChange={(e) => updateVariant(i, 'size', e.target.value)}
+              onBlur={() => blurVariant(i, 'size')} />
+            {variantError(i, 'size') && <div className="invalid-feedback">{variantError(i, 'size')}</div>}
           </div>
           <div className="col-5 col-md-3">
-            <input type="number" min="0" step="1" className="form-control" placeholder="Stock qty"
-              value={v.stock} onChange={(e) => updateVariant(i, 'stock', e.target.value)} />
+            <input type="number" min="0" step="1" placeholder="Stock qty"
+              className={'form-control' + (variantError(i, 'stock') ? ' is-invalid' : '')}
+              value={v.stock} onChange={(e) => updateVariant(i, 'stock', e.target.value)}
+              onBlur={() => blurVariant(i, 'stock')} />
+            {variantError(i, 'stock') && <div className="invalid-feedback">{variantError(i, 'stock')}</div>}
           </div>
           <div className="col-2 col-md-1">
             <button type="button" className="btn btn-outline-danger btn-sm w-100"
