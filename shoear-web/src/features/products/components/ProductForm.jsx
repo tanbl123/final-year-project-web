@@ -29,6 +29,7 @@ function ProductForm({ onAdd, onCancel }) {
   const [touched, setTouched] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const [variantTouched, setVariantTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     fetchCategories()
@@ -178,11 +179,24 @@ function ProductForm({ onAdd, onCancel }) {
     setDescription(''); setVariants([emptyVariant()]); setImages([]);
     setModelUrl(''); setModelName(''); setTryOn(false);
     setError(''); setTouched({}); setFieldErrors({}); setVariantTouched({});
+    setSubmitAttempted(false);
   }
+
+  // section-level requirements, shown only after a save attempt (and they
+  // clear live once the supplier adds a valid size / an image)
+  const hasValidVariant = variants.some((row, i) => {
+    if (row.size.trim() === '' && row.stock === '') return false;
+    return Object.keys(validateVariant(i)).length === 0;
+  });
+  const sizesError = submitAttempted && !hasValidVariant
+    ? 'Add at least one size with its stock quantity.' : '';
+  const imagesError = submitAttempted && images.length === 0
+    ? 'Upload at least one product image.' : '';
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+    setSubmitAttempted(true);
 
     // validate the base fields and mark them all touched
     const base = ['name', 'brand', 'price', 'categoryId'];
@@ -208,8 +222,12 @@ function ProductForm({ onAdd, onCancel }) {
       setVariantTouched((t) => ({ ...t, ...allTouched }));
     }
 
+    // sizes and at least one image are required
+    const noSizes = cleanVariants.length === 0;
+    const noImages = images.length === 0;
+
     // inline field errors already explain what to fix — no summary banner
-    if (hasBaseError || hasSizeError) {
+    if (hasBaseError || hasSizeError || noSizes || noImages) {
       return;
     }
     if (uploading) { setError('Please wait for uploads to finish.'); return; }
@@ -323,14 +341,17 @@ function ProductForm({ onAdd, onCancel }) {
           </div>
         </div>
       ))}
+      {sizesError && <div className="text-danger small mt-1">{sizesError}</div>}
 
       <hr className="my-4" />
 
       {/* images */}
       <label className="form-label fw-semibold">Product images</label>
       <p className="text-muted small">JPG, PNG or WebP, up to 5&nbsp;MB each.</p>
-      <input type="file" className="form-control" accept="image/png,image/jpeg,image/webp"
-        multiple onChange={handleImageFiles} disabled={uploading} />
+      <input type="file" multiple accept="image/png,image/jpeg,image/webp"
+        className={'form-control' + (imagesError ? ' is-invalid' : '')}
+        onChange={handleImageFiles} disabled={uploading} />
+      {imagesError && <div className="invalid-feedback">{imagesError}</div>}
       {images.length > 0 && (
         <div className="d-flex flex-wrap gap-2 mt-3">
           {images.map((img) => (
