@@ -113,11 +113,13 @@ For `"role": "Supplier"` send `companyName` + `companyAddress` instead; for
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET   | `/admin/users` | Admin | List/filter users (`?role=Supplier&status=Pending`). |
-| GET   | `/admin/users/{userId}` | Admin | One user's full detail. |
-| PATCH | `/admin/users/{userId}/status` | Admin | Approve / reject / suspend. Body: `{ "status": "Active" }`. |
+| GET   | `/admin/users` | Admin | **(Implemented)** List/filter users (`?role=Supplier&status=Pending&search=...`). |
+| GET   | `/admin/users/{userId}` | Admin | **(Implemented)** One user's full detail, incl. role-specific `profile`. |
+| PATCH | `/admin/users/{userId}/status` | Admin | **(Implemented)** Approve / reject / suspend / reactivate / delete. Body: `{ "status": "Active" }`. |
 
-This is how a `Pending` supplier or delivery person becomes `Active`.
+This is how a `Pending` supplier or delivery person becomes `Active`. Guards:
+an admin cannot change **their own** account, and **Admin** accounts cannot be
+modified through this endpoint.
 
 ---
 

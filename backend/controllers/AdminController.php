@@ -90,3 +90,92 @@ function handleApproveProduct(PDO $pdo, string $productId): void {
 function handleRejectProduct(PDO $pdo, string $productId): void {
   setProductStatus($pdo, $productId, 'Rejected');
 }
+
+// ── User management ──────────────────────────────────────────────────
+
+// GET /admin/users — list/filter all users (?role=, ?status=, ?search=).
+function handleListUsers(PDO $pdo): void {
+  $role   = $_GET['role']   ?? '';
+  $status = $_GET['status'] ?? '';
+  $search = trim($_GET['search'] ?? '');
+
+  $allowedRoles    = ['Admin', 'Supplier', 'Customer', 'DeliveryPersonnel'];
+  $allowedStatuses = ['Pending', 'Active', 'Rejected', 'Suspended', 'Deleted'];
+
+  $where = [];
+  $params = [];
+  if ($role !== '' && in_array($role, $allowedRoles, true)) {
+    $where[] = 'role = :role'; $params['role'] = $role;
+  }
+  if ($status !== '' && in_array($status, $allowedStatuses, true)) {
+    $where[] = 'status = :status'; $params['status'] = $status;
+  }
+  if ($search !== '') {
+    $where[] = '(fullName LIKE :q OR username LIKE :q OR email LIKE :q)';
+    $params['q'] = '%' . $search . '%';
+  }
+
+  $sql = 'SELECT userId, username, fullName, email, phoneNumber, role, status, created_at FROM `user`';
+  if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
+  $sql .= ' ORDER BY created_at DESC';
+
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  sendJson(200, true, ['users' => $stmt->fetchAll()]);
+}
+
+// GET /admin/users/{userId} — one user with their role-specific profile.
+function handleGetUser(PDO $pdo, string $userId): void {
+  $stmt = $pdo->prepare(
+    'SELECT userId, username, fullName, email, phoneNumber, role, status, created_at, updated_at
+       FROM `user` WHERE userId = :id'
+  );
+  $stmt->execute(['id' => $userId]);
+  $u = $stmt->fetch();
+  if (!$u) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'User not found.']);
+  }
+
+  $profile = null;
+  if ($u['role'] === 'Supplier') {
+    $p = $pdo->prepare('SELECT supplierId, companyName, companyAddress FROM supplier WHERE userId = :id');
+  } elseif ($u['role'] === 'Customer') {
+    $p = $pdo->prepare('SELECT customerId, shippingAddress FROM customer WHERE userId = :id');
+  } elseif ($u['role'] === 'DeliveryPersonnel') {
+    $p = $pdo->prepare('SELECT deliveryPersonnelId, vehicleInfo FROM delivery_personnel WHERE userId = :id');
+  } else {
+    $p = null;
+  }
+  if ($p) { $p->execute(['id' => $userId]); $profile = $p->fetch() ?: null; }
+  $u['profile'] = $profile;
+
+  sendJson(200, true, $u);
+}
+
+// PATCH /admin/users/{userId}/status — change a user's status. Body: { status }.
+function handleSetUserStatus(PDO $pdo, array $auth, string $userId): void {
+  $body   = getJsonBody();
+  $status = trim($body['status'] ?? '');
+  $allowed = ['Active', 'Suspended', 'Rejected', 'Deleted'];
+  if (!in_array($status, $allowed, true)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Invalid status.']);
+  }
+  // safety: an admin can't lock themselves out or touch other admins here
+  if (($auth['userId'] ?? '') === $userId) {
+    sendJson(409, false, null, ['code' => 'SELF', 'message' => 'You cannot change your own account status.']);
+  }
+
+  $stmt = $pdo->prepare('SELECT role FROM `user` WHERE userId = :id');
+  $stmt->execute(['id' => $userId]);
+  $target = $stmt->fetch();
+  if (!$target) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'User not found.']);
+  }
+  if ($target['role'] === 'Admin') {
+    sendJson(403, false, null, ['code' => 'FORBIDDEN', 'message' => 'Admin accounts cannot be changed here.']);
+  }
+
+  $upd = $pdo->prepare('UPDATE `user` SET status = :s WHERE userId = :id');
+  $upd->execute(['s' => $status, 'id' => $userId]);
+  sendJson(200, true, ['userId' => $userId, 'status' => $status]);
+}

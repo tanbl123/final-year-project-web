@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete, getToken } from '../../api/client';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, getToken } from '../../api/client';
 
 // Suppliers awaiting approval.
 export function getPendingSuppliers() {
@@ -46,4 +46,23 @@ export function renameCategory(id, name) {
 
 export function deleteCategory(id) {
   return apiDelete(`/admin/categories/${id}`, getToken());
+}
+
+// ── user management ──────────────────────────────────────────────────
+// filters: { role, status, search } — any can be omitted/empty.
+export function getUsers(filters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.role) qs.set('role', filters.role);
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.search) qs.set('search', filters.search);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiGet(`/admin/users${suffix}`, getToken());
+}
+
+export function getUser(userId) {
+  return apiGet(`/admin/users/${userId}`, getToken());
+}
+
+export function setUserStatus(userId, status) {
+  return apiPatch(`/admin/users/${userId}/status`, { status }, getToken());
 }

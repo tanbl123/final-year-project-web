@@ -57,6 +57,18 @@ export function apiPut(path, body, token) {
   });
 }
 
+// PATCH request with a JSON body (optionally with a token).
+export function apiPatch(path, body, token) {
+  return request(path, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: 'Bearer ' + token } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 // Multipart upload (a FormData body). We deliberately DON'T set Content-Type:
 // the browser adds it with the correct multipart boundary.
 export function apiUpload(path, formData, token) {

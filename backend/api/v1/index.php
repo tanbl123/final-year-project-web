@@ -14,7 +14,7 @@ require __DIR__ . '/../../controllers/UploadController.php';
 
 // ── CORS: let the React dev server (port 5173) call us ──
 header('Access-Control-Allow-Origin: http://localhost:5173');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
@@ -126,6 +126,28 @@ if ($method === 'DELETE' && preg_match('#^/admin/categories/([^/]+)$#', $path, $
   requireAdmin($auth);
   $pdo  = getPDO();
   handleDeleteCategory($pdo, $m[1]);
+}
+
+// ── admin user management (require an Admin token) ──
+if ($method === 'GET' && $path === '/admin/users') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListUsers($pdo);
+}
+
+if ($method === 'GET' && preg_match('#^/admin/users/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleGetUser($pdo, $m[1]);
+}
+
+if ($method === 'PATCH' && preg_match('#^/admin/users/([^/]+)/status$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleSetUserStatus($pdo, $auth, $m[1]);
 }
 
 // ── file uploads (multipart): images + 3D models for products ──
