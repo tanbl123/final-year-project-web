@@ -211,10 +211,7 @@ function AdminCategoriesPage() {
           </table>
 
           {totalPages > 1 && (
-            <nav className="d-flex justify-content-between align-items-center">
-              <span className="text-muted small">
-                Page {page} of {totalPages} · {sorted.length} categories
-              </span>
+            <nav className="d-flex flex-column align-items-center gap-2">
               <ul className="pagination mb-0">
                 <li className={'page-item' + (page === 1 ? ' disabled' : '')}>
                   <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
@@ -232,6 +229,9 @@ function AdminCategoriesPage() {
                   </button>
                 </li>
               </ul>
+              <span className="text-muted small">
+                Page {page} of {totalPages} · {sorted.length} categories
+              </span>
             </nav>
           )}
         </div>
