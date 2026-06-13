@@ -22,6 +22,15 @@ function ProductFilterBar({ filters, onChange }) {
 
   return (
     <div className="card card-body mb-4">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h6 className="mb-0 text-muted">Filter products</h6>
+        {isFiltering && (
+          <button type="button" className="btn btn-outline-secondary btn-sm"
+            onClick={() => onChange({ name: '', brand: '', maxPrice: '', categoryId: '', status: '' })}>
+            Clear filters
+          </button>
+        )}
+      </div>
       <div className="row g-2 align-items-end">
         <div className="col-md-3">
           <label className="form-label small text-muted mb-1">Search name</label>
@@ -57,14 +66,6 @@ function ProductFilterBar({ filters, onChange }) {
           </select>
         </div>
       </div>
-      {isFiltering && (
-        <div className="mt-2">
-          <button type="button" className="btn btn-link btn-sm px-0"
-            onClick={() => onChange({ name: '', brand: '', maxPrice: '', categoryId: '', status: '' })}>
-            Clear filters
-          </button>
-        </div>
-      )}
     </div>
   );
 }
