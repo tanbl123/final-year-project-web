@@ -165,7 +165,7 @@ function AdminCategoriesPage() {
             <tbody>
               {pageItems.map((cat) => (
                 <tr key={cat.id}>
-                  <td style={{ maxWidth: 360 }}>
+                  <td style={{ overflowWrap: 'anywhere' }}>
                     {editingId === cat.id ? (
                       <input type="text" className="form-control" maxLength="80" autoFocus
                         value={editName} onChange={(e) => setEditName(e.target.value)}
