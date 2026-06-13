@@ -77,8 +77,9 @@ function ProductsPage() {
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">👟 Supplier Products</h1>
-        <button className="btn btn-primary" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? 'Close' : '+ Add product'}
+        <button className={showForm ? 'btn btn-outline-danger' : 'btn btn-primary'}
+          onClick={() => setShowForm((s) => !s)}>
+          {showForm ? 'Discard add product' : '+ Add product'}
         </button>
       </div>
 

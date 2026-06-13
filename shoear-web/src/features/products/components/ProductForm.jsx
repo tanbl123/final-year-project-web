@@ -152,12 +152,7 @@ function ProductForm({ onAdd, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="card card-body mb-4 bg-light">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0">New product</h5>
-        {onCancel && (
-          <button type="button" className="btn-close" aria-label="Close" onClick={onCancel}></button>
-        )}
-      </div>
+      <h5 className="mb-3">New product</h5>
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
 
