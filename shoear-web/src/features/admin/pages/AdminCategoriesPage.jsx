@@ -149,17 +149,17 @@ function AdminCategoriesPage() {
         <div className="card card-body text-center text-muted">No categories yet. Add one above.</div>
       ) : (
         <div className="table-responsive">
-          <table className="table align-middle">
+          <table className="table align-middle" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr>
                 <th role="button" onClick={() => toggleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                   Category<span className="text-muted small">{sortArrow('name')}</span>
                 </th>
                 <th role="button" className="text-center" onClick={() => toggleSort('productCount')}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  style={{ cursor: 'pointer', userSelect: 'none', width: 160 }}>
                   Products<span className="text-muted small">{sortArrow('productCount')}</span>
                 </th>
-                <th className="text-center">Actions</th>
+                <th className="text-center" style={{ width: 240 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
