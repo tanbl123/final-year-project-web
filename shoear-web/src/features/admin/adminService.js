@@ -1,4 +1,4 @@
-import { apiGet, apiPost, getToken } from '../../api/client';
+import { apiGet, apiPost, apiPut, apiDelete, getToken } from '../../api/client';
 
 // Suppliers awaiting approval.
 export function getPendingSuppliers() {
@@ -28,4 +28,22 @@ export function approveProduct(productId) {
 // Reject a pending product (status → Rejected).
 export function rejectProduct(productId) {
   return apiPost(`/admin/products/${productId}/reject`, {}, getToken());
+}
+
+// ── category management ──────────────────────────────────────────────
+// List categories with how many products use each.
+export function getCategoriesAdmin() {
+  return apiGet('/admin/categories', getToken());
+}
+
+export function createCategory(name) {
+  return apiPost('/admin/categories', { name }, getToken());
+}
+
+export function renameCategory(id, name) {
+  return apiPut(`/admin/categories/${id}`, { name }, getToken());
+}
+
+export function deleteCategory(id) {
+  return apiDelete(`/admin/categories/${id}`, getToken());
 }

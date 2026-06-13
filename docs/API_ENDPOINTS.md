@@ -125,10 +125,15 @@ This is how a `Pending` supplier or delivery person becomes `Active`.
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET    | `/categories` | Public | List all categories. |
-| POST   | `/categories` | Admin | Create category. |
-| PUT    | `/categories/{categoryId}` | Admin | Rename category. |
-| DELETE | `/categories/{categoryId}` | Admin | Delete (only if no products use it). |
+| GET    | `/categories` | Auth | List all categories (populates the product form dropdown). |
+
+**Implemented admin management** (Admin → Manage Categories screen):
+| Method | Path | Access | Purpose |
+|--------|------|--------|---------|
+| GET    | `/admin/categories` | Admin | List categories with `productCount` (how many products use each). |
+| POST   | `/admin/categories` | Admin | Create category. Body: `{ "name": "Tennis" }`. 409 if the name already exists. |
+| PUT    | `/admin/categories/{categoryId}` | Admin | Rename. Body: `{ "name": "..." }`. 409 on duplicate name. |
+| DELETE | `/admin/categories/{categoryId}` | Admin | Delete — **blocked (409)** if any product still uses it. |
 
 ---
 

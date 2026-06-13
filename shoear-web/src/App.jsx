@@ -9,6 +9,7 @@ import ProductDetailPage from './features/products/pages/ProductDetailPage';
 import AddProductPage from './features/products/pages/AddProductPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
+import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
 
 function App() {
   const { user, logout } = useAuth();   // 👈 tune in to the auth broadcast
@@ -35,6 +36,7 @@ function App() {
               <>
                 <Link className="nav-link" to="/admin">Suppliers</Link>
                 <Link className="nav-link" to="/admin/products">Products</Link>
+                <Link className="nav-link" to="/admin/categories">Categories</Link>
               </>
             ) : (
               <>
@@ -69,6 +71,9 @@ function App() {
         } />
         <Route path="/admin/products" element={
           <ProtectedRoute role="Admin"><AdminProductApprovalsPage /></ProtectedRoute>
+        } />
+        <Route path="/admin/categories" element={
+          <ProtectedRoute role="Admin"><AdminCategoriesPage /></ProtectedRoute>
         } />
 
         {/* supplier */}

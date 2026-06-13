@@ -99,6 +99,35 @@ if ($method === 'GET' && $path === '/categories') {
   handleListCategories($pdo);
 }
 
+// ── admin category management (require an Admin token) ──
+if ($method === 'GET' && $path === '/admin/categories') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleAdminListCategories($pdo);
+}
+
+if ($method === 'POST' && $path === '/admin/categories') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleCreateCategory($pdo);
+}
+
+if ($method === 'PUT' && preg_match('#^/admin/categories/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleRenameCategory($pdo, $m[1]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/admin/categories/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleDeleteCategory($pdo, $m[1]);
+}
+
 // ── file uploads (multipart): images + 3D models for products ──
 if ($path === '/uploads' && $method === 'POST') {
   $auth = requireAuth($secret);
