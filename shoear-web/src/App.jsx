@@ -6,6 +6,7 @@ import LoginPage from './features/auth/pages/LoginPage';
 import ProtectedRoute, { homePathFor } from './features/auth/ProtectedRoute';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import ProductDetailPage from './features/products/pages/ProductDetailPage';
+import AddProductPage from './features/products/pages/AddProductPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 
@@ -73,6 +74,9 @@ function App() {
         {/* supplier */}
         <Route path="/products" element={
           <ProtectedRoute role="Supplier"><ProductsPage /></ProtectedRoute>
+        } />
+        <Route path="/products/new" element={
+          <ProtectedRoute role="Supplier"><AddProductPage /></ProtectedRoute>
         } />
         <Route path="/products/:id" element={
           <ProtectedRoute role="Supplier"><ProductDetailPage /></ProtectedRoute>

@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
-import ProductForm from '../components/ProductForm';
 import ProductFilterBar from '../components/ProductFilterBar';
 import ConfirmDialog from '../../../components/ConfirmDialog';
-import { fetchProducts, createProduct, deleteProduct } from '../productService';
+import { fetchProducts, deleteProduct } from '../productService';
 
 const EMPTY_FILTERS = { name: '', brand: '', maxPrice: '', categoryId: '', status: '' };
 
@@ -12,7 +12,6 @@ function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   const [dialog, setDialog] = useState({
@@ -31,13 +30,6 @@ function ProductsPage() {
       .catch((err) => setError(err.message))
       .finally(() => setIsLoading(false));
   }, []);
-
-  // create on the server, then prepend the returned product. Errors are
-  // thrown so the form can show them inline (and keep the panel open).
-  async function addProduct(newProductData) {
-    const created = await createProduct(newProductData);
-    setProducts((prev) => [created, ...prev]);
-  }
 
   function askDelete(id) {
     setDialog({
@@ -77,15 +69,10 @@ function ProductsPage() {
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">👟 Supplier Products</h1>
-        <button className={showForm ? 'btn btn-outline-danger' : 'btn btn-primary'}
-          onClick={() => setShowForm((s) => !s)}>
-          {showForm ? 'Discard add product' : '+ Add product'}
-        </button>
+        <Link to="/products/new" className="btn btn-primary">+ Add product</Link>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
-
-      {showForm && <ProductForm onAdd={addProduct} onCancel={() => setShowForm(false)} />}
 
       <ProductFilterBar filters={filters} onChange={setFilters} />
 
