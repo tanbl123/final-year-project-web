@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import ProductFilterBar from '../components/ProductFilterBar';
 import ConfirmDialog from '../../../components/ConfirmDialog';
+import Toast from '../../../components/Toast';
 import { fetchProducts, deleteProduct } from '../productService';
 
 const EMPTY_FILTERS = { name: '', brand: '', maxPrice: '', categoryId: '', status: '' };
@@ -13,6 +14,17 @@ function ProductsPage() {
   const [error, setError] = useState('');
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [toast, setToast] = useState('');
+
+  // a redirect (e.g. after adding a product) may pass a toast message
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (location.state?.toast) {
+      setToast(location.state.toast);
+      navigate(location.pathname, { replace: true });   // clear it so it won't reappear
+    }
+  }, [location, navigate]);
 
   const [dialog, setDialog] = useState({
     isOpen: false, title: '', message: '',
@@ -122,6 +134,8 @@ function ProductsPage() {
         onConfirm={dialog.onConfirm}
         onCancel={closeDialog}
       />
+
+      <Toast message={toast} onClose={() => setToast('')} />
     </div>
   );
 }

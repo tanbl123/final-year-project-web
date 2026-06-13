@@ -9,8 +9,12 @@ function AddProductPage() {
   const navigate = useNavigate();
 
   // Throw on failure so ProductForm shows the error inline and stays open.
+  // On success, return to the list and hand it a toast message to show.
   async function addProduct(newProductData) {
     await createProduct(newProductData);
+    navigate('/products', {
+      state: { toast: `“${newProductData.name}” was added — it’s now pending admin approval.` },
+    });
   }
 
   return (

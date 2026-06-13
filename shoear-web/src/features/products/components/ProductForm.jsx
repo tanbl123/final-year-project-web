@@ -228,7 +228,7 @@ function ProductForm({ onAdd, onCancel }) {
         modelUrl,
       });
       resetForm();
-      if (onCancel) onCancel();          // leave the form after a successful add
+      // onAdd owns what happens next (e.g. navigate away + show a toast)
     } catch (err) {
       setError(err.message);
     } finally {
