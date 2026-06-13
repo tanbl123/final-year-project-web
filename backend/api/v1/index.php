@@ -69,6 +69,27 @@ if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/reject$#', $pat
   handleRejectSupplier($pdo, $m[1]);
 }
 
+if ($method === 'GET' && $path === '/admin/products/pending') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListPendingProducts($pdo);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/products/([^/]+)/approve$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleApproveProduct($pdo, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/products/([^/]+)/reject$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleRejectProduct($pdo, $m[1]);
+}
+
 // ── category routes (require a valid token) ──
 if ($method === 'GET' && $path === '/categories') {
   $auth = requireAuth($secret);

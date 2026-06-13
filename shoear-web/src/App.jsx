@@ -7,6 +7,7 @@ import ProtectedRoute, { homePathFor } from './features/auth/ProtectedRoute';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import ProductDetailPage from './features/products/pages/ProductDetailPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
+import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 
 function App() {
   const { user, logout } = useAuth();   // 👈 tune in to the auth broadcast
@@ -30,7 +31,10 @@ function App() {
           {/* admins manage approvals; suppliers manage their catalogue */}
           <div className="navbar-nav me-auto">
             {isAdmin ? (
-              <Link className="nav-link" to="/admin">Approvals</Link>
+              <>
+                <Link className="nav-link" to="/admin">Suppliers</Link>
+                <Link className="nav-link" to="/admin/products">Products</Link>
+              </>
             ) : (
               <>
                 <Link className="nav-link" to="/products">Products</Link>
@@ -61,6 +65,9 @@ function App() {
         {/* admin */}
         <Route path="/admin" element={
           <ProtectedRoute role="Admin"><AdminDashboardPage /></ProtectedRoute>
+        } />
+        <Route path="/admin/products" element={
+          <ProtectedRoute role="Admin"><AdminProductApprovalsPage /></ProtectedRoute>
         } />
 
         {/* supplier */}

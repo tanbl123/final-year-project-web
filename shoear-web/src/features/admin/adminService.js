@@ -14,3 +14,18 @@ export function approveSupplier(userId) {
 export function rejectSupplier(userId) {
   return apiPost(`/admin/suppliers/${userId}/reject`, {}, getToken());
 }
+
+// Products awaiting approval.
+export function getPendingProducts() {
+  return apiGet('/admin/products/pending', getToken());
+}
+
+// Approve a pending product (status → Approved, so it's visible on the platform).
+export function approveProduct(productId) {
+  return apiPost(`/admin/products/${productId}/approve`, {}, getToken());
+}
+
+// Reject a pending product (status → Rejected).
+export function rejectProduct(productId) {
+  return apiPost(`/admin/products/${productId}/reject`, {}, getToken());
+}
