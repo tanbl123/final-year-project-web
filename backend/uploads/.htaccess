@@ -1,0 +1,6 @@
+# Allow product images and 3D models to be loaded cross-origin (the Vite dev
+# server on :5173 loads assets served by Apache on :80; <model-viewer> fetches
+# .glb files via XHR, which is subject to CORS).
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+</IfModule>

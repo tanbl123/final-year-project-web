@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete, getToken } from '../../api/client';
+import { apiGet, apiPost, apiDelete, apiUpload, getToken } from '../../api/client';
 
 // All product data now comes from the real PHP API (with the JWT token).
 
@@ -20,4 +20,12 @@ export function deleteProduct(id) {
 
 export function fetchCategories() {
   return apiGet('/categories', getToken());
+}
+
+// Upload one file (kind = 'image' | 'model'); resolves to { url }.
+export function uploadFile(file, kind) {
+  const form = new FormData();
+  form.append('kind', kind);
+  form.append('file', file);
+  return apiUpload('/uploads', form, getToken());
 }

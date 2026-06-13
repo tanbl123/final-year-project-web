@@ -5,10 +5,12 @@ require __DIR__ . '/../../lib/jwt.php';
 require __DIR__ . '/../../lib/request.php';
 require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
+require __DIR__ . '/../../lib/storage.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
 require __DIR__ . '/../../controllers/ProductController.php';
 require __DIR__ . '/../../controllers/CategoryController.php';
+require __DIR__ . '/../../controllers/UploadController.php';
 
 // ── CORS: let the React dev server (port 5173) call us ──
 header('Access-Control-Allow-Origin: http://localhost:5173');
@@ -95,6 +97,13 @@ if ($method === 'GET' && $path === '/categories') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleListCategories($pdo);
+}
+
+// ── file uploads (multipart): images + 3D models for products ──
+if ($path === '/uploads' && $method === 'POST') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpload($pdo, $auth);
 }
 
 // ── product routes (all require a valid token) ──

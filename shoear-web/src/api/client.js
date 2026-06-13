@@ -45,6 +45,16 @@ export function apiPost(path, body, token) {
   });
 }
 
+// Multipart upload (a FormData body). We deliberately DON'T set Content-Type:
+// the browser adds it with the correct multipart boundary.
+export function apiUpload(path, formData, token) {
+  return request(path, {
+    method: 'POST',
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
+    body: formData,
+  });
+}
+
 // DELETE request (optionally with a token).
 export function apiDelete(path, token) {
   return request(path, {

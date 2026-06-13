@@ -1,0 +1,5 @@
+# Ignore uploaded files (they are user content, not source) but keep the
+# directory and its config files in git.
+*
+!.gitignore
+!.htaccess

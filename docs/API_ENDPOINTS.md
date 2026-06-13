@@ -175,11 +175,39 @@ This is how a `Pending` supplier or delivery person becomes `Active`.
 | POST   | `/products/{productId}/models` | Supplier(Owner) | Attach a 3D model URL (Firebase). |
 | DELETE | `/models/{productModelId}` | Supplier(Owner) | Remove a 3D model. |
 
+### File uploads (Supplier web) — IMPLEMENTED
+| Method | Path | Access | Purpose |
+|--------|------|--------|---------|
+| POST | `/uploads` | Supplier | Upload one image or 3D model (`multipart/form-data`: `kind=image\|model`, `file=<file>`). Returns `{ "url": "..." }`. |
+
+> Storage is behind a swap seam (`backend/lib/storage.php`): today files are
+> saved under `backend/uploads/` and served by Apache; to move to **Firebase
+> Storage** (the project's target), only that helper's body changes. The
+> supplier `POST /products` create accepts the returned URLs.
+
+**Implemented `POST /products` request (supplier, rich form):**
+```json
+{
+  "name": "Air Zoom Pegasus 40", "brand": "Nike", "price": 199.00,
+  "categoryId": "CAT0001", "description": "Lightweight daily trainer.",
+  "virtualTryOnEnable": true,
+  "variants": [ { "size": "UK8", "stock": 20 }, { "size": "UK9", "stock": 15 } ],
+  "images": [ "http://localhost/shoear/uploads/images/ab12.jpg" ],
+  "modelUrl": "http://localhost/shoear/uploads/models/cd34.glb"
+}
+```
+Product, variants, images and model are written in **one transaction**; the
+product starts as `Pending` (awaiting admin approval, Section "Admin — product
+moderation").
+
 ### Admin — product moderation (Admin web)
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
 | GET   | `/admin/products` | Admin | List/filter all products (e.g. `?status=Pending` = moderation queue). |
 | PATCH | `/admin/products/{productId}/status` | Admin | Approve / reject. Body: `{ "status": "Approved" }`. |
+| GET   | `/admin/products/pending` | Admin | **(Implemented)** moderation queue of `Pending` products. |
+| POST  | `/admin/products/{productId}/approve` | Admin | **(Implemented)** set status `Approved`. |
+| POST  | `/admin/products/{productId}/reject` | Admin | **(Implemented)** set status `Rejected`. |
 
 ---
 

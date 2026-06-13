@@ -2,16 +2,22 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { fetchProductById } from '../productService';
 
+const STATUS_COLORS = { Approved: 'success', Pending: 'warning', Rejected: 'danger' };
+
 function ProductDetailPage() {
   const { id } = useParams();          // 👈 read the :id from the URL
   const [product, setProduct] = useState(null);
+  const [activeImage, setActiveImage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setIsLoading(true);
     fetchProductById(id)
-      .then((data) => setProduct(data))
+      .then((data) => {
+        setProduct(data);
+        setActiveImage(data.images?.[0] || '');
+      })
       .catch((err) => setError(err.message))
       .finally(() => setIsLoading(false));
   }, [id]);                            // 👈 re-run if the id changes
@@ -28,17 +34,87 @@ function ProductDetailPage() {
     );
   }
 
+  const statusColor = STATUS_COLORS[product.status] || 'secondary';
+
   return (
     <div className="container py-4">
       <Link to="/products" className="btn btn-link px-0">← Back to products</Link>
-      <div className="card shadow-sm mt-2" style={{ maxWidth: '500px' }}>
-        <div className="card-body">
-          <h2 className="card-title">{product.name}</h2>
-          <h6 className="text-muted">{product.brand}</h6>
-          <p className="fs-3 fw-bold text-primary">RM {product.price}</p>
-          <p className="text-muted mb-0">Product ID: {product.id}</p>
+
+      <div className="row g-4 mt-1">
+        {/* left: images */}
+        <div className="col-md-6">
+          <div className="ratio ratio-1x1 bg-light rounded border overflow-hidden">
+            {activeImage ? (
+              <img src={activeImage} alt={product.name} style={{ objectFit: 'cover' }} className="w-100 h-100" />
+            ) : (
+              <div className="d-flex align-items-center justify-content-center text-muted display-1">👟</div>
+            )}
+          </div>
+          {product.images?.length > 1 && (
+            <div className="d-flex flex-wrap gap-2 mt-2">
+              {product.images.map((url) => (
+                <img key={url} src={url} alt="" onClick={() => setActiveImage(url)}
+                  className={'rounded border ' + (url === activeImage ? 'border-primary border-2' : '')}
+                  style={{ width: 70, height: 70, objectFit: 'cover', cursor: 'pointer' }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* right: details */}
+        <div className="col-md-6">
+          <div className="d-flex justify-content-between align-items-start">
+            <h2 className="mb-0">{product.name}</h2>
+            <span className={`badge text-bg-${statusColor}`}>{product.status}</span>
+          </div>
+          <h6 className="text-muted mt-1">{product.brand}</h6>
+          <p className="fs-2 fw-bold text-primary mb-2">RM {Number(product.price).toFixed(2)}</p>
+          <p className="mb-3">
+            <span className="badge text-bg-light me-2">{product.categoryName}</span>
+            {product.virtualTryOnEnable && <span className="badge text-bg-info">AR try-on enabled</span>}
+          </p>
+
+          {product.description && <p>{product.description}</p>}
+
+          <h5 className="mt-4">Sizes &amp; stock</h5>
+          {product.variants?.length > 0 ? (
+            <table className="table table-sm w-auto">
+              <thead><tr><th>Size</th><th className="text-end">Stock</th></tr></thead>
+              <tbody>
+                {product.variants.map((v) => (
+                  <tr key={v.size}>
+                    <td>{v.size}</td>
+                    <td className="text-end">{v.stock}</td>
+                  </tr>
+                ))}
+                <tr className="fw-bold border-top">
+                  <td>Total</td>
+                  <td className="text-end">{product.totalStock}</td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-muted">No sizes added.</p>
+          )}
+
+          <p className="text-muted small mb-0">Product ID: {product.id}</p>
         </div>
       </div>
+
+      {/* 3D model preview */}
+      {product.modelUrl && (
+        <div className="mt-5">
+          <h4>3D model</h4>
+          <model-viewer
+            src={product.modelUrl}
+            camera-controls
+            auto-rotate
+            ar
+            shadow-intensity="1"
+            style={{ width: '100%', height: '420px', background: '#f8f9fa', borderRadius: '0.5rem' }}
+          ></model-viewer>
+        </div>
+      )}
     </div>
   );
 }
