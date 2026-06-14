@@ -6,6 +6,7 @@ require __DIR__ . '/../../lib/request.php';
 require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
 require __DIR__ . '/../../lib/storage.php';
+require __DIR__ . '/../../lib/banks.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
 require __DIR__ . '/../../controllers/ProductController.php';
@@ -30,6 +31,11 @@ $path   = '/' . trim(substr($uri, strlen($base)), '/');
 // ── public routes ──
 if ($method === 'GET' && $path === '/ping') {
   sendJson(200, true, ['message' => 'pong', 'time' => date('c')]);
+}
+
+// Supported payout banks (for the registration dropdown + length validation).
+if ($method === 'GET' && $path === '/banks') {
+  sendJson(200, true, ['banks' => SUPPORTED_BANKS]);
 }
 
 if ($method === 'GET' && $path === '/db-test') {

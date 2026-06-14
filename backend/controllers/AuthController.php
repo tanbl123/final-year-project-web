@@ -41,9 +41,15 @@ function handleRegister(PDO $pdo): void {
       || $bankName === '' || $bankAccountName === '' || $bankAccountNo === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields are required.']);
   }
-  // bank account number: digits (and dashes/spaces) only, reasonable length
-  if (!preg_match('/^[0-9][0-9 -]{5,33}$/', $bankAccountNo)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid bank account number.']);
+  // bank: must be a supported bank, and the account number must match its
+  // expected length (catches typos; not an ownership check)
+  $bank = findBank($bankName);
+  if (!$bank) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please choose a supported bank.']);
+  }
+  $accErr = bankAccountError($bank, $bankAccountNo);
+  if ($accErr) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $accErr]);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);

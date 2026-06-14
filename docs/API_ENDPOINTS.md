@@ -106,6 +106,7 @@ The supplier's `businessLicenseUrl` comes from first uploading the document:
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
 | POST | `/uploads/registration-doc` | Public | **(Implemented)** Upload a business document (PDF/image, ≤10 MB) during registration; returns `{ url }`. No token (the account doesn't exist yet). |
+| GET | `/banks` | Public | **(Implemented)** Supported payout banks with valid account-number lengths, for the registration dropdown + length validation. |
 
 **`POST /auth/login` response:**
 ```json

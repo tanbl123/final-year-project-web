@@ -26,6 +26,11 @@ export function uploadRegistrationDoc(file) {
   return apiUpload('/uploads/registration-doc', form);
 }
 
+// Supported payout banks (+ valid account-number lengths) for the dropdown.
+export function getBanks() {
+  return apiGet('/banks');
+}
+
 // The signed-in user's own profile (GET /auth/me).
 export function getMe() {
   return apiGet('/auth/me', getToken());
