@@ -268,11 +268,6 @@ function RegisterPage() {
         {field('taxNumber', 'Tax / SST number (optional)')}
         {licenseField()}
 
-        <div className="alert alert-light border small mb-3">
-          💳 <strong>Payouts:</strong> after your account is approved, you'll set up payouts
-          securely through <strong>Stripe</strong> from your dashboard — we never store your bank details.
-        </div>
-
         <hr className="my-3" />
         <h6 className="text-muted text-uppercase small fw-bold">Account login</h6>
         {field('username', 'Username')}
