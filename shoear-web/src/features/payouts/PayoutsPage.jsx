@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getPayoutStatus, startStripeOnboarding } from './payoutService';
+import { getPayoutStatus, startStripeOnboarding, openStripeDashboard } from './payoutService';
 
 function PayoutsPage() {
   const [status, setStatus] = useState(null);
@@ -38,6 +38,19 @@ function PayoutsPage() {
     }
   }
 
+  // Open the Stripe Express dashboard so the supplier can change their bank.
+  async function manage() {
+    setWorking(true);
+    setError('');
+    try {
+      const { url } = await openStripeDashboard();
+      window.location.href = url;
+    } catch (err) {
+      setError(err.message);
+      setWorking(false);
+    }
+  }
+
   return (
     <div className="container py-4 text-start" style={{ maxWidth: 640 }}>
       <h1 className="mb-1">💳 Payouts</h1>
@@ -63,9 +76,15 @@ function PayoutsPage() {
       ) : status.payoutsEnabled ? (
         <div className="card card-body border-success">
           <h5 className="text-success mb-1">✅ Payouts enabled</h5>
-          <p className="text-muted mb-0">
-            Your Stripe account is verified and ready to receive payouts.
+          <p className="text-muted">
+            Your Stripe account is verified and ready to receive payouts. Sales
+            income is paid into the bank account on file.
           </p>
+          <div>
+            <button className="btn btn-outline-secondary btn-sm" onClick={manage} disabled={working}>
+              {working ? 'Opening Stripe…' : 'Manage / change bank account'}
+            </button>
+          </div>
         </div>
       ) : status.connected ? (
         <div className="card card-body border-warning">

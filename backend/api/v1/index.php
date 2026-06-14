@@ -78,6 +78,12 @@ if ($method === 'POST' && $path === '/supplier/stripe/onboard') {
   handleStripeOnboard($pdo, $config, $auth);
 }
 
+if ($method === 'POST' && $path === '/supplier/stripe/dashboard') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleStripeDashboard($pdo, $config, $auth);
+}
+
 if ($method === 'GET' && $path === '/supplier/stripe/status') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();

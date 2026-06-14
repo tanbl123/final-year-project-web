@@ -10,3 +10,9 @@ export function getPayoutStatus() {
 export function startStripeOnboarding() {
   return apiPost('/supplier/stripe/onboard', {}, getToken());
 }
+
+// One-time link to the Stripe Express dashboard, where the supplier can
+// review/change their payout bank account. Resolves with { url }.
+export function openStripeDashboard() {
+  return apiPost('/supplier/stripe/dashboard', {}, getToken());
+}

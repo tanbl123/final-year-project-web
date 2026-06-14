@@ -58,6 +58,28 @@ function handleStripeOnboard(PDO $pdo, array $config, array $auth): void {
   }
 }
 
+// POST /supplier/stripe/dashboard — one-time link to the supplier's Stripe
+// Express dashboard, where they can review/update their payout bank account.
+// Only works once onboarding is complete (the account has a dashboard).
+function handleStripeDashboard(PDO $pdo, array $config, array $auth): void {
+  requireSupplierId($pdo, $auth);
+  if (!stripeConfigured($config)) {
+    sendJson(503, false, null, ['code' => 'STRIPE_NOT_CONFIGURED', 'message' => 'Payouts are not configured yet.']);
+  }
+  $row = supplierRowForAuth($pdo, $auth);
+  if (!$row['stripeAccountId']) {
+    sendJson(409, false, null, ['code' => 'NOT_CONNECTED', 'message' => 'Connect a Stripe account first.']);
+  }
+
+  try {
+    $link = stripeApi($config['stripe_secret'], 'POST',
+      '/v1/accounts/' . $row['stripeAccountId'] . '/login_links');
+    sendJson(200, true, ['url' => $link['url']]);
+  } catch (Throwable $e) {
+    sendJson(502, false, null, ['code' => 'STRIPE_ERROR', 'message' => $e->getMessage()]);
+  }
+}
+
 // GET /supplier/stripe/status — report the supplier's payout status, syncing
 // payoutsEnabled from Stripe when an account exists.
 function handleStripeStatus(PDO $pdo, array $config, array $auth): void {
