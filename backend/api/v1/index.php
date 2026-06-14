@@ -62,6 +62,12 @@ if ($method === 'PUT' && $path === '/auth/me') {
   handleUpdateMe($pdo, $auth);
 }
 
+if ($method === 'POST' && $path === '/auth/change-password') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleChangePassword($pdo, $auth);
+}
+
 // ── admin routes (require an Admin token) ──
 if ($method === 'GET' && $path === '/admin/suppliers/pending') {
   $auth = requireAuth($secret);

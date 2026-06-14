@@ -81,7 +81,7 @@ List responses include paging info:
 | POST | `/auth/logout` | Any | Client-side token discard (and optional server token blacklist). |
 | GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). |
 | PUT  | `/auth/me` | Any | **(Implemented)** Update own profile (`fullName`, `phoneNumber`). |
-| POST | `/auth/change-password` | Any | Change own password (old + new). |
+| POST | `/auth/change-password` | Any | **(Implemented)** Change own password — verifies `currentPassword` before setting `newPassword`. |
 
 **`POST /auth/register` request (customer):**
 ```json

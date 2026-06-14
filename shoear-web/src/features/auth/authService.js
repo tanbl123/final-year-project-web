@@ -27,3 +27,8 @@ export function getMe() {
 export function updateMe(data) {
   return apiPut('/auth/me', data, getToken());
 }
+
+// Change own password (POST /auth/change-password). Requires the current one.
+export function changePassword(currentPassword, newPassword) {
+  return apiPost('/auth/change-password', { currentPassword, newPassword }, getToken());
+}

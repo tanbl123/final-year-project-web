@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getMe, updateMe } from '../auth/authService';
+import { getMe, updateMe, changePassword } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
 import Avatar from '../../components/Avatar';
 import Toast from '../../components/Toast';
+
+const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
 const STATUS_COLORS = {
   Active: 'success', Pending: 'warning', Suspended: 'secondary',
@@ -20,6 +22,11 @@ function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ fullName: '', phoneNumber: '' });
   const [saving, setSaving] = useState(false);
+
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState(EMPTY_PW);
+  const [pwError, setPwError] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -49,6 +56,31 @@ function ProfilePage() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function closePw() {
+    setPwOpen(false);
+    setPw(EMPTY_PW);
+    setPwError('');
+  }
+
+  async function savePassword(e) {
+    e.preventDefault();
+    setPwError('');
+    if (pw.newPassword !== pw.confirmPassword) {
+      setPwError('New password and confirmation do not match.');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await changePassword(pw.currentPassword, pw.newPassword);
+      closePw();
+      setToast('Password changed.');
+    } catch (err) {
+      setPwError(err.message);
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -144,6 +176,62 @@ function ProfilePage() {
               <hr />
               <button className="btn btn-primary" onClick={startEdit}>Edit profile</button>
             </>
+          )}
+        </div>
+      </div>
+
+      {/* change password */}
+      <div className="card mt-4">
+        <div className="card-body">
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <h5 className="mb-0">Password</h5>
+              <small className="text-muted">Change the password you use to sign in.</small>
+            </div>
+            {!pwOpen && (
+              <button className="btn btn-outline-primary" onClick={() => setPwOpen(true)}>
+                Change password
+              </button>
+            )}
+          </div>
+
+          {pwOpen && (
+            <form className="mt-3" onSubmit={savePassword}>
+              {pwError && (
+                <div className="alert alert-danger py-2">{pwError}</div>
+              )}
+              <div className="mb-3">
+                <label className="form-label">Current password</label>
+                <input type="password" className="form-control" required autoFocus
+                  autoComplete="current-password"
+                  value={pw.currentPassword}
+                  onChange={(e) => setPw((p) => ({ ...p, currentPassword: e.target.value }))} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">New password</label>
+                <input type="password" className="form-control" required
+                  autoComplete="new-password"
+                  value={pw.newPassword}
+                  onChange={(e) => setPw((p) => ({ ...p, newPassword: e.target.value }))} />
+                <div className="form-text">
+                  At least 8 characters with upper &amp; lower case, a number and a special character.
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Confirm new password</label>
+                <input type="password" className="form-control" required
+                  autoComplete="new-password"
+                  value={pw.confirmPassword}
+                  onChange={(e) => setPw((p) => ({ ...p, confirmPassword: e.target.value }))} />
+              </div>
+              <div className="d-flex gap-2">
+                <button type="submit" className="btn btn-primary" disabled={pwSaving}>
+                  {pwSaving ? 'Saving…' : 'Update password'}
+                </button>
+                <button type="button" className="btn btn-outline-secondary"
+                  onClick={closePw} disabled={pwSaving}>Cancel</button>
+              </div>
+            </form>
           )}
         </div>
       </div>

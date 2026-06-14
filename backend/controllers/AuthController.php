@@ -1,6 +1,17 @@
 <?php
 // Handles authentication endpoints.
 
+// Shared password policy: 8+ chars with lower, upper, digit and special char.
+// Returns an error message, or null when the password is acceptable.
+function passwordPolicyError(string $password): ?string {
+  if (strlen($password) < 8)                    return 'Password must be at least 8 characters.';
+  if (!preg_match('/[a-z]/', $password))        return 'Password must include a lowercase letter.';
+  if (!preg_match('/[A-Z]/', $password))        return 'Password must include an uppercase letter.';
+  if (!preg_match('/[0-9]/', $password))        return 'Password must include a number.';
+  if (!preg_match('/[^a-zA-Z0-9]/', $password)) return 'Password must include a special character.';
+  return null;
+}
+
 // POST /auth/register — create a new SUPPLIER account (status Pending,
 // awaiting admin approval). Creates a `user` row + a `supplier` row together.
 function handleRegister(PDO $pdo): void {
@@ -28,20 +39,9 @@ function handleRegister(PDO $pdo): void {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid phone number in international format, e.g. +60123456789.']);
   }
   // password policy: 8+ chars with lower, upper, digit and special char
-  if (strlen($password) < 8) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must be at least 8 characters.']);
-  }
-  if (!preg_match('/[a-z]/', $password)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include a lowercase letter.']);
-  }
-  if (!preg_match('/[A-Z]/', $password)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include an uppercase letter.']);
-  }
-  if (!preg_match('/[0-9]/', $password)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include a number.']);
-  }
-  if (!preg_match('/[^a-zA-Z0-9]/', $password)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Password must include a special character.']);
+  $pwErr = passwordPolicyError($password);
+  if ($pwErr) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $pwErr]);
   }
 
   // friendly duplicate check (the UNIQUE keys also protect us)
@@ -176,4 +176,41 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
   $upd->execute(['fn' => $fullName, 'ph' => $phone, 'id' => $auth['userId']]);
 
   sendJson(200, true, ['fullName' => $fullName, 'phoneNumber' => $phone]);
+}
+
+// POST /auth/change-password — verify the current password, then set a new one.
+function handleChangePassword(PDO $pdo, array $auth): void {
+  $body    = getJsonBody();
+  $current = (string) ($body['currentPassword'] ?? '');
+  $new     = (string) ($body['newPassword'] ?? '');
+
+  if ($current === '' || $new === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Current and new password are both required.']);
+  }
+
+  $stmt = $pdo->prepare('SELECT password FROM `user` WHERE userId = :id');
+  $stmt->execute(['id' => $auth['userId']]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Account not found.']);
+  }
+
+  // must prove they know the existing password before we change it
+  if (!password_verify($current, $row['password'])) {
+    sendJson(403, false, null, ['code' => 'BAD_PASSWORD', 'message' => 'Your current password is incorrect.']);
+  }
+
+  $pwErr = passwordPolicyError($new);
+  if ($pwErr) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $pwErr]);
+  }
+  if (password_verify($new, $row['password'])) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'New password must be different from the current one.']);
+  }
+
+  $hash = password_hash($new, PASSWORD_BCRYPT);
+  $upd  = $pdo->prepare('UPDATE `user` SET password = :p WHERE userId = :id');
+  $upd->execute(['p' => $hash, 'id' => $auth['userId']]);
+
+  sendJson(200, true, ['message' => 'Password changed.']);
 }
