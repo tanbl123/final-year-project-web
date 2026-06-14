@@ -104,6 +104,12 @@ if ($method === 'POST' && $path === '/supplier/application/resubmit') {
   handleResubmitApplication($pdo, $auth);
 }
 
+if ($method === 'PUT' && $path === '/supplier/bank-account') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpdateBankAccount($pdo, $auth);
+}
+
 // ── reports ──
 if ($method === 'GET' && $path === '/reports/sales') {
   $auth = requireAuth($secret);

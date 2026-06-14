@@ -38,6 +38,11 @@ export function resubmitApplication(data) {
   return apiPost('/supplier/application/resubmit', data, getToken());
 }
 
+// Set/update the supplier's payout bank account. Resolves with the saved fields.
+export function updateBankAccount(data) {
+  return apiPut('/supplier/bank-account', data, getToken());
+}
+
 // The signed-in user's own profile (GET /auth/me).
 export function getMe() {
   return apiGet('/auth/me', getToken());

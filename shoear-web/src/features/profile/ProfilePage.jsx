@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getMe, updateMe, changePassword } from '../auth/authService';
+import { getMe, updateMe, changePassword, updateBankAccount } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
 import Avatar from '../../components/Avatar';
 import Toast from '../../components/Toast';
@@ -7,6 +7,13 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import EyeIcon from '../../components/EyeIcon';
 
 const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
+const EMPTY_BANK = { bankName: '', bankAccountName: '', bankAccountNumber: '' };
+
+// Show only the last 4 digits of an account number, e.g. ••••5678.
+function maskAccount(no) {
+  if (!no) return '';
+  return '••••' + String(no).slice(-4);
+}
 
 // Mirrors the backend password policy so we can flag problems before submitting.
 function passwordPolicyError(pw) {
@@ -42,7 +49,11 @@ function ProfilePage() {
   const [pwShown, setPwShown] = useState({ currentPassword: false, newPassword: false, confirmPassword: false });
   const toggleShown = (name) => setPwShown((s) => ({ ...s, [name]: !s[name] }));
 
-  const [discard, setDiscard] = useState(null);   // 'profile' | 'password' when confirming a discard
+  const [bankEditing, setBankEditing] = useState(false);
+  const [bankForm, setBankForm] = useState(EMPTY_BANK);
+  const [bankSaving, setBankSaving] = useState(false);
+
+  const [discard, setDiscard] = useState(null);   // 'profile' | 'password' | 'bank' when confirming a discard
 
   useEffect(() => {
     let active = true;
@@ -98,6 +109,55 @@ function ProfilePage() {
     setCurrentPwError('');
   }
 
+  // ── bank account ──────────────────────────────────────────────────
+  function startBankEdit() {
+    const p = me.profile || {};
+    setBankForm({
+      bankName: p.bankName || '',
+      bankAccountName: p.bankAccountName || '',
+      bankAccountNumber: p.bankAccountNumber || '',
+    });
+    setBankEditing(true);
+  }
+
+  const bankDirty = bankEditing && me.profile && (
+    bankForm.bankName.trim() !== (me.profile.bankName || '') ||
+    bankForm.bankAccountName.trim() !== (me.profile.bankAccountName || '') ||
+    bankForm.bankAccountNumber.trim() !== (me.profile.bankAccountNumber || '')
+  );
+
+  const bankNumberError = bankForm.bankAccountNumber && !/^\d{5,20}$/.test(bankForm.bankAccountNumber.trim())
+    ? 'Account number must be 5–20 digits.' : null;
+  const bankReady = bankForm.bankName.trim() && bankForm.bankAccountName.trim()
+    && bankForm.bankAccountNumber.trim() && !bankNumberError;
+
+  function cancelBank() {
+    if (bankDirty) setDiscard('bank');
+    else setBankEditing(false);
+  }
+
+  async function saveBank(e) {
+    e.preventDefault();
+    if (!bankReady) return;
+    if (!bankDirty) { setBankEditing(false); return; }
+    setBankSaving(true);
+    setError('');
+    try {
+      const saved = await updateBankAccount({
+        bankName: bankForm.bankName.trim(),
+        bankAccountName: bankForm.bankAccountName.trim(),
+        bankAccountNumber: bankForm.bankAccountNumber.trim(),
+      });
+      setMe((m) => ({ ...m, profile: { ...m.profile, ...saved } }));
+      setBankEditing(false);
+      setToast('Bank account updated.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBankSaving(false);
+    }
+  }
+
   // cancel: confirm first if there are unsaved edits, otherwise just close
   function cancelEdit() {
     if (dirty) setDiscard('profile');
@@ -111,6 +171,7 @@ function ProfilePage() {
   function confirmDiscard() {
     if (discard === 'profile') setEditing(false);
     if (discard === 'password') closePw();
+    if (discard === 'bank') setBankEditing(false);
     setDiscard(null);
   }
 
@@ -234,6 +295,69 @@ function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* bank account (suppliers only) — where their sales payouts are sent */}
+      {me.role === 'Supplier' && (
+        <div className="card mt-4">
+          <div className="card-body">
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <h5 className="mb-0">Bank account</h5>
+                <small className="text-muted">Where your sales payouts are sent.</small>
+              </div>
+              {!bankEditing && (
+                <button className="btn btn-outline-primary"
+                  onClick={startBankEdit}>
+                  {me.profile?.bankAccountNumber ? 'Edit' : 'Add bank account'}
+                </button>
+              )}
+            </div>
+
+            {bankEditing ? (
+              <form className="mt-3" onSubmit={saveBank}>
+                <div className="mb-3">
+                  <label className="form-label">Bank name</label>
+                  <input type="text" className="form-control" maxLength="100" required autoFocus
+                    value={bankForm.bankName}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankName: e.target.value }))} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Account holder name</label>
+                  <input type="text" className="form-control" maxLength="150" required
+                    value={bankForm.bankAccountName}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountName: e.target.value }))} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Account number</label>
+                  <input type="text" inputMode="numeric" maxLength="34" required
+                    className={'form-control' + (bankNumberError ? ' is-invalid' : '')}
+                    value={bankForm.bankAccountNumber}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountNumber: e.target.value }))} />
+                  {bankNumberError && <div className="invalid-feedback">{bankNumberError}</div>}
+                </div>
+                <div className="d-flex gap-2">
+                  <button type="submit" className="btn btn-primary" disabled={bankSaving || !bankReady || !bankDirty}>
+                    {bankSaving ? 'Saving…' : 'Save bank account'}
+                  </button>
+                  <button type="button" className="btn btn-outline-secondary"
+                    onClick={cancelBank} disabled={bankSaving}>Cancel</button>
+                </div>
+              </form>
+            ) : me.profile?.bankAccountNumber ? (
+              <dl className="row mb-0 mt-3">
+                <dt className="col-sm-4">Bank</dt>
+                <dd className="col-sm-8">{me.profile.bankName}</dd>
+                <dt className="col-sm-4">Account holder</dt>
+                <dd className="col-sm-8">{me.profile.bankAccountName}</dd>
+                <dt className="col-sm-4">Account number</dt>
+                <dd className="col-sm-8">{maskAccount(me.profile.bankAccountNumber)}</dd>
+              </dl>
+            ) : (
+              <p className="text-muted mb-0 mt-3">No bank account added yet.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* change password */}
       <div className="card mt-4">

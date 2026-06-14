@@ -174,7 +174,9 @@ function handleMe(PDO $pdo, array $auth): void {
 
   $profile = null;
   if ($u['role'] === 'Supplier') {
-    $p = $pdo->prepare('SELECT supplierId, companyName, companyAddress FROM supplier WHERE userId = :id');
+    $p = $pdo->prepare('SELECT supplierId, companyName, companyAddress,
+                               bankName, bankAccountName, bankAccountNumber
+                          FROM supplier WHERE userId = :id');
   } elseif ($u['role'] === 'Customer') {
     $p = $pdo->prepare('SELECT customerId, shippingAddress FROM customer WHERE userId = :id');
   } elseif ($u['role'] === 'DeliveryPersonnel') {

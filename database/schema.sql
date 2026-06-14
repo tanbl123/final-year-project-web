@@ -93,6 +93,9 @@ CREATE TABLE supplier (
     businessRegNo   VARCHAR(50)  NOT NULL,                -- SSM / company registration no.
     businessLicenseUrl VARCHAR(255) NOT NULL,             -- uploaded registration certificate
     taxNumber       VARCHAR(50)  NULL,                    -- SST / tax no. (optional)
+    bankName          VARCHAR(100) NULL,                  -- supplier's bank, for payouts
+    bankAccountName   VARCHAR(150) NULL,                  -- account holder's name
+    bankAccountNumber VARCHAR(34)  NULL,                  -- account number
     stripeAccountId VARCHAR(60)  NULL,                    -- Stripe Connect account (acct_...)
     payoutsEnabled  TINYINT(1)   NOT NULL DEFAULT 0,      -- set once Stripe verifies payouts
     PRIMARY KEY (supplierId),
