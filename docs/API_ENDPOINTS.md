@@ -79,8 +79,8 @@ List responses include paging info:
 | POST | `/auth/register` | Public | Register. Customer → `Active` immediately. Supplier/Delivery → `Pending` (await admin). |
 | POST | `/auth/login` | Public | Returns JWT + role + basic profile. |
 | POST | `/auth/logout` | Any | Client-side token discard (and optional server token blacklist). |
-| GET  | `/auth/me` | Any | Current user's profile (joins role-specific table). |
-| PUT  | `/auth/me` | Any | Update own profile (fullName, phone, address, etc.). |
+| GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). |
+| PUT  | `/auth/me` | Any | **(Implemented)** Update own profile (`fullName`, `phoneNumber`). |
 | POST | `/auth/change-password` | Any | Change own password (old + new). |
 
 **`POST /auth/register` request (customer):**

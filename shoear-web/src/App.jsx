@@ -11,6 +11,8 @@ import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
+import ProfilePage from './features/profile/ProfilePage';
+import Avatar from './components/Avatar';
 
 function App() {
   const { user, logout } = useAuth();   // 👈 tune in to the auth broadcast
@@ -48,8 +50,12 @@ function App() {
             )}
           </div>
 
-          <div className="navbar-nav">
-            <span className="navbar-text text-light me-3">Hi, {user.fullName}</span>
+          <div className="navbar-nav align-items-center">
+            <Link to="/profile"
+              className="navbar-text text-light me-3 d-inline-flex align-items-center text-decoration-none">
+              <Avatar name={user.fullName} size={32} className="me-2" />
+              <span>Hi, {user.fullName}</span>
+            </Link>
             <button className="btn btn-outline-light btn-sm" onClick={handleLogout}>
               Logout
             </button>
@@ -79,6 +85,11 @@ function App() {
         } />
         <Route path="/admin/users" element={
           <ProtectedRoute role="Admin"><AdminUsersPage /></ProtectedRoute>
+        } />
+
+        {/* any signed-in user's own profile */}
+        <Route path="/profile" element={
+          <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
 
         {/* supplier */}

@@ -49,6 +49,19 @@ if ($method === 'POST' && $path === '/auth/login') {
   handleLogin($pdo, $secret);
 }
 
+// ── own profile (any signed-in user) ──
+if ($method === 'GET' && $path === '/auth/me') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleMe($pdo, $auth);
+}
+
+if ($method === 'PUT' && $path === '/auth/me') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpdateMe($pdo, $auth);
+}
+
 // ── admin routes (require an Admin token) ──
 if ($method === 'GET' && $path === '/admin/suppliers/pending') {
   $auth = requireAuth($secret);

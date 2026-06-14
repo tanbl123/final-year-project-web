@@ -25,8 +25,17 @@ export function AuthProvider({ children }) {
     setUser(null);               // update global state
   }
 
+  // merge fields into the cached user (e.g. after a profile edit) and persist
+  function updateUser(patch) {
+    setUser((prev) => {
+      const next = { ...prev, ...patch };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  }
+
   // everything we want to share with the app
-  const value = { user, login, logout };
+  const value = { user, login, logout, updateUser };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

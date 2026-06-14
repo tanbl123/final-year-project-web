@@ -130,3 +130,50 @@ function handleLogin(PDO $pdo, string $secret): void {
     ],
   ]);
 }
+
+// GET /auth/me — the signed-in user's own profile (+ role-specific details).
+function handleMe(PDO $pdo, array $auth): void {
+  $stmt = $pdo->prepare(
+    'SELECT userId, username, fullName, email, phoneNumber, role, status, created_at
+       FROM `user` WHERE userId = :id'
+  );
+  $stmt->execute(['id' => $auth['userId']]);
+  $u = $stmt->fetch();
+  if (!$u) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Account not found.']);
+  }
+
+  $profile = null;
+  if ($u['role'] === 'Supplier') {
+    $p = $pdo->prepare('SELECT supplierId, companyName, companyAddress FROM supplier WHERE userId = :id');
+  } elseif ($u['role'] === 'Customer') {
+    $p = $pdo->prepare('SELECT customerId, shippingAddress FROM customer WHERE userId = :id');
+  } elseif ($u['role'] === 'DeliveryPersonnel') {
+    $p = $pdo->prepare('SELECT deliveryPersonnelId, vehicleInfo FROM delivery_personnel WHERE userId = :id');
+  } else {
+    $p = null;
+  }
+  if ($p) { $p->execute(['id' => $auth['userId']]); $profile = $p->fetch() ?: null; }
+  $u['profile'] = $profile;
+
+  sendJson(200, true, $u);
+}
+
+// PUT /auth/me — update the signed-in user's own editable fields.
+function handleUpdateMe(PDO $pdo, array $auth): void {
+  $body     = getJsonBody();
+  $fullName = trim($body['fullName'] ?? '');
+  $phone    = trim($body['phoneNumber'] ?? '');
+
+  if ($fullName === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Full name is required.']);
+  }
+  if ($phone === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Phone number is required.']);
+  }
+
+  $upd = $pdo->prepare('UPDATE `user` SET fullName = :fn, phoneNumber = :ph WHERE userId = :id');
+  $upd->execute(['fn' => $fullName, 'ph' => $phone, 'id' => $auth['userId']]);
+
+  sendJson(200, true, ['fullName' => $fullName, 'phoneNumber' => $phone]);
+}
