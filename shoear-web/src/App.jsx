@@ -12,6 +12,7 @@ import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprov
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import ProfilePage from './features/profile/ProfilePage';
+import PayoutsPage from './features/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
 
 function App() {
@@ -46,6 +47,7 @@ function App() {
               <>
                 <Link className="nav-link" to="/products">Products</Link>
                 <Link className="nav-link" to="/reports">Reports</Link>
+                <Link className="nav-link" to="/payouts">Payouts</Link>
               </>
             )}
           </div>
@@ -104,6 +106,9 @@ function App() {
         } />
         <Route path="/reports" element={
           <ProtectedRoute role="Supplier"><ReportsPage /></ProtectedRoute>
+        } />
+        <Route path="/payouts" element={
+          <ProtectedRoute role="Supplier"><PayoutsPage /></ProtectedRoute>
         } />
       </Routes>
     </>

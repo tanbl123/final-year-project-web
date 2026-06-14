@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { register, uploadRegistrationDoc, getBanks } from '../authService';
+import { register, uploadRegistrationDoc } from '../authService';
 import EyeIcon from '../../../components/EyeIcon';
 
 // Password policy: 8+ chars with at least one lowercase, uppercase, digit
@@ -14,26 +14,9 @@ function validatePassword(pw) {
   return '';
 }
 
-// Validate the bank account number against the chosen bank's expected
-// length(s). `banks` is the list from the API (may be empty before it loads).
-function validateBankAccount(form, banks) {
-  const acc = form.bankAccountNo.trim();
-  if (acc === '') return 'Bank account number is required.';
-  const digits = acc.replace(/\D/g, '');
-  const bank = banks.find((b) => b.name === form.bankName);
-  if (bank) {
-    if (!bank.accountLengths.includes(digits.length)) {
-      return `A ${bank.name} account number must be ${bank.accountLengths.join(' or ')} digits.`;
-    }
-  } else if (!/^[0-9][0-9 -]{5,33}$/.test(acc)) {
-    return 'Enter a valid bank account number.';
-  }
-  return '';
-}
-
 // Validate the whole form, returning a { field: message } object.
-// An empty object means everything passed. `banks` powers account validation.
-function validateForm(form, banks = []) {
+// An empty object means everything passed.
+function validateForm(form) {
   const errors = {};
 
   if (form.companyName.trim() === '') errors.companyName = 'Company name is required.';
@@ -59,12 +42,6 @@ function validateForm(form, banks = []) {
   if (form.businessLicenseUrl.trim() === '') errors.businessLicenseUrl = 'Please upload your business registration document.';
   // taxNumber is optional — no rule
 
-  // payout (bank) details
-  if (form.bankName.trim() === '') errors.bankName = 'Please choose your bank.';
-  if (form.bankAccountName.trim() === '') errors.bankAccountName = 'Account holder name is required.';
-  const accErr = validateBankAccount(form, banks);
-  if (accErr) errors.bankAccountNo = accErr;
-
   const pwError = validatePassword(form.password);
   if (pwError) errors.password = pwError;
 
@@ -79,8 +56,8 @@ function validateForm(form, banks = []) {
 
 // Set or clear a single field's error on an errors object (mutates it),
 // reusing the same rules as the full-form validation.
-function applyFieldError(errors, name, form, banks) {
-  const msg = validateForm(form, banks)[name];
+function applyFieldError(errors, name, form) {
+  const msg = validateForm(form)[name];
   if (msg) errors[name] = msg;
   else delete errors[name];
 }
@@ -90,7 +67,6 @@ function RegisterPage() {
     companyName: '', username: '', email: '', phoneNumber: '',
     companyAddress: '', password: '', confirm: '',
     businessRegNo: '', taxNumber: '', businessLicenseUrl: '',
-    bankName: '', bankAccountName: '', bankAccountNo: '',
   });
   const [errors, setErrors] = useState({});       // per-field messages
   const [formError, setFormError] = useState(''); // general/server fallback
@@ -99,19 +75,6 @@ function RegisterPage() {
   const [shown, setShown] = useState({ password: false, confirm: false }); // show/hide toggles
   const [licenseName, setLicenseName] = useState('');   // uploaded document filename
   const [uploadingDoc, setUploadingDoc] = useState(false);
-  const [banks, setBanks] = useState([]);               // payout banks from the API
-  const [loadingBanks, setLoadingBanks] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    getBanks()
-      .then((data) => { if (active) setBanks(data.banks); })
-      .catch(() => { /* dropdown falls back to a generic account check */ })
-      .finally(() => { if (active) setLoadingBanks(false); });
-    return () => { active = false; };
-  }, []);
-
-  const selectedBank = banks.find((b) => b.name === form.bankName);
 
   async function handleLicenseFile(event) {
     const file = event.target.files[0];
@@ -147,11 +110,9 @@ function RegisterPage() {
 
     setErrors((prev) => {
       const next = { ...prev };
-      if (name in prev) applyFieldError(next, name, nextForm, banks);
+      if (name in prev) applyFieldError(next, name, nextForm);
       // password & confirm are linked — keep the confirm error in sync
-      if (name === 'password' && 'confirm' in prev) applyFieldError(next, 'confirm', nextForm, banks);
-      // bank & account number are linked — re-check the account when the bank changes
-      if (name === 'bankName' && 'bankAccountNo' in prev) applyFieldError(next, 'bankAccountNo', nextForm, banks);
+      if (name === 'password' && 'confirm' in prev) applyFieldError(next, 'confirm', nextForm);
       return next;
     });
   }
@@ -161,7 +122,7 @@ function RegisterPage() {
     const { name } = event.target;
     setErrors((prev) => {
       const next = { ...prev };
-      applyFieldError(next, name, form, banks);
+      applyFieldError(next, name, form);
       return next;
     });
   }
@@ -170,7 +131,7 @@ function RegisterPage() {
     event.preventDefault();   // AJAX submit — no page reload
     setFormError('');
 
-    const found = validateForm(form, banks);
+    const found = validateForm(form);
     if (Object.keys(found).length > 0) {
       setErrors(found);
       return;
@@ -189,9 +150,6 @@ function RegisterPage() {
         businessRegNo: form.businessRegNo.trim(),
         businessLicenseUrl: form.businessLicenseUrl,
         taxNumber: form.taxNumber.trim(),
-        bankName: form.bankName.trim(),
-        bankAccountName: form.bankAccountName.trim(),
-        bankAccountNo: form.bankAccountNo.trim(),
         password: form.password,
       });
       setDone(true);   // success → show pending-approval message
@@ -310,31 +268,9 @@ function RegisterPage() {
         {field('taxNumber', 'Tax / SST number (optional)')}
         {licenseField()}
 
-        <hr className="my-3" />
-        <h6 className="text-muted text-uppercase small fw-bold">Payout (bank) details</h6>
-        <p className="text-muted small mb-3">Used to pay out your sales income. The account holder should match your company name.</p>
-        <div className="mb-3">
-          <label className="form-label">Bank name</label>
-          <select name="bankName"
-            className={`form-select ${errors.bankName ? 'is-invalid' : ''}`}
-            value={form.bankName} onChange={handleChange} onBlur={handleBlur} disabled={loadingBanks}>
-            <option value="">{loadingBanks ? 'Loading banks…' : 'Choose your bank…'}</option>
-            {banks.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-          </select>
-          {errors.bankName && <div className="invalid-feedback">{errors.bankName}</div>}
-        </div>
-        {field('bankAccountName', 'Account holder name')}
-        <div className="mb-3">
-          <label className="form-label">Bank account number</label>
-          <input type="text" name="bankAccountNo" inputMode="numeric"
-            className={`form-control ${errors.bankAccountNo ? 'is-invalid' : ''}`}
-            value={form.bankAccountNo} onChange={handleChange} onBlur={handleBlur} />
-          {errors.bankAccountNo && <div className="invalid-feedback">{errors.bankAccountNo}</div>}
-          {selectedBank && !errors.bankAccountNo && (
-            <div className="form-text">
-              Enter your {selectedBank.accountLengths.join(' or ')}-digit {selectedBank.name} account number.
-            </div>
-          )}
+        <div className="alert alert-light border small mb-3">
+          💳 <strong>Payouts:</strong> after your account is approved, you'll set up payouts
+          securely through <strong>Stripe</strong> from your dashboard — we never store your bank details.
         </div>
 
         <hr className="my-3" />

@@ -96,17 +96,18 @@ List responses include paging info:
 }
 ```
 For `"role": "Supplier"` send `companyName`, `companyAddress`,
-`businessRegNo`, `businessLicenseUrl`, `bankName`, `bankAccountName`,
-`bankAccountNo` (and optional `taxNumber`) instead; for
+`businessRegNo`, `businessLicenseUrl` (and optional `taxNumber`) instead; for
 `"role": "DeliveryPersonnel"` send `vehicleInfo`. Server hashes the password
-(bcrypt/argon2) before storing — never stores plain text.
+(bcrypt/argon2) before storing — never stores plain text. Bank/payout details
+are NOT collected here — suppliers add them later via Stripe Connect.
 
 The supplier's `businessLicenseUrl` comes from first uploading the document:
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
 | POST | `/uploads/registration-doc` | Public | **(Implemented)** Upload a business document (PDF/image, ≤10 MB) during registration; returns `{ url }`. No token (the account doesn't exist yet). |
-| GET | `/banks` | Public | **(Implemented)** Supported payout banks with valid account-number lengths, for the registration dropdown + length validation. |
+| POST | `/supplier/stripe/onboard` | Supplier | **(Implemented)** Create/resume a Stripe Connect account; returns a hosted onboarding `{ url }`. Needs `STRIPE_SECRET` configured. |
+| GET | `/supplier/stripe/status` | Supplier | **(Implemented)** Payout status `{ connected, payoutsEnabled, configured }`; syncs `payoutsEnabled` from Stripe. |
 
 **`POST /auth/login` response:**
 ```json

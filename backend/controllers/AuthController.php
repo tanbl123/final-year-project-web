@@ -23,13 +23,11 @@ function handleRegister(PDO $pdo): void {
   $companyAddress = trim($body['companyAddress'] ?? '');
   $password       = $body['password'] ?? '';
 
-  // business identity + payout details (Stage 1 supplier KYC)
+  // business identity (supplier KYB). Bank/payout details are NOT collected
+  // here — Stripe Connect collects + verifies them later via hosted onboarding.
   $businessRegNo      = trim($body['businessRegNo'] ?? '');
   $businessLicenseUrl = trim($body['businessLicenseUrl'] ?? '');
   $taxNumber          = trim($body['taxNumber'] ?? '');     // optional
-  $bankName           = trim($body['bankName'] ?? '');
-  $bankAccountName    = trim($body['bankAccountName'] ?? '');
-  $bankAccountNo      = trim($body['bankAccountNo'] ?? '');
 
   // the supplier's display name IS their company name (no separate contact name)
   $fullName = $companyName;
@@ -37,19 +35,8 @@ function handleRegister(PDO $pdo): void {
   // every required field must be present (taxNumber is the only optional one)
   if ($username === '' || $email === '' || $phoneNumber === ''
       || $companyName === '' || $companyAddress === ''
-      || $businessRegNo === '' || $businessLicenseUrl === ''
-      || $bankName === '' || $bankAccountName === '' || $bankAccountNo === '') {
+      || $businessRegNo === '' || $businessLicenseUrl === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields are required.']);
-  }
-  // bank: must be a supported bank, and the account number must match its
-  // expected length (catches typos; not an ownership check)
-  $bank = findBank($bankName);
-  if (!$bank) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please choose a supported bank.']);
-  }
-  $accErr = bankAccountError($bank, $bankAccountNo);
-  if ($accErr) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $accErr]);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
@@ -93,14 +80,12 @@ function handleRegister(PDO $pdo): void {
     $pdo->prepare(
       'INSERT INTO supplier
          (supplierId, userId, companyName, companyAddress,
-          businessRegNo, businessLicenseUrl, taxNumber,
-          bankName, bankAccountName, bankAccountNo)
-       VALUES (:sid, :uid, :cn, :ca, :brn, :blu, :tax, :bn, :ban, :bno)'
+          businessRegNo, businessLicenseUrl, taxNumber)
+       VALUES (:sid, :uid, :cn, :ca, :brn, :blu, :tax)'
     )->execute([
       'sid' => $supplierId, 'uid' => $userId, 'cn' => $companyName, 'ca' => $companyAddress,
       'brn' => $businessRegNo, 'blu' => $businessLicenseUrl,
       'tax' => ($taxNumber === '' ? null : $taxNumber),
-      'bn' => $bankName, 'ban' => $bankAccountName, 'bno' => $bankAccountNo,
     ]);
 
     $pdo->commit();

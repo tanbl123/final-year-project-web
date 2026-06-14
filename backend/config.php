@@ -13,4 +13,11 @@ return [
     'charset' => 'utf8mb4',
   ],
   'jwt_secret' => 'CHANGE_ME_to_a_long_random_string',
+
+  // Stripe Connect (payouts). Keep the secret OUT of git — set it via the
+  // STRIPE_SECRET environment variable (use a test key: sk_test_...).
+  'stripe_secret' => getenv('STRIPE_SECRET') ?: '',
+
+  // Where Stripe sends the supplier back after hosted onboarding.
+  'app_url' => getenv('APP_URL') ?: 'http://localhost:5173',
 ];
