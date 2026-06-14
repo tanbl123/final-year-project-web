@@ -13,6 +13,7 @@ require __DIR__ . '/../../controllers/ProductController.php';
 require __DIR__ . '/../../controllers/CategoryController.php';
 require __DIR__ . '/../../controllers/UploadController.php';
 require __DIR__ . '/../../controllers/StripeController.php';
+require __DIR__ . '/../../controllers/ReportController.php';
 
 // ── CORS: let the React dev server (port 5173) call us ──
 header('Access-Control-Allow-Origin: http://localhost:5173');
@@ -81,6 +82,20 @@ if ($method === 'GET' && $path === '/supplier/stripe/status') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleStripeStatus($pdo, $config, $auth);
+}
+
+// ── reports ──
+if ($method === 'GET' && $path === '/reports/sales') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleSupplierSalesReport($pdo, $auth);
+}
+
+if ($method === 'GET' && $path === '/admin/reports/commission') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleAdminCommissionReport($pdo);
 }
 
 // ── admin routes (require an Admin token) ──

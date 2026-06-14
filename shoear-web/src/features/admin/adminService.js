@@ -66,3 +66,9 @@ export function getUser(userId) {
 export function setUserStatus(userId, status) {
   return apiPatch(`/admin/users/${userId}/status`, { status }, getToken());
 }
+
+// ── reports ──────────────────────────────────────────────────────────
+// Platform commission across all suppliers (paid orders only).
+export function getCommissionReport() {
+  return apiGet('/admin/reports/commission', getToken());
+}

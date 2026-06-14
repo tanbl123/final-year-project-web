@@ -359,8 +359,8 @@ updates (Section 11) drive the later stages.
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET | `/admin/reports/sales` | Admin | Platform sales + commission earned, date-range filter. |
-| GET | `/supplier/reports/sales` | Supplier | The logged-in supplier's own sales summary. |
+| GET | `/reports/sales` | Supplier | **(Implemented)** The logged-in supplier's own sales summary + per-product breakdown (paid orders); commission derived from the active rate. |
+| GET | `/admin/reports/commission` | Admin | **(Implemented)** Platform commission across all suppliers (paid orders), broken down per supplier. |
 
 > These rely on the `created_at` / `updated_at` columns and the order/payment
 > tables — the reason those audit columns were added to the schema.

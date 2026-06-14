@@ -11,6 +11,7 @@ import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
+import AdminCommissionPage from './features/admin/pages/AdminCommissionPage';
 import ProfilePage from './features/profile/ProfilePage';
 import PayoutsPage from './features/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
@@ -42,6 +43,7 @@ function App() {
                 <Link className="nav-link" to="/admin/users">Users</Link>
                 <Link className="nav-link" to="/admin/products">Products</Link>
                 <Link className="nav-link" to="/admin/categories">Categories</Link>
+                <Link className="nav-link" to="/admin/commission">Commission</Link>
               </>
             ) : (
               <>
@@ -87,6 +89,9 @@ function App() {
         } />
         <Route path="/admin/users" element={
           <ProtectedRoute role="Admin"><AdminUsersPage /></ProtectedRoute>
+        } />
+        <Route path="/admin/commission" element={
+          <ProtectedRoute role="Admin"><AdminCommissionPage /></ProtectedRoute>
         } />
 
         {/* any signed-in user's own profile */}
