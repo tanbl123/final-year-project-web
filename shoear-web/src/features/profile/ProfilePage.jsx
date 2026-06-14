@@ -3,6 +3,7 @@ import { getMe, updateMe, changePassword } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
 import Avatar from '../../components/Avatar';
 import Toast from '../../components/Toast';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
@@ -37,6 +38,8 @@ function ProfilePage() {
   const [pw, setPw] = useState(EMPTY_PW);
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+
+  const [discard, setDiscard] = useState(null);   // 'profile' | 'password' when confirming a discard
 
   useEffect(() => {
     let active = true;
@@ -90,6 +93,22 @@ function ProfilePage() {
     setPwOpen(false);
     setPw(EMPTY_PW);
     setPwError('');
+  }
+
+  // cancel: confirm first if there are unsaved edits, otherwise just close
+  function cancelEdit() {
+    if (dirty) setDiscard('profile');
+    else setEditing(false);
+  }
+  const pwTouched = pw.currentPassword || pw.newPassword || pw.confirmPassword;
+  function cancelPw() {
+    if (pwTouched) setDiscard('password');
+    else closePw();
+  }
+  function confirmDiscard() {
+    if (discard === 'profile') setEditing(false);
+    if (discard === 'password') closePw();
+    setDiscard(null);
   }
 
   async function savePassword(e) {
@@ -183,7 +202,7 @@ function ProfilePage() {
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
                 <button type="button" className="btn btn-outline-secondary"
-                  onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
+                  onClick={cancelEdit} disabled={saving}>Cancel</button>
               </div>
             </form>
           ) : (
@@ -277,12 +296,22 @@ function ProfilePage() {
                   {pwSaving ? 'Saving…' : 'Update password'}
                 </button>
                 <button type="button" className="btn btn-outline-secondary"
-                  onClick={closePw} disabled={pwSaving}>Cancel</button>
+                  onClick={cancelPw} disabled={pwSaving}>Cancel</button>
               </div>
             </form>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={!!discard}
+        title="Discard changes?"
+        message="You have unsaved changes. Are you sure you want to discard them?"
+        confirmText="Discard"
+        confirmColor="danger"
+        onCancel={() => setDiscard(null)}
+        onConfirm={confirmDiscard}
+      />
 
       <Toast message={toast} onClose={() => setToast('')} />
     </div>
