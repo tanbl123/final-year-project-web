@@ -6,6 +6,16 @@ import Toast from '../../components/Toast';
 
 const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
+// Mirrors the backend password policy so we can flag problems before submitting.
+function passwordPolicyError(pw) {
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[a-z]/.test(pw)) return 'Password must include a lowercase letter.';
+  if (!/[A-Z]/.test(pw)) return 'Password must include an uppercase letter.';
+  if (!/[0-9]/.test(pw)) return 'Password must include a number.';
+  if (!/[^a-zA-Z0-9]/.test(pw)) return 'Password must include a special character.';
+  return null;
+}
+
 const STATUS_COLORS = {
   Active: 'success', Pending: 'warning', Suspended: 'secondary',
   Rejected: 'danger', Deleted: 'dark',
@@ -42,12 +52,29 @@ function ProfilePage() {
     setEditing(true);
   }
 
+  // has the user actually changed anything in the edit form?
+  const dirty = editing && (
+    form.fullName.trim() !== me.fullName ||
+    form.phoneNumber.trim() !== (me.phoneNumber || '')
+  );
+
   async function save(e) {
     e.preventDefault();
+    if (!form.fullName.trim() || !form.phoneNumber.trim()) {
+      setError('Full name and phone number are required.');
+      return;
+    }
+    if (!dirty) {                 // nothing changed — don't pretend we saved
+      setEditing(false);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
-      const saved = await updateMe(form);
+      const saved = await updateMe({
+        fullName: form.fullName.trim(),
+        phoneNumber: form.phoneNumber.trim(),
+      });
       setMe((m) => ({ ...m, ...saved }));
       updateUser({ fullName: saved.fullName });   // refresh the navbar greeting
       setEditing(false);
@@ -68,6 +95,19 @@ function ProfilePage() {
   async function savePassword(e) {
     e.preventDefault();
     setPwError('');
+    if (!pw.currentPassword) {
+      setPwError('Please enter your current password.');
+      return;
+    }
+    const policyError = passwordPolicyError(pw.newPassword);
+    if (policyError) {
+      setPwError(policyError);
+      return;
+    }
+    if (pw.newPassword === pw.currentPassword) {
+      setPwError('New password must be different from your current one.');
+      return;
+    }
     if (pw.newPassword !== pw.confirmPassword) {
       setPwError('New password and confirmation do not match.');
       return;
@@ -83,6 +123,11 @@ function ProfilePage() {
       setPwSaving(false);
     }
   }
+
+  // live feedback for the password form
+  const newPwError = pw.newPassword ? passwordPolicyError(pw.newPassword) : null;
+  const confirmMismatch = pw.confirmPassword.length > 0 && pw.confirmPassword !== pw.newPassword;
+  const pwReady = pw.currentPassword && !newPwError && !confirmMismatch && pw.confirmPassword;
 
   if (loading) return <div className="container py-4"><p className="text-muted">Loading…</p></div>;
   if (!me) {
@@ -134,7 +179,7 @@ function ProfilePage() {
                   onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))} />
               </div>
               <div className="d-flex gap-2">
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+                <button type="submit" className="btn btn-primary" disabled={saving || !dirty}>
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
                 <button type="button" className="btn btn-outline-secondary"
@@ -209,23 +254,26 @@ function ProfilePage() {
               </div>
               <div className="mb-3">
                 <label className="form-label">New password</label>
-                <input type="password" className="form-control" required
-                  autoComplete="new-password"
+                <input type="password" required autoComplete="new-password"
+                  className={'form-control' + (newPwError ? ' is-invalid' : '')}
                   value={pw.newPassword}
                   onChange={(e) => setPw((p) => ({ ...p, newPassword: e.target.value }))} />
-                <div className="form-text">
-                  At least 8 characters with upper &amp; lower case, a number and a special character.
-                </div>
+                {newPwError
+                  ? <div className="invalid-feedback">{newPwError}</div>
+                  : <div className="form-text">
+                      At least 8 characters with upper &amp; lower case, a number and a special character.
+                    </div>}
               </div>
               <div className="mb-3">
                 <label className="form-label">Confirm new password</label>
-                <input type="password" className="form-control" required
-                  autoComplete="new-password"
+                <input type="password" required autoComplete="new-password"
+                  className={'form-control' + (confirmMismatch ? ' is-invalid' : '')}
                   value={pw.confirmPassword}
                   onChange={(e) => setPw((p) => ({ ...p, confirmPassword: e.target.value }))} />
+                {confirmMismatch && <div className="invalid-feedback">Passwords do not match.</div>}
               </div>
               <div className="d-flex gap-2">
-                <button type="submit" className="btn btn-primary" disabled={pwSaving}>
+                <button type="submit" className="btn btn-primary" disabled={pwSaving || !pwReady}>
                   {pwSaving ? 'Saving…' : 'Update password'}
                 </button>
                 <button type="button" className="btn btn-outline-secondary"
