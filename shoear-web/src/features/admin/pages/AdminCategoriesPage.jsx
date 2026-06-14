@@ -155,7 +155,9 @@ function AdminCategoriesPage() {
                     {editingId === cat.id ? (
                       <>
                         <button className="btn btn-success btn-sm me-2"
-                          disabled={savingId === cat.id} onClick={() => saveEdit(cat)}>
+                          disabled={savingId === cat.id ||
+                            editName.trim() === '' || editName.trim() === cat.name}
+                          onClick={() => saveEdit(cat)}>
                           {savingId === cat.id ? '…' : 'Save'}
                         </button>
                         <button className="btn btn-outline-secondary btn-sm" onClick={cancelEdit}>
