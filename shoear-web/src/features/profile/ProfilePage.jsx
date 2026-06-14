@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import Avatar from '../../components/Avatar';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EyeIcon from '../../components/EyeIcon';
 
 const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
@@ -38,6 +39,8 @@ function ProfilePage() {
   const [pw, setPw] = useState(EMPTY_PW);
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+  const [pwShown, setPwShown] = useState({ currentPassword: false, newPassword: false, confirmPassword: false });
+  const toggleShown = (name) => setPwShown((s) => ({ ...s, [name]: !s[name] }));
 
   const [discard, setDiscard] = useState(null);   // 'profile' | 'password' when confirming a discard
 
@@ -266,30 +269,54 @@ function ProfilePage() {
               )}
               <div className="mb-3">
                 <label className="form-label">Current password</label>
-                <input type="password" className="form-control" required autoFocus
-                  autoComplete="current-password"
-                  value={pw.currentPassword}
-                  onChange={(e) => setPw((p) => ({ ...p, currentPassword: e.target.value }))} />
+                <div className="input-group">
+                  <input type={pwShown.currentPassword ? 'text' : 'password'} required autoFocus
+                    autoComplete="current-password" className="form-control"
+                    value={pw.currentPassword}
+                    onChange={(e) => setPw((p) => ({ ...p, currentPassword: e.target.value }))} />
+                  <button type="button" className="btn btn-outline-secondary d-flex align-items-center"
+                    onClick={() => toggleShown('currentPassword')} tabIndex={-1}
+                    aria-label={pwShown.currentPassword ? 'Hide password' : 'Show password'}>
+                    <EyeIcon off={pwShown.currentPassword} />
+                  </button>
+                </div>
               </div>
               <div className="mb-3">
                 <label className="form-label">New password</label>
-                <input type="password" required autoComplete="new-password"
-                  className={'form-control' + (newPwError ? ' is-invalid' : '')}
-                  value={pw.newPassword}
-                  onChange={(e) => setPw((p) => ({ ...p, newPassword: e.target.value }))} />
-                {newPwError
-                  ? <div className="invalid-feedback">{newPwError}</div>
-                  : <div className="form-text">
-                      At least 8 characters with upper &amp; lower case, a number and a special character.
-                    </div>}
+                <div className="input-group has-validation">
+                  <input type={pwShown.newPassword ? 'text' : 'password'} required autoComplete="new-password"
+                    className={'form-control' + (newPwError ? ' is-invalid' : '')}
+                    style={{ backgroundImage: 'none' }}
+                    value={pw.newPassword}
+                    onChange={(e) => setPw((p) => ({ ...p, newPassword: e.target.value }))} />
+                  <button type="button" className="btn btn-outline-secondary d-flex align-items-center"
+                    onClick={() => toggleShown('newPassword')} tabIndex={-1}
+                    aria-label={pwShown.newPassword ? 'Hide password' : 'Show password'}>
+                    <EyeIcon off={pwShown.newPassword} />
+                  </button>
+                  {newPwError && <div className="invalid-feedback">{newPwError}</div>}
+                </div>
+                {!newPwError && (
+                  <div className="form-text">
+                    At least 8 characters with upper &amp; lower case, a number and a special character.
+                  </div>
+                )}
               </div>
               <div className="mb-3">
                 <label className="form-label">Confirm new password</label>
-                <input type="password" required autoComplete="new-password"
-                  className={'form-control' + (confirmMismatch ? ' is-invalid' : '')}
-                  value={pw.confirmPassword}
-                  onChange={(e) => setPw((p) => ({ ...p, confirmPassword: e.target.value }))} />
-                {confirmMismatch && <div className="invalid-feedback">Passwords do not match.</div>}
+                <div className="input-group has-validation">
+                  <input type={pwShown.confirmPassword ? 'text' : 'password'} required autoComplete="new-password"
+                    className={'form-control' + (confirmMismatch ? ' is-invalid' : '')}
+                    style={{ backgroundImage: 'none' }}
+                    value={pw.confirmPassword}
+                    onChange={(e) => setPw((p) => ({ ...p, confirmPassword: e.target.value }))} />
+                  <button type="button" className="btn btn-outline-secondary d-flex align-items-center"
+                    onClick={() => toggleShown('confirmPassword')} tabIndex={-1}
+                    aria-label={pwShown.confirmPassword ? 'Hide password' : 'Show password'}>
+                    <EyeIcon off={pwShown.confirmPassword} />
+                  </button>
+                  {confirmMismatch && <div className="invalid-feedback">Passwords do not match.</div>}
+                </div>
               </div>
               <div className="d-flex gap-2">
                 <button type="submit" className="btn btn-primary" disabled={pwSaving || !pwReady}>
