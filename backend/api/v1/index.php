@@ -14,6 +14,7 @@ require __DIR__ . '/../../controllers/CategoryController.php';
 require __DIR__ . '/../../controllers/UploadController.php';
 require __DIR__ . '/../../controllers/StripeController.php';
 require __DIR__ . '/../../controllers/ReportController.php';
+require __DIR__ . '/../../controllers/SupplierController.php';
 
 // ── CORS: let the React dev server (port 5173) call us ──
 header('Access-Control-Allow-Origin: http://localhost:5173');
@@ -88,6 +89,19 @@ if ($method === 'GET' && $path === '/supplier/stripe/status') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleStripeStatus($pdo, $config, $auth);
+}
+
+// ── supplier registration application (fix & resubmit after rejection) ──
+if ($method === 'GET' && $path === '/supplier/application') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetApplication($pdo, $auth);
+}
+
+if ($method === 'POST' && $path === '/supplier/application/resubmit') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleResubmitApplication($pdo, $auth);
 }
 
 // ── reports ──

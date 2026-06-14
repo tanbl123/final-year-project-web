@@ -61,10 +61,14 @@ CREATE TABLE `user` (
     role          ENUM('Admin','Supplier','Customer','DeliveryPersonnel') NOT NULL,
     -- Pending  : supplier/delivery awaiting admin approval
     -- Active    : approved & usable (customers are Active immediately)
-    -- Rejected  : registration rejected by admin
+    -- Rejected  : registration rejected — supplier may fix & resubmit
+    -- Banned    : registration rejected permanently (terminal)
     -- Suspended : disabled by admin
     -- Deleted   : soft-deleted account
-    status        ENUM('Pending','Active','Rejected','Suspended','Deleted') NOT NULL DEFAULT 'Pending',
+    status        ENUM('Pending','Active','Rejected','Banned','Suspended','Deleted') NOT NULL DEFAULT 'Pending',
+    -- why a registration was rejected, shown to the supplier so they know what
+    -- to fix before resubmitting; cleared when they resubmit or are approved
+    rejectionReason VARCHAR(255) NULL,
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (userId),

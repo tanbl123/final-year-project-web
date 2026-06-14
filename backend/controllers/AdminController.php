@@ -2,9 +2,12 @@
 // Admin-only endpoints. For now: the supplier approval queue.
 
 // GET /admin/suppliers/pending — list supplier accounts awaiting approval.
+// Includes the business-verification fields + document URL so the admin can
+// actually review the application before approving or rejecting it.
 function handleListPendingSuppliers(PDO $pdo): void {
   $stmt = $pdo->query(
     "SELECT u.userId, s.supplierId, s.companyName, s.companyAddress,
+            s.businessRegNo, s.businessLicenseUrl, s.taxNumber,
             u.username, u.email, u.phoneNumber, u.created_at
        FROM `user` u
        JOIN supplier s ON s.userId = u.userId
@@ -14,8 +17,9 @@ function handleListPendingSuppliers(PDO $pdo): void {
   sendJson(200, true, ['suppliers' => $stmt->fetchAll()]);
 }
 
-// Shared: move a currently-Pending supplier to a new status (Active/Rejected).
-function setSupplierStatus(PDO $pdo, string $userId, string $newStatus): void {
+// Shared: move a currently-Pending supplier to a new status. Optionally records
+// a rejection reason (shown to the supplier) — passing null clears any old one.
+function setSupplierStatus(PDO $pdo, string $userId, string $newStatus, ?string $reason = null): void {
   $stmt = $pdo->prepare("SELECT status, role FROM `user` WHERE userId = :id");
   $stmt->execute(['id' => $userId]);
   $row = $stmt->fetch();
@@ -28,20 +32,32 @@ function setSupplierStatus(PDO $pdo, string $userId, string $newStatus): void {
     sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This account has already been reviewed.']);
   }
 
-  $upd = $pdo->prepare("UPDATE `user` SET status = :s WHERE userId = :id");
-  $upd->execute(['s' => $newStatus, 'id' => $userId]);
+  $upd = $pdo->prepare("UPDATE `user` SET status = :s, rejectionReason = :r WHERE userId = :id");
+  $upd->execute(['s' => $newStatus, 'r' => $reason, 'id' => $userId]);
 
   sendJson(200, true, ['userId' => $userId, 'status' => $newStatus]);
 }
 
-// POST /admin/suppliers/{userId}/approve
+// POST /admin/suppliers/{userId}/approve — clears any past rejection reason.
 function handleApproveSupplier(PDO $pdo, string $userId): void {
-  setSupplierStatus($pdo, $userId, 'Active');
+  setSupplierStatus($pdo, $userId, 'Active', null);
 }
 
-// POST /admin/suppliers/{userId}/reject
+// POST /admin/suppliers/{userId}/reject — body: { reason, terminal? }.
+// terminal=true bans the applicant permanently; otherwise they may fix the
+// stated reason and resubmit. A reason is required so the supplier knows why.
 function handleRejectSupplier(PDO $pdo, string $userId): void {
-  setSupplierStatus($pdo, $userId, 'Rejected');
+  $body     = getJsonBody();
+  $reason   = trim($body['reason'] ?? '');
+  $terminal = !empty($body['terminal']);
+
+  if ($reason === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A rejection reason is required.']);
+  }
+  if (mb_strlen($reason) > 255) {
+    $reason = mb_substr($reason, 0, 255);
+  }
+  setSupplierStatus($pdo, $userId, $terminal ? 'Banned' : 'Rejected', $reason);
 }
 
 // ── Product approvals ────────────────────────────────────────────────

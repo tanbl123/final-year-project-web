@@ -10,9 +10,10 @@ export function approveSupplier(userId) {
   return apiPost(`/admin/suppliers/${userId}/approve`, {}, getToken());
 }
 
-// Reject a pending supplier (status → Rejected).
-export function rejectSupplier(userId) {
-  return apiPost(`/admin/suppliers/${userId}/reject`, {}, getToken());
+// Reject a pending supplier. reason is required and shown to the supplier;
+// terminal=true bans them permanently, otherwise they may fix it and resubmit.
+export function rejectSupplier(userId, { reason, terminal = false } = {}) {
+  return apiPost(`/admin/suppliers/${userId}/reject`, { reason, terminal }, getToken());
 }
 
 // Products awaiting approval.

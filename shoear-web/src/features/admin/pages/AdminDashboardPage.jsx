@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { getPendingSuppliers, approveSupplier, rejectSupplier } from '../adminService';
-import ConfirmDialog from '../../../components/ConfirmDialog';
 
 function AdminDashboardPage() {
   const [suppliers, setSuppliers] = useState([]);
@@ -8,7 +7,12 @@ function AdminDashboardPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');       // transient success message
   const [busyId, setBusyId] = useState('');        // userId currently being actioned
-  const [rejecting, setRejecting] = useState(null); // supplier pending reject confirmation
+
+  // reject modal state
+  const [rejecting, setRejecting] = useState(null); // supplier being rejected
+  const [reason, setReason] = useState('');
+  const [terminal, setTerminal] = useState(false);  // false = can resubmit, true = ban
+  const [reasonError, setReasonError] = useState('');
 
   // load the pending queue on mount
   useEffect(() => {
@@ -20,16 +24,37 @@ function AdminDashboardPage() {
     return () => { active = false; };
   }, []);
 
-  // approve / reject share the same shape: call the API, drop the row, notify
-  async function act(supplier, action) {
+  async function approve(supplier) {
     setBusyId(supplier.userId);
     setError('');
     try {
-      if (action === 'approve') await approveSupplier(supplier.userId);
-      else await rejectSupplier(supplier.userId);
-
+      await approveSupplier(supplier.userId);
       setSuppliers((prev) => prev.filter((s) => s.userId !== supplier.userId));
-      setNotice(`${supplier.companyName} ${action === 'approve' ? 'approved' : 'rejected'}.`);
+      setNotice(`${supplier.companyName} approved.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  function openReject(supplier) {
+    setRejecting(supplier);
+    setReason('');
+    setTerminal(false);
+    setReasonError('');
+  }
+
+  async function confirmReject() {
+    if (reason.trim() === '') { setReasonError('Please give a reason — the supplier sees this.'); return; }
+    const supplier = rejecting;
+    setBusyId(supplier.userId);
+    setRejecting(null);
+    setError('');
+    try {
+      await rejectSupplier(supplier.userId, { reason: reason.trim(), terminal });
+      setSuppliers((prev) => prev.filter((s) => s.userId !== supplier.userId));
+      setNotice(`${supplier.companyName} ${terminal ? 'banned' : 'rejected'}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -63,7 +88,7 @@ function AdminDashboardPage() {
               <tr>
                 <th>Company</th>
                 <th>Contact</th>
-                <th>Address</th>
+                <th>Business verification</th>
                 <th>Submitted</th>
                 <th className="text-end">Actions</th>
               </tr>
@@ -74,25 +99,34 @@ function AdminDashboardPage() {
                   <td>
                     <div className="fw-semibold">{s.companyName}</div>
                     <div className="text-muted small">@{s.username}</div>
+                    <div className="text-muted small">{s.companyAddress}</div>
                   </td>
                   <td>
                     <div>{s.email}</div>
                     <div className="text-muted small">{s.phoneNumber}</div>
                   </td>
-                  <td className="text-muted">{s.companyAddress}</td>
+                  <td className="small">
+                    <div>Reg: {s.businessRegNo || '—'}</div>
+                    {s.taxNumber && <div className="text-muted">Tax: {s.taxNumber}</div>}
+                    {s.businessLicenseUrl ? (
+                      <a href={s.businessLicenseUrl} target="_blank" rel="noreferrer">📄 View document</a>
+                    ) : (
+                      <span className="text-muted">No document</span>
+                    )}
+                  </td>
                   <td className="text-muted small">{new Date(s.created_at).toLocaleDateString()}</td>
                   <td className="text-end text-nowrap">
                     <button
                       className="btn btn-success btn-sm me-2"
                       disabled={busyId === s.userId}
-                      onClick={() => act(s, 'approve')}
+                      onClick={() => approve(s)}
                     >
                       {busyId === s.userId ? '…' : 'Approve'}
                     </button>
                     <button
                       className="btn btn-outline-danger btn-sm"
                       disabled={busyId === s.userId}
-                      onClick={() => setRejecting(s)}
+                      onClick={() => openReject(s)}
                     >
                       Reject
                     </button>
@@ -104,15 +138,57 @@ function AdminDashboardPage() {
         </div>
       )}
 
-      <ConfirmDialog
-        isOpen={!!rejecting}
-        title="Reject supplier?"
-        message={rejecting ? `Reject ${rejecting.companyName}'s registration? They won't be able to log in.` : ''}
-        confirmText="Reject"
-        confirmColor="danger"
-        onCancel={() => setRejecting(null)}
-        onConfirm={() => { const s = rejecting; setRejecting(null); act(s, 'reject'); }}
-      />
+      {rejecting && (
+        <>
+          <div className="modal d-block" tabIndex="-1" role="dialog">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Reject {rejecting.companyName}</h5>
+                  <button type="button" className="btn-close" onClick={() => setRejecting(null)}></button>
+                </div>
+                <div className="modal-body text-start">
+                  <label className="form-label">Reason (shown to the supplier)</label>
+                  <textarea
+                    className={`form-control ${reasonError ? 'is-invalid' : ''}`}
+                    rows={3}
+                    value={reason}
+                    placeholder="e.g. The business registration document is blurry — please upload a clearer scan."
+                    onChange={(e) => { setReason(e.target.value); setReasonError(''); }}
+                  />
+                  {reasonError && <div className="invalid-feedback">{reasonError}</div>}
+
+                  <div className="form-check mt-3">
+                    <input className="form-check-input" type="radio" id="rej-fixable"
+                      checked={!terminal} onChange={() => setTerminal(false)} />
+                    <label className="form-check-label" htmlFor="rej-fixable">
+                      <strong>Reject — can resubmit.</strong> The supplier can fix the issue and
+                      resubmit. Their details are kept.
+                    </label>
+                  </div>
+                  <div className="form-check mt-2">
+                    <input className="form-check-input" type="radio" id="rej-ban"
+                      checked={terminal} onChange={() => setTerminal(true)} />
+                    <label className="form-check-label" htmlFor="rej-ban">
+                      <strong>Ban — permanent.</strong> For fraud or policy violations. The
+                      applicant cannot log in or resubmit.
+                    </label>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setRejecting(null)}>
+                    Cancel
+                  </button>
+                  <button type="button" className={`btn btn-${terminal ? 'danger' : 'warning'}`} onClick={confirmReject}>
+                    {terminal ? 'Ban permanently' : 'Reject (can resubmit)'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop show"></div>
+        </>
+      )}
     </div>
   );
 }

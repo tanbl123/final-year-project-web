@@ -26,6 +26,18 @@ export function uploadRegistrationDoc(file) {
   return apiUpload('/uploads/registration-doc', form);
 }
 
+// The signed-in supplier's own registration application (for the resubmit form).
+// Resolves with company fields, status and any rejectionReason.
+export function getMyApplication() {
+  return apiGet('/supplier/application', getToken());
+}
+
+// Resubmit a corrected application after a (curable) rejection. Flips the
+// account back to Pending for re-review. Resolves with { status, message }.
+export function resubmitApplication(data) {
+  return apiPost('/supplier/application/resubmit', data, getToken());
+}
+
 // The signed-in user's own profile (GET /auth/me).
 export function getMe() {
   return apiGet('/auth/me', getToken());

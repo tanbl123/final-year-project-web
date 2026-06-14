@@ -108,7 +108,7 @@ function handleLogin(PDO $pdo, string $secret): void {
   }
 
   // look up the user by email (prepared statement → safe from SQL injection)
-  $stmt = $pdo->prepare('SELECT userId, password, role, fullName, status FROM `user` WHERE email = :email');
+  $stmt = $pdo->prepare('SELECT userId, password, role, fullName, status, rejectionReason FROM `user` WHERE email = :email');
   $stmt->execute(['email' => $email]);
   $user = $stmt->fetch();
 
@@ -117,9 +117,18 @@ function handleLogin(PDO $pdo, string $secret): void {
     sendJson(401, false, null, ['code' => 'AUTH', 'message' => 'Invalid email or password.']);
   }
 
-  // only Active accounts may log in (suppliers start as Pending)
-  if ($user['status'] !== 'Active') {
-    sendJson(403, false, null, ['code' => 'NOT_ACTIVE', 'message' => 'Your account is ' . $user['status'] . '. Please wait for approval.']);
+  // Active accounts get full access. A Rejected supplier is also let in, but
+  // only to the limited "fix & resubmit your application" flow (the front-end
+  // gates them there). Pending/Banned/Suspended/Deleted stay blocked.
+  $isActive           = $user['status'] === 'Active';
+  $isRejectedSupplier = $user['role'] === 'Supplier' && $user['status'] === 'Rejected';
+  if (!$isActive && !$isRejectedSupplier) {
+    $msg = $user['status'] === 'Pending'
+      ? 'Your account is pending admin approval. Please wait for approval.'
+      : ($user['status'] === 'Banned'
+          ? 'Your registration has been rejected and cannot be resubmitted.'
+          : 'Your account is ' . $user['status'] . '.');
+    sendJson(403, false, null, ['code' => 'NOT_ACTIVE', 'message' => $msg]);
   }
 
   // issue a token valid for 7 days
@@ -138,6 +147,7 @@ function handleLogin(PDO $pdo, string $secret): void {
       'role'     => $user['role'],
       'fullName' => $user['fullName'],
       'status'   => $user['status'],
+      'rejectionReason' => $user['rejectionReason'],
     ],
   ]);
 }

@@ -5,6 +5,7 @@ import ReportsPage from './features/reports/pages/ReportsPage';
 import LoginPage from './features/auth/pages/LoginPage';
 import ProtectedRoute, { homePathFor } from './features/auth/ProtectedRoute';
 import RegisterPage from './features/auth/pages/RegisterPage';
+import ResubmitApplicationPage from './features/auth/pages/ResubmitApplicationPage';
 import ProductDetailPage from './features/products/pages/ProductDetailPage';
 import AddProductPage from './features/products/pages/AddProductPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
@@ -45,12 +46,15 @@ function App() {
                 <Link className="nav-link" to="/admin/categories">Categories</Link>
                 <Link className="nav-link" to="/admin/commission">Commission</Link>
               </>
-            ) : (
+            ) : user.status === 'Active' ? (
               <>
                 <Link className="nav-link" to="/products">Products</Link>
                 <Link className="nav-link" to="/reports">Reports</Link>
                 <Link className="nav-link" to="/payouts">Payouts</Link>
               </>
+            ) : (
+              // a not-yet-approved supplier only has the resubmit/status page
+              <Link className="nav-link" to="/resubmit">My application</Link>
             )}
           </div>
 
@@ -71,6 +75,11 @@ function App() {
         <Route path="/login" element={<LoginPage variant="supplier" />} />
         <Route path="/admin/login" element={<LoginPage variant="admin" />} />
         <Route path="/register" element={<RegisterPage />} />
+
+        {/* rejected suppliers fix & resubmit their application here */}
+        <Route path="/resubmit" element={
+          <ProtectedRoute role="Supplier" allowInactive><ResubmitApplicationPage /></ProtectedRoute>
+        } />
 
         {/* "/" sends each user to their own home */}
         <Route path="/" element={
