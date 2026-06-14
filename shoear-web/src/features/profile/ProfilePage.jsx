@@ -37,7 +37,7 @@ function ProfilePage() {
 
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState(EMPTY_PW);
-  const [pwError, setPwError] = useState('');
+  const [currentPwError, setCurrentPwError] = useState('');   // shown under the Current password field
   const [pwSaving, setPwSaving] = useState(false);
   const [pwShown, setPwShown] = useState({ currentPassword: false, newPassword: false, confirmPassword: false });
   const toggleShown = (name) => setPwShown((s) => ({ ...s, [name]: !s[name] }));
@@ -95,7 +95,7 @@ function ProfilePage() {
   function closePw() {
     setPwOpen(false);
     setPw(EMPTY_PW);
-    setPwError('');
+    setCurrentPwError('');
   }
 
   // cancel: confirm first if there are unsaved edits, otherwise just close
@@ -116,38 +116,26 @@ function ProfilePage() {
 
   async function savePassword(e) {
     e.preventDefault();
-    setPwError('');
-    if (!pw.currentPassword) {
-      setPwError('Please enter your current password.');
-      return;
-    }
-    const policyError = passwordPolicyError(pw.newPassword);
-    if (policyError) {
-      setPwError(policyError);
-      return;
-    }
-    if (pw.newPassword === pw.currentPassword) {
-      setPwError('New password must be different from your current one.');
-      return;
-    }
-    if (pw.newPassword !== pw.confirmPassword) {
-      setPwError('New password and confirmation do not match.');
-      return;
-    }
+    setCurrentPwError('');
+    // the live field checks below already gate the submit button; the only
+    // failure left to handle is the server rejecting the current password
     setPwSaving(true);
     try {
       await changePassword(pw.currentPassword, pw.newPassword);
       closePw();
       setToast('Password changed.');
     } catch (err) {
-      setPwError(err.message);
+      setCurrentPwError(err.message);
     } finally {
       setPwSaving(false);
     }
   }
 
-  // live feedback for the password form
-  const newPwError = pw.newPassword ? passwordPolicyError(pw.newPassword) : null;
+  // live feedback for the password form, shown inline under each field
+  const newPwError = pw.newPassword
+    ? (passwordPolicyError(pw.newPassword)
+        || (pw.newPassword === pw.currentPassword ? 'New password must be different from your current one.' : null))
+    : null;
   const confirmMismatch = pw.confirmPassword.length > 0 && pw.confirmPassword !== pw.newPassword;
   const pwReady = pw.currentPassword && !newPwError && !confirmMismatch && pw.confirmPassword;
 
@@ -264,21 +252,24 @@ function ProfilePage() {
 
           {pwOpen && (
             <form className="mt-3" onSubmit={savePassword}>
-              {pwError && (
-                <div className="alert alert-danger py-2">{pwError}</div>
-              )}
               <div className="mb-3">
                 <label className="form-label">Current password</label>
-                <div className="input-group">
+                <div className="input-group has-validation">
                   <input type={pwShown.currentPassword ? 'text' : 'password'} required autoFocus
-                    autoComplete="current-password" className="form-control"
+                    autoComplete="current-password"
+                    className={'form-control' + (currentPwError ? ' is-invalid' : '')}
+                    style={{ backgroundImage: 'none' }}
                     value={pw.currentPassword}
-                    onChange={(e) => setPw((p) => ({ ...p, currentPassword: e.target.value }))} />
+                    onChange={(e) => {
+                      setPw((p) => ({ ...p, currentPassword: e.target.value }));
+                      if (currentPwError) setCurrentPwError('');
+                    }} />
                   <button type="button" className="btn btn-outline-secondary d-flex align-items-center"
                     onClick={() => toggleShown('currentPassword')} tabIndex={-1}
                     aria-label={pwShown.currentPassword ? 'Hide password' : 'Show password'}>
                     <EyeIcon off={pwShown.currentPassword} />
                   </button>
+                  {currentPwError && <div className="invalid-feedback">{currentPwError}</div>}
                 </div>
               </div>
               <div className="mb-3">
