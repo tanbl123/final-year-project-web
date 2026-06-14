@@ -22,6 +22,8 @@ function AdminUsersPage() {
   const [filters, setFilters] = useState({ role: '', status: '', search: '' });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState('created_at'); // 'fullName' | 'role' | 'status' | 'created_at'
+  const [sortDir, setSortDir] = useState('desc');       // 'asc' | 'desc'
 
   const [busyId, setBusyId] = useState('');         // user being actioned
   const [confirm, setConfirm] = useState(null);     // { user, status, title, message, color }
@@ -44,10 +46,35 @@ function AdminUsersPage() {
   // refetch whenever a filter changes
   useEffect(() => { load(); setPage(1); /* eslint-disable-next-line */ }, [filters.role, filters.status, debouncedSearch]);
 
-  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  // click a column header to sort by it; click again to flip the direction
+  function toggleSort(key) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+  const sortArrow = (key) => (sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅');
+
+  const sorted = useMemo(() => {
+    const list = [...users];
+    list.sort((a, b) => {
+      let cmp;
+      if (sortKey === 'created_at') {
+        cmp = new Date(a.created_at) - new Date(b.created_at);
+      } else {
+        cmp = String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''));
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  }, [users, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
   const pageItems = useMemo(
-    () => users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [users, page]);
+    () => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page]);
 
   async function changeStatus(user, status) {
     setBusyId(user.userId);
@@ -159,10 +186,18 @@ function AdminUsersPage() {
           <table className="table align-middle" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th>User</th>
-                <th style={{ width: 130 }}>Role</th>
-                <th className="text-center" style={{ width: 110 }}>Status</th>
-                <th style={{ width: 110 }}>Joined</th>
+                <th role="button" onClick={() => toggleSort('fullName')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  User<span className="text-muted small">{sortArrow('fullName')}</span>
+                </th>
+                <th role="button" onClick={() => toggleSort('role')} style={{ width: 130, cursor: 'pointer', userSelect: 'none' }}>
+                  Role<span className="text-muted small">{sortArrow('role')}</span>
+                </th>
+                <th role="button" className="text-center" onClick={() => toggleSort('status')} style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}>
+                  Status<span className="text-muted small">{sortArrow('status')}</span>
+                </th>
+                <th role="button" onClick={() => toggleSort('created_at')} style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}>
+                  Joined<span className="text-muted small">{sortArrow('created_at')}</span>
+                </th>
                 <th className="text-center" style={{ width: 260 }}>Actions</th>
               </tr>
             </thead>
@@ -206,7 +241,7 @@ function AdminUsersPage() {
                   <button className="page-link" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</button>
                 </li>
               </ul>
-              <span className="text-muted small">Page {page} of {totalPages} · {users.length} users</span>
+              <span className="text-muted small">Page {page} of {totalPages} · {sorted.length} users</span>
             </nav>
           )}
         </div>
