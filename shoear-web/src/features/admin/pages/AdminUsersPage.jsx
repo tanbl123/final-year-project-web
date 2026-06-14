@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getUsers, getUser, setUserStatus } from '../adminService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
+import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
+import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 const ROLES = ['Admin', 'Supplier', 'Customer', 'DeliveryPersonnel'];
@@ -21,14 +25,18 @@ function AdminUsersPage() {
 
   const [filters, setFilters] = useState({ role: '', status: '', search: '' });
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState('created_at'); // 'fullName' | 'role' | 'status' | 'created_at'
-  const [sortDir, setSortDir] = useState('desc');       // 'asc' | 'desc'
 
   const [busyId, setBusyId] = useState('');         // user being actioned
   const [confirm, setConfirm] = useState(null);     // { user, status, title, message, color }
   const [detail, setDetail] = useState(null);       // fetched user for the modal
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const sort = useTableSort(users, {
+    initialKey: 'created_at',
+    initialDir: 'desc',
+    getValue: (u, k) => (k === 'created_at' ? new Date(u.created_at).getTime() : u[k]),
+  });
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   // debounce the free-text search so we don't hit the API on every keystroke
   useEffect(() => {
@@ -43,38 +51,19 @@ function AdminUsersPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
-  // refetch whenever a filter changes
-  useEffect(() => { load(); setPage(1); /* eslint-disable-next-line */ }, [filters.role, filters.status, debouncedSearch]);
+  // refetch whenever a filter changes (the search is already debounced above)
+  useEffect(() => {
+    // intentional fetch-on-change; load() owns its own loading state
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.role, filters.status, debouncedSearch]);
 
-  // click a column header to sort by it; click again to flip the direction
-  function toggleSort(key) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
+  // update a filter and jump back to the first page of results
+  function setFilter(patch) {
+    setFilters((f) => ({ ...f, ...patch }));
+    setPage(1);
   }
-  const sortArrow = (key) => (sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅');
-
-  const sorted = useMemo(() => {
-    const list = [...users];
-    list.sort((a, b) => {
-      let cmp;
-      if (sortKey === 'created_at') {
-        cmp = new Date(a.created_at) - new Date(b.created_at);
-      } else {
-        cmp = String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''));
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return list;
-  }, [users, sortKey, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
-  const pageItems = useMemo(
-    () => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page]);
 
   async function changeStatus(user, status) {
     setBusyId(user.userId);
@@ -156,12 +145,12 @@ function AdminUsersPage() {
           <div className="col-md-5">
             <label className="form-label small text-muted mb-1">Search</label>
             <input type="text" className="form-control" placeholder="Name, username or email"
-              value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+              value={filters.search} onChange={(e) => setFilter({ search: e.target.value })} />
           </div>
           <div className="col-md-4">
             <label className="form-label small text-muted mb-1">Role</label>
             <select className="form-select" value={filters.role}
-              onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value }))}>
+              onChange={(e) => setFilter({ role: e.target.value })}>
               <option value="">All roles</option>
               {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
             </select>
@@ -169,7 +158,7 @@ function AdminUsersPage() {
           <div className="col-md-3">
             <label className="form-label small text-muted mb-1">Status</label>
             <select className="form-select" value={filters.status}
-              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
+              onChange={(e) => setFilter({ status: e.target.value })}>
               <option value="">All statuses</option>
               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -186,18 +175,10 @@ function AdminUsersPage() {
           <table className="table align-middle" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th role="button" onClick={() => toggleSort('fullName')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  User<span className="text-muted small">{sortArrow('fullName')}</span>
-                </th>
-                <th role="button" onClick={() => toggleSort('role')} style={{ width: 130, cursor: 'pointer', userSelect: 'none' }}>
-                  Role<span className="text-muted small">{sortArrow('role')}</span>
-                </th>
-                <th role="button" className="text-center" onClick={() => toggleSort('status')} style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}>
-                  Status<span className="text-muted small">{sortArrow('status')}</span>
-                </th>
-                <th role="button" onClick={() => toggleSort('created_at')} style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}>
-                  Joined<span className="text-muted small">{sortArrow('created_at')}</span>
-                </th>
+                <SortableTh label="User" columnKey="fullName" sort={sort} />
+                <SortableTh label="Role" columnKey="role" sort={sort} style={{ width: 130 }} />
+                <SortableTh label="Status" columnKey="status" sort={sort} className="text-center" style={{ width: 110 }} />
+                <SortableTh label="Joined" columnKey="created_at" sort={sort} style={{ width: 110 }} />
                 <th className="text-center" style={{ width: 260 }}>Actions</th>
               </tr>
             </thead>
@@ -226,24 +207,8 @@ function AdminUsersPage() {
             </tbody>
           </table>
 
-          {totalPages > 1 && (
-            <nav className="d-flex flex-column align-items-center gap-2">
-              <ul className="pagination mb-0">
-                <li className={'page-item' + (page === 1 ? ' disabled' : '')}>
-                  <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</button>
-                </li>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                  <li key={n} className={'page-item' + (n === page ? ' active' : '')}>
-                    <button className="page-link" onClick={() => setPage(n)}>{n}</button>
-                  </li>
-                ))}
-                <li className={'page-item' + (page === totalPages ? ' disabled' : '')}>
-                  <button className="page-link" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</button>
-                </li>
-              </ul>
-              <span className="text-muted small">Page {page} of {totalPages} · {sorted.length} users</span>
-            </nav>
-          )}
+          <Pagination page={page} totalPages={totalPages} onChange={setPage}
+            summary={`Page ${page} of ${totalPages} · ${sort.sorted.length} users`} />
         </div>
       )}
 

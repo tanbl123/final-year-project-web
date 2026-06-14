@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getCategoriesAdmin, createCategory, renameCategory, deleteCategory,
 } from '../adminService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
+import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
+import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 5;
 
@@ -22,10 +26,6 @@ function AdminCategoriesPage() {
 
   const [deleting, setDeleting] = useState(null); // category pending delete confirm
 
-  const [sortKey, setSortKey] = useState('name'); // 'name' | 'productCount'
-  const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
-  const [page, setPage] = useState(1);
-
   useEffect(() => {
     let active = true;
     getCategoriesAdmin()
@@ -35,32 +35,8 @@ function AdminCategoriesPage() {
     return () => { active = false; };
   }, []);
 
-  // click a column header to sort by it; click again to flip the direction
-  function toggleSort(key) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  }
-  const sortArrow = (key) => (sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅');
-
-  const sorted = useMemo(() => {
-    const list = [...categories];
-    list.sort((a, b) => {
-      let cmp;
-      if (sortKey === 'productCount') cmp = a.productCount - b.productCount;
-      else cmp = a.name.localeCompare(b.name);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return list;
-  }, [categories, sortKey, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  // keep the page in range when the list shrinks (e.g. after a delete)
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
-  const pageItems = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const sort = useTableSort(categories, { initialKey: 'name', initialDir: 'asc' });
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   async function handleAdd(event) {
     event.preventDefault();
@@ -152,13 +128,8 @@ function AdminCategoriesPage() {
           <table className="table align-middle" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th role="button" onClick={() => toggleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  Category<span className="text-muted small">{sortArrow('name')}</span>
-                </th>
-                <th role="button" className="text-center" onClick={() => toggleSort('productCount')}
-                  style={{ cursor: 'pointer', userSelect: 'none', width: 160 }}>
-                  Products<span className="text-muted small">{sortArrow('productCount')}</span>
-                </th>
+                <SortableTh label="Category" columnKey="name" sort={sort} />
+                <SortableTh label="Products" columnKey="productCount" sort={sort} className="text-center" style={{ width: 160 }} />
                 <th className="text-center" style={{ width: 240 }}>Actions</th>
               </tr>
             </thead>
@@ -210,30 +181,8 @@ function AdminCategoriesPage() {
             </tbody>
           </table>
 
-          {totalPages > 1 && (
-            <nav className="d-flex flex-column align-items-center gap-2">
-              <ul className="pagination mb-0">
-                <li className={'page-item' + (page === 1 ? ' disabled' : '')}>
-                  <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </button>
-                </li>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                  <li key={n} className={'page-item' + (n === page ? ' active' : '')}>
-                    <button className="page-link" onClick={() => setPage(n)}>{n}</button>
-                  </li>
-                ))}
-                <li className={'page-item' + (page === totalPages ? ' disabled' : '')}>
-                  <button className="page-link" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                    Next
-                  </button>
-                </li>
-              </ul>
-              <span className="text-muted small">
-                Page {page} of {totalPages} · {sorted.length} categories
-              </span>
-            </nav>
-          )}
+          <Pagination page={page} totalPages={totalPages} onChange={setPage}
+            summary={`Page ${page} of ${totalPages} · ${sort.sorted.length} categories`} />
         </div>
       )}
 
