@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { fetchCategories, uploadFile } from '../productService';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 
 // A blank size row. Suppliers add one row per size they sell.
 const emptyVariant = () => ({ size: '', stock: '' });
 
 // Letters, numbers, spaces and a little punctuation — blocks junk like "??".
-const NAME_RE = /^[\p{L}\p{N} .,&'\/+-]+$/u;
+const NAME_RE = /^[\p{L}\p{N} .,&'/+-]+$/u;
 
 function ProductForm({ onAdd, onCancel }) {
   const [name, setName] = useState('');
@@ -30,6 +31,7 @@ function ProductForm({ onAdd, onCancel }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [variantTouched, setVariantTouched] = useState({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);   // discard-changes prompt
 
   useEffect(() => {
     fetchCategories()
@@ -182,6 +184,18 @@ function ProductForm({ onAdd, onCancel }) {
     setSubmitAttempted(false);
   }
 
+  // has the supplier entered anything? (used to confirm before discarding)
+  const dirty =
+    name !== '' || brand !== '' || price !== '' || categoryId !== '' ||
+    description !== '' || images.length > 0 || modelUrl !== '' || tryOn ||
+    variants.some((v) => v.size !== '' || v.stock !== '');
+
+  // cancel: confirm first if there's unsaved work, otherwise leave straight away
+  function handleCancel() {
+    if (dirty) setConfirmCancel(true);
+    else onCancel();
+  }
+
   // section-level requirements, shown only after a save attempt (and they
   // clear live once the supplier adds a valid size / an image)
   const hasValidVariant = variants.some((row, i) => {
@@ -255,6 +269,7 @@ function ProductForm({ onAdd, onCancel }) {
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="card card-body mb-4 bg-light" noValidate>
       <h5 className="mb-3">New product</h5>
 
@@ -399,10 +414,21 @@ function ProductForm({ onAdd, onCancel }) {
           {submitting ? 'Saving…' : uploading ? 'Uploading…' : 'Save product'}
         </button>
         {onCancel && (
-          <button type="button" className="btn btn-outline-secondary" onClick={onCancel}>Cancel</button>
+          <button type="button" className="btn btn-outline-secondary" onClick={handleCancel}>Cancel</button>
         )}
       </div>
     </form>
+
+    <ConfirmDialog
+      isOpen={confirmCancel}
+      title="Discard product?"
+      message="You have unsaved changes. Are you sure you want to discard this product?"
+      confirmText="Discard"
+      confirmColor="danger"
+      onCancel={() => setConfirmCancel(false)}
+      onConfirm={() => { setConfirmCancel(false); onCancel(); }}
+    />
+    </>
   );
 }
 
