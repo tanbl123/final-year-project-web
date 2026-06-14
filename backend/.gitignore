@@ -1,0 +1,2 @@
+# Local secret overrides — never commit real keys
+config.local.php
