@@ -41,6 +41,7 @@ function ProfilePage() {
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ fullName: '', phoneNumber: '', username: '' });
+  const [fieldErrors, setFieldErrors] = useState({});   // inline per-field messages
   const [saving, setSaving] = useState(false);
 
   const [pwOpen, setPwOpen] = useState(false);
@@ -67,7 +68,14 @@ function ProfilePage() {
 
   function startEdit() {
     setForm({ fullName: me.fullName, phoneNumber: me.phoneNumber || '', username: me.username || '' });
+    setFieldErrors({});
     setEditing(true);
+  }
+
+  // update an edit-form field and clear its inline error as the user fixes it
+  function setField(name, value) {
+    setForm((f) => ({ ...f, [name]: value }));
+    setFieldErrors((fe) => { if (!fe[name]) return fe; const n = { ...fe }; delete n[name]; return n; });
   }
 
   // has the user actually changed anything in the edit form?
@@ -84,14 +92,14 @@ function ProfilePage() {
 
   async function save(e) {
     e.preventDefault();
-    if (!form.fullName.trim() || !form.phoneNumber.trim() || !form.username.trim()) {
-      setError('Full name, username and phone number are required.');
-      return;
-    }
-    if (usernameError) {          // invalid format — block before hitting the server
-      setError(usernameError);
-      return;
-    }
+    // validate inline, under each field (consistent with the register form)
+    const fe = {};
+    if (!form.fullName.trim()) fe.fullName = 'Full name is required.';
+    if (!form.phoneNumber.trim()) fe.phoneNumber = 'Phone number is required.';
+    if (!form.username.trim()) fe.username = 'Username is required.';
+    else if (usernameError) fe.username = usernameError;   // invalid format
+    if (Object.keys(fe).length) { setFieldErrors(fe); return; }
+
     if (!dirty) {                 // nothing changed — don't pretend we saved
       setEditing(false);
       return;
@@ -109,7 +117,9 @@ function ProfilePage() {
       setEditing(false);
       setToast('Profile updated.');
     } catch (err) {
-      setError(err.message);
+      // server rejections (e.g. "username already taken") land under the field
+      if (/username/i.test(err.message || '')) setFieldErrors({ username: err.message });
+      else setError(err.message);
     } finally {
       setSaving(false);
     }
@@ -252,26 +262,31 @@ function ProfilePage() {
               <div className="mb-3">
                 <label className="form-label">Full name</label>
                 <ClearableInput type="text" maxLength="100" required autoFocus
+                  className={fieldErrors.fullName ? 'is-invalid' : ''}
                   value={form.fullName}
-                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                  onClear={() => setForm((f) => ({ ...f, fullName: '' }))} />
+                  onChange={(e) => setField('fullName', e.target.value)}
+                  onClear={() => setField('fullName', '')} />
+                {fieldErrors.fullName && <div className="invalid-feedback d-block">{fieldErrors.fullName}</div>}
               </div>
               <div className="mb-3">
                 <label className="form-label">Username</label>
                 <ClearableInput type="text" maxLength="20"
-                  className={usernameError ? 'is-invalid' : ''}
+                  className={(usernameError || fieldErrors.username) ? 'is-invalid' : ''}
                   value={form.username}
-                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-                  onClear={() => setForm((f) => ({ ...f, username: '' }))} />
-                {usernameError && <div className="invalid-feedback d-block">{usernameError}</div>}
-                <div className="form-text">Letters, numbers or underscores. You can sign in with this or your email.</div>
+                  onChange={(e) => setField('username', e.target.value)}
+                  onClear={() => setField('username', '')} />
+                {(usernameError || fieldErrors.username)
+                  ? <div className="invalid-feedback d-block">{usernameError || fieldErrors.username}</div>
+                  : <div className="form-text">Letters, numbers or underscores. You can sign in with this or your email.</div>}
               </div>
               <div className="mb-3">
                 <label className="form-label">Phone number</label>
                 <ClearableInput type="text" maxLength="30" required
+                  className={fieldErrors.phoneNumber ? 'is-invalid' : ''}
                   value={form.phoneNumber}
-                  onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
-                  onClear={() => setForm((f) => ({ ...f, phoneNumber: '' }))} />
+                  onChange={(e) => setField('phoneNumber', e.target.value)}
+                  onClear={() => setField('phoneNumber', '')} />
+                {fieldErrors.phoneNumber && <div className="invalid-feedback d-block">{fieldErrors.phoneNumber}</div>}
               </div>
               <div className="d-flex gap-2">
                 <button type="submit" className="btn btn-primary" disabled={saving || !dirty || !!usernameError}>
