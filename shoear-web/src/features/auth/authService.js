@@ -1,9 +1,10 @@
 import { apiPost, apiGet, apiPut, apiUpload, getToken } from '../../api/client';
 
 // REAL login against the PHP API (POST /auth/login).
+// `identifier` may be either an email or a username.
 // Returns { token, user } on success, or throws with the server's error message.
-export function login(email, password) {
-  return apiPost('/auth/login', { email, password });
+export function login(identifier, password) {
+  return apiPost('/auth/login', { identifier, password });
 }
 
 // Logout is client-side: just discard the saved token + user.

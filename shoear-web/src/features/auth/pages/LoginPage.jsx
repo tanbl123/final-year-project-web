@@ -7,10 +7,8 @@ import EyeIcon from '../../../components/EyeIcon';
 // Validate the login fields, returning a { field: message } object.
 function validateForm(form) {
   const errors = {};
-  if (form.email.trim() === '') {
-    errors.email = 'Email is required.';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    errors.email = 'Please enter a valid email.';
+  if (form.identifier.trim() === '') {
+    errors.identifier = 'Email or username is required.';
   }
   if (form.password === '') errors.password = 'Password is required.';
   return errors;
@@ -33,7 +31,7 @@ const VARIANTS = {
 
 function LoginPage({ variant = 'supplier' }) {
   const config = VARIANTS[variant];
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ identifier: '', password: '' });
   const [errors, setErrors] = useState({});       // per-field messages
   const [formError, setFormError] = useState(''); // server/auth error (not field-specific)
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,7 +81,7 @@ function LoginPage({ variant = 'supplier' }) {
 
     setIsSubmitting(true);
     try {
-      const result = await login(form.email.trim(), form.password);
+      const result = await login(form.identifier.trim(), form.password);
 
       // each login page only accepts its own role — bounce the wrong one
       if (result.user.role !== config.allowedRole) {
@@ -107,16 +105,17 @@ function LoginPage({ variant = 'supplier' }) {
 
       <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
         <div className="mb-3">
-          <label className="form-label">Email</label>
+          <label className="form-label">Email or username</label>
           <input
-            type="email"
-            name="email"
-            className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-            value={form.email}
+            type="text"
+            name="identifier"
+            autoComplete="username"
+            className={`form-control ${errors.identifier ? 'is-invalid' : ''}`}
+            value={form.identifier}
             onChange={handleChange}
             onBlur={handleBlur}
           />
-          {errors.email && <div className="invalid-feedback">{errors.email}</div>}
+          {errors.identifier && <div className="invalid-feedback">{errors.identifier}</div>}
         </div>
 
         <div className="mb-3">

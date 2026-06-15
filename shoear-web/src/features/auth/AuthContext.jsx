@@ -12,8 +12,8 @@ export function AuthProvider({ children }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  async function login(email, password) {
-    const result = await loginRequest(email, password);   // the fake API call
+  async function login(identifier, password) {
+    const result = await loginRequest(identifier, password);   // identifier = email or username
     localStorage.setItem('token', result.token);
     localStorage.setItem('user', JSON.stringify(result.user));
     setUser(result.user);        // update global state → whole app re-renders

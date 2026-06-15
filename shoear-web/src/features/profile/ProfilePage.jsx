@@ -39,7 +39,7 @@ function ProfilePage() {
   const [toast, setToast] = useState('');
 
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ fullName: '', phoneNumber: '' });
+  const [form, setForm] = useState({ fullName: '', phoneNumber: '', username: '' });
   const [saving, setSaving] = useState(false);
 
   const [pwOpen, setPwOpen] = useState(false);
@@ -65,20 +65,30 @@ function ProfilePage() {
   }, []);
 
   function startEdit() {
-    setForm({ fullName: me.fullName, phoneNumber: me.phoneNumber || '' });
+    setForm({ fullName: me.fullName, phoneNumber: me.phoneNumber || '', username: me.username || '' });
     setEditing(true);
   }
 
   // has the user actually changed anything in the edit form?
   const dirty = editing && (
     form.fullName.trim() !== me.fullName ||
-    form.phoneNumber.trim() !== (me.phoneNumber || '')
+    form.phoneNumber.trim() !== (me.phoneNumber || '') ||
+    form.username.trim() !== (me.username || '')
   );
+
+  // live username format check (uniqueness is verified by the server on save)
+  const usernameError = editing && form.username.trim() !== ''
+    && !/^[A-Za-z0-9_]{3,20}$/.test(form.username.trim())
+    ? 'Username must be 3–20 letters, numbers or underscores.' : null;
 
   async function save(e) {
     e.preventDefault();
-    if (!form.fullName.trim() || !form.phoneNumber.trim()) {
-      setError('Full name and phone number are required.');
+    if (!form.fullName.trim() || !form.phoneNumber.trim() || !form.username.trim()) {
+      setError('Full name, username and phone number are required.');
+      return;
+    }
+    if (usernameError) {          // invalid format — block before hitting the server
+      setError(usernameError);
       return;
     }
     if (!dirty) {                 // nothing changed — don't pretend we saved
@@ -91,6 +101,7 @@ function ProfilePage() {
       const saved = await updateMe({
         fullName: form.fullName.trim(),
         phoneNumber: form.phoneNumber.trim(),
+        username: form.username.trim(),
       });
       setMe((m) => ({ ...m, ...saved }));
       updateUser({ fullName: saved.fullName });   // refresh the navbar greeting
@@ -244,13 +255,25 @@ function ProfilePage() {
                   onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} />
               </div>
               <div className="mb-3">
+                <label className="form-label">Username</label>
+                <div className="input-group has-validation">
+                  <span className="input-group-text">@</span>
+                  <input type="text" maxLength="20"
+                    className={'form-control' + (usernameError ? ' is-invalid' : '')}
+                    value={form.username}
+                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
+                  {usernameError && <div className="invalid-feedback">{usernameError}</div>}
+                </div>
+                <div className="form-text">Letters, numbers or underscores. You can sign in with this or your email.</div>
+              </div>
+              <div className="mb-3">
                 <label className="form-label">Phone number</label>
                 <input type="text" className="form-control" maxLength="30" required
                   value={form.phoneNumber}
                   onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))} />
               </div>
               <div className="d-flex gap-2">
-                <button type="submit" className="btn btn-primary" disabled={saving || !dirty}>
+                <button type="submit" className="btn btn-primary" disabled={saving || !dirty || !!usernameError}>
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
                 <button type="button" className="btn btn-outline-secondary"

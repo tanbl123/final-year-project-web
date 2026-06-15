@@ -122,21 +122,26 @@ function handleRegister(PDO $pdo): void {
 // POST /auth/login  — verify email + password, return a JWT + basic profile.
 function handleLogin(PDO $pdo, string $secret): void {
   $body = getJsonBody();
-  $email = trim($body['email'] ?? '');
+  // accept either an email or a username in the same field (older clients may
+  // still send 'email' — fall back to that)
+  $identifier = trim($body['identifier'] ?? $body['email'] ?? '');
   $password = $body['password'] ?? '';
 
-  if ($email === '' || $password === '') {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Email and password are required.']);
+  if ($identifier === '' || $password === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Email/username and password are required.']);
   }
 
-  // look up the user by email (prepared statement → safe from SQL injection)
-  $stmt = $pdo->prepare('SELECT userId, password, role, fullName, status, rejectionReason FROM `user` WHERE email = :email');
-  $stmt->execute(['email' => $email]);
+  // look up by email OR username (prepared statement → safe from SQL injection)
+  $stmt = $pdo->prepare(
+    'SELECT userId, password, role, fullName, status, rejectionReason
+       FROM `user` WHERE email = :id OR username = :id'
+  );
+  $stmt->execute(['id' => $identifier]);
   $user = $stmt->fetch();
 
-  // same message whether the email or password is wrong (don't leak which)
+  // same message whichever was wrong (don't leak which)
   if (!$user || !password_verify($password, $user['password'])) {
-    sendJson(401, false, null, ['code' => 'AUTH', 'message' => 'Invalid email or password.']);
+    sendJson(401, false, null, ['code' => 'AUTH', 'message' => 'Invalid email/username or password.']);
   }
 
   // Active accounts get full access. A Rejected supplier is also let in, but
@@ -209,6 +214,7 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
   $body     = getJsonBody();
   $fullName = trim($body['fullName'] ?? '');
   $phone    = trim($body['phoneNumber'] ?? '');
+  $username = trim($body['username'] ?? '');
 
   if ($fullName === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Full name is required.']);
@@ -216,11 +222,25 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
   if ($phone === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Phone number is required.']);
   }
+  if ($username === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Username is required.']);
+  }
+  if (!preg_match('/^[A-Za-z0-9_]{3,20}$/', $username)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Username must be 3–20 letters, numbers or underscores.']);
+  }
 
-  $upd = $pdo->prepare('UPDATE `user` SET fullName = :fn, phoneNumber = :ph WHERE userId = :id');
-  $upd->execute(['fn' => $fullName, 'ph' => $phone, 'id' => $auth['userId']]);
+  // username must stay unique (case-insensitive via the column collation),
+  // ignoring the user's own current row
+  $chk = $pdo->prepare('SELECT 1 FROM `user` WHERE username = :u AND userId != :id');
+  $chk->execute(['u' => $username, 'id' => $auth['userId']]);
+  if ($chk->fetch()) {
+    sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That username is already taken.']);
+  }
 
-  sendJson(200, true, ['fullName' => $fullName, 'phoneNumber' => $phone]);
+  $upd = $pdo->prepare('UPDATE `user` SET fullName = :fn, phoneNumber = :ph, username = :un WHERE userId = :id');
+  $upd->execute(['fn' => $fullName, 'ph' => $phone, 'un' => $username, 'id' => $auth['userId']]);
+
+  sendJson(200, true, ['fullName' => $fullName, 'phoneNumber' => $phone, 'username' => $username]);
 }
 
 // POST /auth/change-password — verify the current password, then set a new one.
