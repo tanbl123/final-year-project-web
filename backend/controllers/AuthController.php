@@ -12,11 +12,27 @@ function passwordPolicyError(string $password): ?string {
   return null;
 }
 
+// Derive a unique login @handle from the company name — suppliers no longer
+// pick a username themselves. e.g. "Aiman Sports Sdn Bhd" → "aimansportssdnbhd",
+// then "aimansportssdnbhd2" if that handle is already taken.
+function generateUsername(PDO $pdo, string $companyName): string {
+  $base = preg_replace('/[^a-z0-9]/', '', strtolower($companyName));
+  if ($base === '') $base = 'supplier';
+  $base = substr($base, 0, 24);
+  $stmt = $pdo->prepare('SELECT 1 FROM `user` WHERE username = :u');
+  $candidate = $base;
+  $n = 1;
+  while (true) {
+    $stmt->execute(['u' => $candidate]);
+    if (!$stmt->fetch()) return $candidate;
+    $candidate = $base . (++$n);
+  }
+}
+
 // POST /auth/register — create a new SUPPLIER account (status Pending,
 // awaiting admin approval). Creates a `user` row + a `supplier` row together.
 function handleRegister(PDO $pdo): void {
   $body           = getJsonBody();
-  $username       = trim($body['username'] ?? '');
   $email          = trim($body['email'] ?? '');
   $phoneNumber    = trim($body['phoneNumber'] ?? '');
   $companyName    = trim($body['companyName'] ?? '');
@@ -33,7 +49,7 @@ function handleRegister(PDO $pdo): void {
   $fullName = $companyName;
 
   // every required field must be present (taxNumber is the only optional one)
-  if ($username === '' || $email === '' || $phoneNumber === ''
+  if ($email === '' || $phoneNumber === ''
       || $companyName === '' || $companyAddress === ''
       || $businessRegNo === '' || $businessLicenseUrl === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields are required.']);
@@ -59,17 +75,15 @@ function handleRegister(PDO $pdo): void {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $pwErr]);
   }
 
-  // friendly duplicate check (the UNIQUE keys also protect us)
-  $chk = $pdo->prepare('SELECT email, username FROM `user` WHERE email = :e OR username = :u');
-  $chk->execute(['e' => $email, 'u' => $username]);
-  foreach ($chk->fetchAll() as $row) {
-    if (strcasecmp($row['email'], $email) === 0) {
-      sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That email is already registered.']);
-    }
-    if (strcasecmp($row['username'], $username) === 0) {
-      sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That username is already taken.']);
-    }
+  // friendly duplicate check on email (the UNIQUE key also protects us)
+  $chk = $pdo->prepare('SELECT 1 FROM `user` WHERE email = :e');
+  $chk->execute(['e' => $email]);
+  if ($chk->fetch()) {
+    sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That email is already registered.']);
   }
+
+  // the login handle is derived from the company name (suppliers don't choose one)
+  $username = generateUsername($pdo, $companyName);
 
   // create user + supplier together (roll back if either fails)
   $pdo->beginTransaction();

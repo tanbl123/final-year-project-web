@@ -34,7 +34,6 @@ function validateForm(form) {
   const errors = {};
 
   if (form.companyName.trim() === '') errors.companyName = 'Company name is required.';
-  if (form.username.trim() === '') errors.username = 'Username is required.';
 
   if (form.email.trim() === '') {
     errors.email = 'Email is required.';
@@ -85,7 +84,7 @@ function applyFieldError(errors, name, form) {
 
 function RegisterPage() {
   const [form, setForm] = useState({
-    companyName: '', username: '', email: '', phoneNumber: '',
+    companyName: '', email: '', phoneNumber: '',
     companyAddress: '', password: '', confirm: '',
     businessRegNo: '', taxNumber: '', businessLicenseUrl: '',
   });
@@ -163,7 +162,6 @@ function RegisterPage() {
     try {
       // send everything the backend needs (not the confirm field)
       await register({
-        username: form.username.trim(),
         email: form.email.trim(),
         phoneNumber: form.phoneNumber.trim(),
         companyName: form.companyName.trim(),
@@ -178,7 +176,6 @@ function RegisterPage() {
       // map known duplicate errors back onto the offending field
       const msg = err.message || 'Something went wrong. Please try again.';
       if (/email/i.test(msg)) setErrors({ email: msg });
-      else if (/username/i.test(msg)) setErrors({ username: msg });
       else setFormError(msg);
     } finally {
       setIsSubmitting(false);
@@ -291,7 +288,6 @@ function RegisterPage() {
 
         <hr className="my-3" />
         <h6 className="text-muted text-uppercase small fw-bold">Account login</h6>
-        {field('username', 'Username')}
         {field('email', 'Email', 'email')}
         {field('phoneNumber', 'Phone number', 'tel')}
         {passwordField('password', 'Password')}
