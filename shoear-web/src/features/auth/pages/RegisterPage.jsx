@@ -305,7 +305,7 @@ function RegisterPage() {
           maxLength="20"
           autoComplete="username"
           className={invalid ? 'is-invalid' : valid ? 'is-valid' : ''}
-          placeholder={usernameSlug(form.companyName) || 'username'}
+          placeholder="username"
           value={form.username}
           onChange={handleUsernameChange}
           onBlur={handleBlur}
