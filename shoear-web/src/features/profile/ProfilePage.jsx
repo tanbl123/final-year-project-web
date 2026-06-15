@@ -5,6 +5,7 @@ import Avatar from '../../components/Avatar';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EyeIcon from '../../components/EyeIcon';
+import ClearableInput from '../../components/ClearableInput';
 
 const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
 const EMPTY_BANK = { bankName: '', bankAccountName: '', bankAccountNumber: '' };
@@ -250,24 +251,27 @@ function ProfilePage() {
             <form onSubmit={save}>
               <div className="mb-3">
                 <label className="form-label">Full name</label>
-                <input type="text" className="form-control" maxLength="100" required autoFocus
+                <ClearableInput type="text" maxLength="100" required autoFocus
                   value={form.fullName}
-                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} />
+                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+                  onClear={() => setForm((f) => ({ ...f, fullName: '' }))} />
               </div>
               <div className="mb-3">
                 <label className="form-label">Username</label>
-                <input type="text" maxLength="20"
-                  className={'form-control' + (usernameError ? ' is-invalid' : '')}
+                <ClearableInput type="text" maxLength="20"
+                  className={usernameError ? 'is-invalid' : ''}
                   value={form.username}
-                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-                {usernameError && <div className="invalid-feedback">{usernameError}</div>}
+                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                  onClear={() => setForm((f) => ({ ...f, username: '' }))} />
+                {usernameError && <div className="invalid-feedback d-block">{usernameError}</div>}
                 <div className="form-text">Letters, numbers or underscores. You can sign in with this or your email.</div>
               </div>
               <div className="mb-3">
                 <label className="form-label">Phone number</label>
-                <input type="text" className="form-control" maxLength="30" required
+                <ClearableInput type="text" maxLength="30" required
                   value={form.phoneNumber}
-                  onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))} />
+                  onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                  onClear={() => setForm((f) => ({ ...f, phoneNumber: '' }))} />
               </div>
               <div className="d-flex gap-2">
                 <button type="submit" className="btn btn-primary" disabled={saving || !dirty || !!usernameError}>
@@ -337,23 +341,26 @@ function ProfilePage() {
               <form className="mt-3" onSubmit={saveBank}>
                 <div className="mb-3">
                   <label className="form-label">Bank name</label>
-                  <input type="text" className="form-control" maxLength="100" required autoFocus
+                  <ClearableInput type="text" maxLength="100" required autoFocus
                     value={bankForm.bankName}
-                    onChange={(e) => setBankForm((f) => ({ ...f, bankName: e.target.value }))} />
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankName: e.target.value }))}
+                    onClear={() => setBankForm((f) => ({ ...f, bankName: '' }))} />
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Account holder name</label>
-                  <input type="text" className="form-control" maxLength="150" required
+                  <ClearableInput type="text" maxLength="150" required
                     value={bankForm.bankAccountName}
-                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountName: e.target.value }))} />
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountName: e.target.value }))}
+                    onClear={() => setBankForm((f) => ({ ...f, bankAccountName: '' }))} />
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Account number</label>
-                  <input type="text" inputMode="numeric" maxLength="34" required
-                    className={'form-control' + (bankNumberError ? ' is-invalid' : '')}
+                  <ClearableInput type="text" inputMode="numeric" maxLength="34" required
+                    className={bankNumberError ? 'is-invalid' : ''}
                     value={bankForm.bankAccountNumber}
-                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountNumber: e.target.value }))} />
-                  {bankNumberError && <div className="invalid-feedback">{bankNumberError}</div>}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountNumber: e.target.value }))}
+                    onClear={() => setBankForm((f) => ({ ...f, bankAccountNumber: '' }))} />
+                  {bankNumberError && <div className="invalid-feedback d-block">{bankNumberError}</div>}
                 </div>
                 <div className="d-flex gap-2">
                   <button type="submit" className="btn btn-primary" disabled={bankSaving || !bankReady || !bankDirty}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyApplication, resubmitApplication, uploadRegistrationDoc } from '../authService';
 import { useAuth } from '../AuthContext';
+import ClearableInput from '../../../components/ClearableInput';
 
 // Shown to a supplier whose registration was rejected (a curable rejection).
 // They see why it was rejected, fix the flagged details on a prefilled form,
@@ -77,6 +78,13 @@ function ResubmitApplicationPage() {
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((f) => ({ ...f, [name]: value }));
+    setFormError('');
+    setErrors((prev) => (name in prev ? { ...prev, [name]: undefined } : prev));
+  }
+
+  // clear a field via its ✕ button
+  function clearField(name) {
+    setForm((f) => ({ ...f, [name]: '' }));
     setFormError('');
     setErrors((prev) => (name in prev ? { ...prev, [name]: undefined } : prev));
   }
@@ -222,14 +230,15 @@ function ResubmitApplicationPage() {
     return (
       <div className="mb-3">
         <label className="form-label">{label}</label>
-        <input
+        <ClearableInput
           type={type}
           name={name}
-          className={`form-control ${errors[name] ? 'is-invalid' : ''}`}
+          className={errors[name] ? 'is-invalid' : ''}
           value={form[name]}
           onChange={handleChange}
+          onClear={() => clearField(name)}
         />
-        {errors[name] && <div className="invalid-feedback">{errors[name]}</div>}
+        {errors[name] && <div className="invalid-feedback d-block">{errors[name]}</div>}
       </div>
     );
   }
