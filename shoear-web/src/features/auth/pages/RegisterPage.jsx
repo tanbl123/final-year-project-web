@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { register, uploadRegistrationDoc, checkUsername } from '../authService';
 import EyeIcon from '../../../components/EyeIcon';
+import ClearableInput from '../../../components/ClearableInput';
 
 // Reduce free text (e.g. a company name) to a valid username body:
 // lowercase, only letters/numbers/underscore, max 20 chars.
@@ -179,6 +180,18 @@ function RegisterPage() {
     setForm((f) => ({ ...f, username: name }));
   }
 
+  // clear a field via its ✕ button (mirrors handleChange's live re-validation)
+  function clearField(name) {
+    const nextForm = { ...form, [name]: '' };
+    if (name === 'companyName' && !usernameEdited) nextForm.username = '';
+    setForm(nextForm);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (name in prev) applyFieldError(next, name, nextForm);
+      return next;
+    });
+  }
+
   // live availability check (debounced) against the API as the username changes
   useEffect(() => {
     const u = form.username.trim();
@@ -258,15 +271,16 @@ function RegisterPage() {
     return (
       <div className="mb-3">
         <label className="form-label">{label}</label>
-        <input
+        <ClearableInput
           type={type}
           name={name}
-          className={`form-control ${errors[name] ? 'is-invalid' : ''}`}
+          className={errors[name] ? 'is-invalid' : ''}
           value={form[name]}
           onChange={handleChange}
           onBlur={handleBlur}
+          onClear={() => clearField(name)}
         />
-        {errors[name] && <div className="invalid-feedback">{errors[name]}</div>}
+        {errors[name] && <div className="invalid-feedback d-block">{errors[name]}</div>}
       </div>
     );
   }
@@ -279,18 +293,19 @@ function RegisterPage() {
     return (
       <div className="mb-3">
         <label className="form-label">Username</label>
-        <input
+        <ClearableInput
           type="text"
           name="username"
           maxLength="20"
           autoComplete="username"
-          className={`form-control ${invalid ? 'is-invalid' : valid ? 'is-valid' : ''}`}
+          className={invalid ? 'is-invalid' : valid ? 'is-valid' : ''}
           placeholder={usernameSlug(form.companyName) || 'username'}
           value={form.username}
           onChange={handleUsernameChange}
           onBlur={handleBlur}
+          onClear={() => { setUsernameEdited(true); setForm((f) => ({ ...f, username: '' })); setErrors((p) => { const n = { ...p }; delete n.username; return n; }); }}
         />
-        {errors.username && <div className="invalid-feedback">{errors.username}</div>}
+        {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
         {!errors.username && (
           <div className="form-text">
             {s === 'idle' && 'Auto-filled from your company name — you can change it.'}

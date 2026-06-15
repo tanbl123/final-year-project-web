@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { homePathFor } from '../ProtectedRoute';
 import EyeIcon from '../../../components/EyeIcon';
+import ClearableInput from '../../../components/ClearableInput';
 
 // Validate the login fields, returning a { field: message } object.
 function validateForm(form) {
@@ -106,16 +107,17 @@ function LoginPage({ variant = 'supplier' }) {
       <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
         <div className="mb-3">
           <label className="form-label">Email or username</label>
-          <input
+          <ClearableInput
             type="text"
             name="identifier"
             autoComplete="username"
-            className={`form-control ${errors.identifier ? 'is-invalid' : ''}`}
+            className={errors.identifier ? 'is-invalid' : ''}
             value={form.identifier}
             onChange={handleChange}
             onBlur={handleBlur}
+            onClear={() => { setForm((f) => ({ ...f, identifier: '' })); setErrors((p) => { const n = { ...p }; delete n.identifier; return n; }); setFormError(''); }}
           />
-          {errors.identifier && <div className="invalid-feedback">{errors.identifier}</div>}
+          {errors.identifier && <div className="invalid-feedback d-block">{errors.identifier}</div>}
         </div>
 
         <div className="mb-3">
