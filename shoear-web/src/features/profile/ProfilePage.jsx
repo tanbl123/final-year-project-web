@@ -256,14 +256,11 @@ function ProfilePage() {
               </div>
               <div className="mb-3">
                 <label className="form-label">Username</label>
-                <div className="input-group has-validation">
-                  <span className="input-group-text">@</span>
-                  <input type="text" maxLength="20"
-                    className={'form-control' + (usernameError ? ' is-invalid' : '')}
-                    value={form.username}
-                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-                  {usernameError && <div className="invalid-feedback">{usernameError}</div>}
-                </div>
+                <input type="text" maxLength="20"
+                  className={'form-control' + (usernameError ? ' is-invalid' : '')}
+                  value={form.username}
+                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
+                {usernameError && <div className="invalid-feedback">{usernameError}</div>}
                 <div className="form-text">Letters, numbers or underscores. You can sign in with this or your email.</div>
               </div>
               <div className="mb-3">

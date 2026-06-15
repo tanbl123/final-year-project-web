@@ -279,36 +279,33 @@ function RegisterPage() {
     return (
       <div className="mb-3">
         <label className="form-label">Username</label>
-        <div className="input-group has-validation">
-          <span className="input-group-text">@</span>
-          <input
-            type="text"
-            name="username"
-            maxLength="20"
-            autoComplete="username"
-            className={`form-control ${invalid ? 'is-invalid' : valid ? 'is-valid' : ''}`}
-            placeholder={usernameSlug(form.companyName) || 'username'}
-            value={form.username}
-            onChange={handleUsernameChange}
-            onBlur={handleBlur}
-          />
-          {errors.username && <div className="invalid-feedback">{errors.username}</div>}
-        </div>
+        <input
+          type="text"
+          name="username"
+          maxLength="20"
+          autoComplete="username"
+          className={`form-control ${invalid ? 'is-invalid' : valid ? 'is-valid' : ''}`}
+          placeholder={usernameSlug(form.companyName) || 'username'}
+          value={form.username}
+          onChange={handleUsernameChange}
+          onBlur={handleBlur}
+        />
+        {errors.username && <div className="invalid-feedback">{errors.username}</div>}
         {!errors.username && (
           <div className="form-text">
             {s === 'idle' && 'Auto-filled from your company name — you can change it.'}
             {s === 'checking' && <span className="text-muted">Checking availability…</span>}
             {s === 'invalid' && <span className="text-danger">3–20 letters, numbers or underscores.</span>}
-            {s === 'available' && <span className="text-success">✓ @{form.username.trim()} is available</span>}
+            {s === 'available' && <span className="text-success">✓ {form.username.trim()} is available</span>}
             {s === 'taken' && (
               <span className="text-danger">
-                @{form.username.trim()} is taken.
+                {form.username.trim()} is taken.
                 {usernameStatus.suggestion && (
                   <>
                     {' '}Try{' '}
                     <button type="button" className="btn btn-link btn-sm p-0 align-baseline"
                       onClick={() => applySuggestion(usernameStatus.suggestion)}>
-                      @{usernameStatus.suggestion}
+                      {usernameStatus.suggestion}
                     </button>
                   </>
                 )}
