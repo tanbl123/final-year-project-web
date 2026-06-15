@@ -19,10 +19,12 @@ function AdminCategoriesPage() {
 
   const [newName, setNewName] = useState('');     // add form
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');   // inline error under the add input
 
   const [editingId, setEditingId] = useState(''); // inline rename
   const [editName, setEditName] = useState('');
   const [savingId, setSavingId] = useState('');
+  const [editError, setEditError] = useState(''); // inline error under the rename input
 
   const [deleting, setDeleting] = useState(null); // category pending delete confirm
 
@@ -42,7 +44,7 @@ function AdminCategoriesPage() {
     event.preventDefault();
     const name = newName.trim();
     if (name === '') return;
-    setError('');
+    setAddError('');
     setAdding(true);
     try {
       const created = await createCategory(name);
@@ -50,7 +52,7 @@ function AdminCategoriesPage() {
       setNewName('');
       setToast(`Category “${created.name}” added.`);
     } catch (err) {
-      setError(err.message);
+      setAddError(err.message);
     } finally {
       setAdding(false);
     }
@@ -59,16 +61,17 @@ function AdminCategoriesPage() {
   function startEdit(cat) {
     setEditingId(cat.id);
     setEditName(cat.name);
-    setError('');
+    setEditError('');
   }
   function cancelEdit() {
     setEditingId('');
     setEditName('');
+    setEditError('');
   }
   async function saveEdit(cat) {
     const name = editName.trim();
     if (name === '' || name === cat.name) { cancelEdit(); return; }
-    setError('');
+    setEditError('');
     setSavingId(cat.id);
     try {
       const updated = await renameCategory(cat.id, name);
@@ -77,7 +80,7 @@ function AdminCategoriesPage() {
       setToast(`Renamed to “${updated.name}”.`);
       cancelEdit();
     } catch (err) {
-      setError(err.message);
+      setEditError(err.message);
     } finally {
       setSavingId('');
     }
@@ -109,9 +112,12 @@ function AdminCategoriesPage() {
       {/* add form */}
       <form onSubmit={handleAdd} className="card card-body mb-4">
         <label className="form-label fw-semibold">Add a category</label>
-        <div className="d-flex gap-2">
-          <input type="text" className="form-control" maxLength="80" placeholder="e.g. Tennis"
-            value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <div className="d-flex gap-2 align-items-start">
+          <div className="flex-grow-1">
+            <input type="text" className={`form-control ${addError ? 'is-invalid' : ''}`} maxLength="80" placeholder="e.g. Tennis"
+              value={newName} onChange={(e) => { setNewName(e.target.value); if (addError) setAddError(''); }} />
+            {addError && <div className="invalid-feedback d-block">{addError}</div>}
+          </div>
           <button type="submit" className="btn btn-primary text-nowrap"
             disabled={adding || newName.trim() === ''}>
             {adding ? 'Adding…' : '+ Add'}
@@ -138,12 +144,15 @@ function AdminCategoriesPage() {
                 <tr key={cat.id}>
                   <td style={{ overflowWrap: 'anywhere' }}>
                     {editingId === cat.id ? (
-                      <input type="text" className="form-control" maxLength="80" autoFocus
-                        value={editName} onChange={(e) => setEditName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveEdit(cat);
-                          if (e.key === 'Escape') cancelEdit();
-                        }} />
+                      <>
+                        <input type="text" className={`form-control ${editError ? 'is-invalid' : ''}`} maxLength="80" autoFocus
+                          value={editName} onChange={(e) => { setEditName(e.target.value); if (editError) setEditError(''); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(cat);
+                            if (e.key === 'Escape') cancelEdit();
+                          }} />
+                        {editError && <div className="invalid-feedback d-block">{editError}</div>}
+                      </>
                     ) : (
                       <span className="fw-semibold">{cat.name}</span>
                     )}

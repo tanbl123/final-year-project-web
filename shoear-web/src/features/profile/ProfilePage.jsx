@@ -53,6 +53,7 @@ function ProfilePage() {
 
   const [bankEditing, setBankEditing] = useState(false);
   const [bankForm, setBankForm] = useState(EMPTY_BANK);
+  const [bankErrors, setBankErrors] = useState({});   // inline per-field messages
   const [bankSaving, setBankSaving] = useState(false);
 
   const [discard, setDiscard] = useState(null);   // 'profile' | 'password' | 'bank' when confirming a discard
@@ -139,7 +140,14 @@ function ProfilePage() {
       bankAccountName: p.bankAccountName || '',
       bankAccountNumber: p.bankAccountNumber || '',
     });
+    setBankErrors({});
     setBankEditing(true);
+  }
+
+  // update a bank field and clear its inline error as the user fixes it
+  function setBankField(name, value) {
+    setBankForm((f) => ({ ...f, [name]: value }));
+    setBankErrors((be) => { if (!be[name]) return be; const n = { ...be }; delete n[name]; return n; });
   }
 
   const bankDirty = bankEditing && me.profile && (
@@ -148,10 +156,9 @@ function ProfilePage() {
     bankForm.bankAccountNumber.trim() !== (me.profile.bankAccountNumber || '')
   );
 
+  // live account-number format check (shown inline as the user types)
   const bankNumberError = bankForm.bankAccountNumber && !/^\d{5,20}$/.test(bankForm.bankAccountNumber.trim())
     ? 'Account number must be 5–20 digits.' : null;
-  const bankReady = bankForm.bankName.trim() && bankForm.bankAccountName.trim()
-    && bankForm.bankAccountNumber.trim() && !bankNumberError;
 
   function cancelBank() {
     if (bankDirty) setDiscard('bank');
@@ -160,7 +167,14 @@ function ProfilePage() {
 
   async function saveBank(e) {
     e.preventDefault();
-    if (!bankReady) return;
+    // validate inline, under each field
+    const be = {};
+    if (!bankForm.bankName.trim()) be.bankName = 'Bank name is required.';
+    if (!bankForm.bankAccountName.trim()) be.bankAccountName = 'Account holder name is required.';
+    if (!bankForm.bankAccountNumber.trim()) be.bankAccountNumber = 'Account number is required.';
+    else if (bankNumberError) be.bankAccountNumber = bankNumberError;
+    if (Object.keys(be).length) { setBankErrors(be); return; }
+
     if (!bankDirty) { setBankEditing(false); return; }
     setBankSaving(true);
     setError('');
@@ -174,7 +188,9 @@ function ProfilePage() {
       setBankEditing(false);
       setToast('Bank account updated.');
     } catch (err) {
-      setError(err.message);
+      // a server account-number complaint lands under that field
+      if (/account number/i.test(err.message || '')) setBankErrors({ bankAccountNumber: err.message });
+      else setError(err.message);
     } finally {
       setBankSaving(false);
     }
@@ -357,28 +373,33 @@ function ProfilePage() {
                 <div className="mb-3">
                   <label className="form-label">Bank name</label>
                   <ClearableInput type="text" maxLength="100" required autoFocus
+                    className={bankErrors.bankName ? 'is-invalid' : ''}
                     value={bankForm.bankName}
-                    onChange={(e) => setBankForm((f) => ({ ...f, bankName: e.target.value }))}
-                    onClear={() => setBankForm((f) => ({ ...f, bankName: '' }))} />
+                    onChange={(e) => setBankField('bankName', e.target.value)}
+                    onClear={() => setBankField('bankName', '')} />
+                  {bankErrors.bankName && <div className="invalid-feedback d-block">{bankErrors.bankName}</div>}
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Account holder name</label>
                   <ClearableInput type="text" maxLength="150" required
+                    className={bankErrors.bankAccountName ? 'is-invalid' : ''}
                     value={bankForm.bankAccountName}
-                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountName: e.target.value }))}
-                    onClear={() => setBankForm((f) => ({ ...f, bankAccountName: '' }))} />
+                    onChange={(e) => setBankField('bankAccountName', e.target.value)}
+                    onClear={() => setBankField('bankAccountName', '')} />
+                  {bankErrors.bankAccountName && <div className="invalid-feedback d-block">{bankErrors.bankAccountName}</div>}
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Account number</label>
                   <ClearableInput type="text" inputMode="numeric" maxLength="34" required
-                    className={bankNumberError ? 'is-invalid' : ''}
+                    className={(bankNumberError || bankErrors.bankAccountNumber) ? 'is-invalid' : ''}
                     value={bankForm.bankAccountNumber}
-                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountNumber: e.target.value }))}
-                    onClear={() => setBankForm((f) => ({ ...f, bankAccountNumber: '' }))} />
-                  {bankNumberError && <div className="invalid-feedback d-block">{bankNumberError}</div>}
+                    onChange={(e) => setBankField('bankAccountNumber', e.target.value)}
+                    onClear={() => setBankField('bankAccountNumber', '')} />
+                  {(bankNumberError || bankErrors.bankAccountNumber) &&
+                    <div className="invalid-feedback d-block">{bankNumberError || bankErrors.bankAccountNumber}</div>}
                 </div>
                 <div className="d-flex gap-2">
-                  <button type="submit" className="btn btn-primary" disabled={bankSaving || !bankReady || !bankDirty}>
+                  <button type="submit" className="btn btn-primary" disabled={bankSaving || !bankDirty || !!bankNumberError}>
                     {bankSaving ? 'Saving…' : 'Save bank account'}
                   </button>
                   <button type="button" className="btn btn-outline-secondary"
