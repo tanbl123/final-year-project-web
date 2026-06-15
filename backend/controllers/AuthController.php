@@ -181,12 +181,13 @@ function handleLogin(PDO $pdo, string $secret): void {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Email/username and password are required.']);
   }
 
-  // look up by email OR username (prepared statement → safe from SQL injection)
+  // look up by email OR username (prepared statement → safe from SQL injection).
+  // Two distinct placeholders: with emulation off, PDO won't reuse one twice.
   $stmt = $pdo->prepare(
     'SELECT userId, password, role, fullName, status, rejectionReason
-       FROM `user` WHERE email = :id OR username = :id'
+       FROM `user` WHERE email = :email OR username = :username'
   );
-  $stmt->execute(['id' => $identifier]);
+  $stmt->execute(['email' => $identifier, 'username' => $identifier]);
   $user = $stmt->fetch();
 
   // same message whichever was wrong (don't leak which)
