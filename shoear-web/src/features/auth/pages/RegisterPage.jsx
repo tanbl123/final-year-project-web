@@ -153,6 +153,11 @@ function RegisterPage() {
       if (name in prev) applyFieldError(next, name, nextForm);
       // password & confirm are linked — keep the confirm error in sync
       if (name === 'password' && 'confirm' in prev) applyFieldError(next, 'confirm', nextForm);
+      // auto-filling the username from the company name must also refresh its
+      // error, so a stale "Username is required" clears once a value flows in
+      if (name === 'companyName' && !usernameEdited && 'username' in next) {
+        applyFieldError(next, 'username', nextForm);
+      }
       return next;
     });
   }
@@ -178,6 +183,7 @@ function RegisterPage() {
   function applySuggestion(name) {
     setUsernameEdited(true);
     setForm((f) => ({ ...f, username: name }));
+    setErrors((prev) => { const next = { ...prev }; delete next.username; return next; });
   }
 
   // clear a field via its ✕ button (mirrors handleChange's live re-validation)
