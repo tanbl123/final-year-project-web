@@ -20,7 +20,7 @@ function AddProductPage() {
 
   return (
     <div className="container py-4 text-start">
-      <BackButton to="/products" label="Back to products" />
+      <BackButton to="/products" />
       <h1 className="mb-4">Add a product</h1>
       <ProductForm onAdd={addProduct} onCancel={() => navigate('/products')} />
     </div>

@@ -30,7 +30,7 @@ function ProductDetailPage() {
     return (
       <div className="container py-4">
         <div className="alert alert-danger">{error}</div>
-        <BackButton to="/products" label="Back to products" />
+        <BackButton to="/products" />
       </div>
     );
   }
@@ -39,7 +39,7 @@ function ProductDetailPage() {
 
   return (
     <div className="container py-4">
-      <BackButton to="/products" label="Back to products" />
+      <BackButton to="/products" />
 
       <div className="row g-4 mt-1">
         {/* left: images */}
