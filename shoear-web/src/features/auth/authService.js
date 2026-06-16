@@ -50,6 +50,22 @@ export function updateBankAccount(data) {
   return apiPut('/supplier/bank-account', data, getToken());
 }
 
+// The supplier's verified business details + any open/last change request.
+export function getBusinessDetails() {
+  return apiGet('/supplier/business-details', getToken());
+}
+
+// Company address is operational — editable freely (no admin review).
+export function updateCompanyAddress(companyAddress) {
+  return apiPut('/supplier/company-address', { companyAddress }, getToken());
+}
+
+// Propose changes to the verified fields (company name, SSM, SST, document).
+// Goes to the admin re-approval queue; the account stays Active meanwhile.
+export function submitBusinessChangeRequest(data) {
+  return apiPost('/supplier/business-details/change-request', data, getToken());
+}
+
 // The signed-in user's own profile (GET /auth/me).
 export function getMe() {
   return apiGet('/auth/me', getToken());

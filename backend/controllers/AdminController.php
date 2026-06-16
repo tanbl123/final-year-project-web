@@ -195,3 +195,97 @@ function handleSetUserStatus(PDO $pdo, array $auth, string $userId): void {
   $upd->execute(['s' => $status, 'id' => $userId]);
   sendJson(200, true, ['userId' => $userId, 'status' => $status]);
 }
+
+// ── supplier business-detail change requests ─────────────────────────
+// GET /admin/supplier-changes — pending change requests with the current
+// (live) values alongside the proposed ones, so the admin can see the diff.
+function handleListChangeRequests(PDO $pdo): void {
+  $stmt = $pdo->query(
+    "SELECT r.requestId, r.created_at,
+            r.companyName AS newCompanyName, r.businessRegNo AS newBusinessRegNo,
+            r.taxNumber AS newTaxNumber, r.businessLicenseUrl AS newBusinessLicenseUrl,
+            s.supplierId, u.email, u.username,
+            s.companyName AS curCompanyName, s.businessRegNo AS curBusinessRegNo,
+            s.taxNumber AS curTaxNumber, s.businessLicenseUrl AS curBusinessLicenseUrl
+       FROM supplier_change_request r
+       JOIN supplier s ON s.supplierId = r.supplierId
+       JOIN `user` u   ON u.userId = s.userId
+      WHERE r.requestStatus = 'Pending'
+      ORDER BY r.created_at ASC"
+  );
+  sendJson(200, true, ['requests' => $stmt->fetchAll()]);
+}
+
+// Load a still-Pending change request, or 404/409. Returns the request row.
+function loadPendingChangeRequest(PDO $pdo, string $requestId): array {
+  $stmt = $pdo->prepare('SELECT * FROM supplier_change_request WHERE requestId = :id');
+  $stmt->execute(['id' => $requestId]);
+  $req = $stmt->fetch();
+  if (!$req) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Change request not found.']);
+  }
+  if ($req['requestStatus'] !== 'Pending') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This request has already been reviewed.']);
+  }
+  return $req;
+}
+
+// POST /admin/supplier-changes/{requestId}/approve — copy the proposed values
+// onto the live supplier row (and mirror the company name onto user.fullName).
+function handleApproveChangeRequest(PDO $pdo, array $auth, string $requestId): void {
+  $req = loadPendingChangeRequest($pdo, $requestId);
+
+  $pdo->beginTransaction();
+  try {
+    $pdo->prepare(
+      'UPDATE supplier
+          SET companyName = :cn, businessRegNo = :brn, taxNumber = :tax, businessLicenseUrl = :blu
+        WHERE supplierId = :sid'
+    )->execute([
+      'cn' => $req['companyName'], 'brn' => $req['businessRegNo'],
+      'tax' => $req['taxNumber'], 'blu' => $req['businessLicenseUrl'],
+      'sid' => $req['supplierId'],
+    ]);
+
+    // the supplier's display name mirrors the company name (as at registration)
+    $pdo->prepare(
+      'UPDATE `user` u
+         JOIN supplier s ON s.userId = u.userId
+          SET u.fullName = :cn
+        WHERE s.supplierId = :sid'
+    )->execute(['cn' => $req['companyName'], 'sid' => $req['supplierId']]);
+
+    $pdo->prepare(
+      "UPDATE supplier_change_request
+          SET requestStatus = 'Approved', reviewedBy = :by, reviewed_at = NOW()
+        WHERE requestId = :id"
+    )->execute(['by' => $auth['userId'], 'id' => $requestId]);
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    sendJson(500, false, null, ['code' => 'SERVER', 'message' => 'Could not apply the change. Please try again.']);
+  }
+
+  sendJson(200, true, ['requestId' => $requestId, 'status' => 'Approved']);
+}
+
+// POST /admin/supplier-changes/{requestId}/reject — body: { reason }.
+// Leaves the live supplier row untouched; the supplier sees the reason.
+function handleRejectChangeRequest(PDO $pdo, array $auth, string $requestId): void {
+  $req    = loadPendingChangeRequest($pdo, $requestId);
+  $body   = getJsonBody();
+  $reason = trim($body['reason'] ?? '');
+  if ($reason === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A reason is required so the supplier knows what to fix.']);
+  }
+  if (mb_strlen($reason) > 255) { $reason = mb_substr($reason, 0, 255); }
+
+  $pdo->prepare(
+    "UPDATE supplier_change_request
+        SET requestStatus = 'Rejected', reviewNote = :rn, reviewedBy = :by, reviewed_at = NOW()
+      WHERE requestId = :id"
+  )->execute(['rn' => $reason, 'by' => $auth['userId'], 'id' => $requestId]);
+
+  sendJson(200, true, ['requestId' => $requestId, 'status' => 'Rejected']);
+}

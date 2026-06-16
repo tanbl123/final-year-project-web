@@ -31,6 +31,19 @@ export function rejectProduct(productId) {
   return apiPost(`/admin/products/${productId}/reject`, {}, getToken());
 }
 
+// ── supplier business-detail change requests (re-approval queue) ──────
+export function getSupplierChangeRequests() {
+  return apiGet('/admin/supplier-changes', getToken());
+}
+
+export function approveChangeRequest(requestId) {
+  return apiPost(`/admin/supplier-changes/${requestId}/approve`, {}, getToken());
+}
+
+export function rejectChangeRequest(requestId, reason) {
+  return apiPost(`/admin/supplier-changes/${requestId}/reject`, { reason }, getToken());
+}
+
 // ── category management ──────────────────────────────────────────────
 // List categories with how many products use each.
 export function getCategoriesAdmin() {

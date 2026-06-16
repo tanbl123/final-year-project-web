@@ -6,6 +6,7 @@ import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EyeIcon from '../../components/EyeIcon';
 import ClearableInput from '../../components/ClearableInput';
+import BusinessDetailsCard from './BusinessDetailsCard';
 
 const EMPTY_PW = { currentPassword: '', newPassword: '', confirmPassword: '' };
 const EMPTY_BANK = { bankName: '', bankAccountName: '', bankAccountNumber: '' };
@@ -320,14 +321,6 @@ function ProfilePage() {
                 <dt className="col-sm-4">Phone</dt>
                 <dd className="col-sm-8">{me.phoneNumber || <span className="text-muted">—</span>}</dd>
 
-                {me.role === 'Supplier' && me.profile && (
-                  <>
-                    <dt className="col-sm-4">Company</dt>
-                    <dd className="col-sm-8">{me.profile.companyName}</dd>
-                    <dt className="col-sm-4">Company address</dt>
-                    <dd className="col-sm-8">{me.profile.companyAddress}</dd>
-                  </>
-                )}
                 {me.role === 'Customer' && me.profile && (
                   <>
                     <dt className="col-sm-4">Shipping address</dt>
@@ -350,6 +343,9 @@ function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* business details (suppliers only) — verified identity + re-approval flow */}
+      {me.role === 'Supplier' && <BusinessDetailsCard onToast={setToast} />}
 
       {/* bank account (suppliers only) — where their sales payouts are sent */}
       {me.role === 'Supplier' && (

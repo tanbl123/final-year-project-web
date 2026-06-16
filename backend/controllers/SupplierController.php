@@ -124,3 +124,105 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
 
   sendJson(200, true, ['status' => 'Pending', 'message' => 'Application resubmitted for review.']);
 }
+
+// ── business details (post-approval changes via admin re-approval) ──────
+// Shared validation for the sensitive business fields. Returns an error
+// message, or null when everything is valid. (Mirrors the registration rules.)
+function businessDetailsError(string $companyName, string $businessRegNo, string $businessLicenseUrl, string $taxNumber): ?string {
+  if ($companyName === '' || $businessRegNo === '' || $businessLicenseUrl === '') {
+    return 'Company name, SSM number and the registration document are required.';
+  }
+  if (!preg_match('/^(\d{12}|\d{6,8}-?[A-Za-z])$/', $businessRegNo)) {
+    return 'Enter a valid SSM number, e.g. 202301012345 or 1234567-A.';
+  }
+  if ($taxNumber !== '' && !preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{6,18}[A-Za-z0-9]$/', $taxNumber)) {
+    return 'Enter a valid SST number, e.g. W10-1808-32000001.';
+  }
+  return null;
+}
+
+// GET /supplier/business-details — the supplier's current verified business
+// fields plus any open (Pending) change request, so the profile can show the
+// live values and a "changes pending review" banner.
+function handleGetBusinessDetails(PDO $pdo, array $auth): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+
+  $cur = $pdo->prepare(
+    'SELECT companyName, companyAddress, businessRegNo, taxNumber, businessLicenseUrl
+       FROM supplier WHERE supplierId = :sid'
+  );
+  $cur->execute(['sid' => $supplierId]);
+  $current = $cur->fetch();
+
+  // the most recent request (Pending shows as a live banner; Rejected lets the
+  // supplier see why their last attempt was turned down)
+  $req = $pdo->prepare(
+    'SELECT requestId, companyName, businessRegNo, taxNumber, businessLicenseUrl,
+            requestStatus, reviewNote, created_at, reviewed_at
+       FROM supplier_change_request
+      WHERE supplierId = :sid
+      ORDER BY created_at DESC LIMIT 1'
+  );
+  $req->execute(['sid' => $supplierId]);
+  $latest = $req->fetch() ?: null;
+
+  sendJson(200, true, ['current' => $current, 'latestRequest' => $latest]);
+}
+
+// PUT /supplier/company-address — company address is operational (not part of
+// verified identity), so the supplier can change it freely, no review needed.
+function handleUpdateCompanyAddress(PDO $pdo, array $auth): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+  $body    = getJsonBody();
+  $address = trim($body['companyAddress'] ?? '');
+  if ($address === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Company address is required.']);
+  }
+  if (mb_strlen($address) > 255) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Company address is too long.']);
+  }
+  $pdo->prepare('UPDATE supplier SET companyAddress = :ca WHERE supplierId = :sid')
+      ->execute(['ca' => $address, 'sid' => $supplierId]);
+  sendJson(200, true, ['companyAddress' => $address]);
+}
+
+// POST /supplier/business-details/change-request — propose new values for the
+// verified fields (company name, SSM, SST, document). The account stays Active;
+// an admin reviews and approves/rejects. Only one open request at a time.
+function handleSubmitChangeRequest(PDO $pdo, array $auth): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+
+  $body               = getJsonBody();
+  $companyName        = trim($body['companyName'] ?? '');
+  $businessRegNo      = trim($body['businessRegNo'] ?? '');
+  $taxNumber          = trim($body['taxNumber'] ?? '');
+  $businessLicenseUrl = trim($body['businessLicenseUrl'] ?? '');
+
+  $err = businessDetailsError($companyName, $businessRegNo, $businessLicenseUrl, $taxNumber);
+  if ($err !== null) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $err]);
+  }
+
+  // one open request at a time
+  $open = $pdo->prepare(
+    "SELECT 1 FROM supplier_change_request WHERE supplierId = :sid AND requestStatus = 'Pending'"
+  );
+  $open->execute(['sid' => $supplierId]);
+  if ($open->fetch()) {
+    sendJson(409, false, null, ['code' => 'PENDING_EXISTS', 'message' => 'You already have a change pending review.']);
+  }
+
+  $requestId = nextId($pdo, 'supplier_change_request', 'requestId', 'SCR');
+  $pdo->prepare(
+    'INSERT INTO supplier_change_request
+       (requestId, supplierId, companyName, businessRegNo, taxNumber, businessLicenseUrl)
+     VALUES (:rid, :sid, :cn, :brn, :tax, :blu)'
+  )->execute([
+    'rid' => $requestId, 'sid' => $supplierId, 'cn' => $companyName,
+    'brn' => $businessRegNo, 'tax' => ($taxNumber === '' ? null : $taxNumber),
+    'blu' => $businessLicenseUrl,
+  ]);
+
+  sendJson(201, true, ['requestId' => $requestId, 'status' => 'Pending',
+    'message' => 'Your changes were submitted for admin review.']);
+}

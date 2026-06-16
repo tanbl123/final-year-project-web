@@ -136,6 +136,25 @@ if ($method === 'PUT' && $path === '/supplier/bank-account') {
   handleUpdateBankAccount($pdo, $auth);
 }
 
+// ── supplier business details (post-approval changes via re-approval) ──
+if ($method === 'GET' && $path === '/supplier/business-details') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetBusinessDetails($pdo, $auth);
+}
+
+if ($method === 'PUT' && $path === '/supplier/company-address') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpdateCompanyAddress($pdo, $auth);
+}
+
+if ($method === 'POST' && $path === '/supplier/business-details/change-request') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleSubmitChangeRequest($pdo, $auth);
+}
+
 // ── reports ──
 if ($method === 'GET' && $path === '/reports/sales') {
   $auth = requireAuth($secret);
@@ -170,6 +189,28 @@ if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/reject$#', $pat
   requireAdmin($auth);
   $pdo  = getPDO();
   handleRejectSupplier($pdo, $m[1]);
+}
+
+// supplier business-detail change requests (re-approval queue)
+if ($method === 'GET' && $path === '/admin/supplier-changes') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListChangeRequests($pdo);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/supplier-changes/([^/]+)/approve$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleApproveChangeRequest($pdo, $auth, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/supplier-changes/([^/]+)/reject$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleRejectChangeRequest($pdo, $auth, $m[1]);
 }
 
 if ($method === 'GET' && $path === '/admin/products/pending') {
