@@ -1,6 +1,7 @@
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import ProductForm from '../components/ProductForm';
 import { createProduct } from '../productService';
+import BackButton from '../../../components/BackButton';
 
 // Dedicated page for creating a product (instead of an inline panel on the
 // products list). On success we return to the list, which refetches on mount
@@ -19,9 +20,7 @@ function AddProductPage() {
 
   return (
     <div className="container py-4 text-start">
-      <Link to="/products" className="btn btn-outline-secondary mb-3" title="Back to products" aria-label="Back to products">
-        ← Back
-      </Link>
+      <BackButton to="/products" label="Back to products" />
       <h1 className="mb-4">Add a product</h1>
       <ProductForm onAdd={addProduct} onCancel={() => navigate('/products')} />
     </div>

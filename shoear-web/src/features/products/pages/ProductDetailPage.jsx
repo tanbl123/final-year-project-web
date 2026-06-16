@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { fetchProductById } from '../productService';
+import BackButton from '../../../components/BackButton';
 
 const STATUS_COLORS = { Approved: 'success', Pending: 'warning', Rejected: 'danger' };
 
@@ -29,7 +30,7 @@ function ProductDetailPage() {
     return (
       <div className="container py-4">
         <div className="alert alert-danger">{error}</div>
-        <Link to="/products">← Back to products</Link>
+        <BackButton to="/products" label="Back to products" />
       </div>
     );
   }
@@ -38,7 +39,7 @@ function ProductDetailPage() {
 
   return (
     <div className="container py-4">
-      <Link to="/products" className="btn btn-link px-0">← Back to products</Link>
+      <BackButton to="/products" label="Back to products" />
 
       <div className="row g-4 mt-1">
         {/* left: images */}
