@@ -287,7 +287,7 @@ updates (Section 11) drive the later stages.
 |--------|------|--------|---------|
 | POST | `/orders/{orderId}/payment` | Customer(Owner) | Start payment. Body: `{ "paymentMethod": "Stripe" }`. Returns gateway client-secret / approval URL. |
 | GET  | `/orders/{orderId}/payment` | Customer(Owner)/Admin | Payment status for an order. |
-| POST | `/payments/webhook` | Public (gateway-signed) | **Stripe/PayPal calls this**, not an app. On success → run atomic stock decrement, set payment `Successful`, order → `Paid`, create receipt + a `Pending` delivery row. |
+| POST | `/payments/webhook` | Public (gateway-signed) | **Stripe/PayPal calls this**, not an app. On success → run atomic stock decrement, set payment `Successful`, order → `Paid`, create receipt + **auto-assign a courier** (`assignDelivery()`). If no courier is free the delivery is left `Pending`/unassigned for the admin queue. |
 
 > The webhook is the trusted "payment really happened" signal. The
 > **atomic stock decrement** (`UPDATE ... WHERE stockQuantity >= :qty`) runs here,
@@ -307,8 +307,9 @@ updates (Section 11) drive the later stages.
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET   | `/admin/deliveries` | Admin | All deliveries, filter by status (`Pending` = needs assigning). |
-| POST  | `/admin/deliveries/{deliveryId}/assign` | Admin | Assign a delivery person. Body: `{ "deliveryPersonnelId": "DEL0001" }` → status `Assigned`. |
+| GET   | `/admin/deliveries` | Admin | All deliveries; filters `?status=` and `?unassigned=1` (unassigned = needs assigning). Unassigned/`Pending` are listed first. |
+| GET   | `/admin/couriers` | Admin | Active courier roster ranked best-first by current load (the same scoring the auto-assigner uses) — powers the manual-assign dropdown. |
+| POST  | `/admin/deliveries/{deliveryId}/assign` | Admin | Manually (re)assign a courier. Body: `{ "deliveryPersonnelId": "DEL0001" }`. `Pending` → `Assigned`; allowed until the delivery is `Delivered`/`Failed`. |
 | GET   | `/delivery/assignments` | Delivery | Deliveries assigned to the logged-in delivery person. |
 | GET   | `/deliveries/{deliveryId}` | Delivery(Owner)/Admin | One delivery's detail (address, customer, items). |
 | PATCH | `/deliveries/{deliveryId}/status` | Delivery(Owner) | Update: `PickedUp` → `OutForDelivery` → `Delivered`/`Failed`. |
@@ -316,6 +317,18 @@ updates (Section 11) drive the later stages.
 | POST  | `/deliveries/{deliveryId}/proof` | Delivery(Owner) | Attach proof-of-delivery photo URL (Firebase). |
 
 > OTP + proof-of-delivery satisfy the delivery app's confirmation requirement.
+
+> **Dispatch design (auto-assign).** Courier assignment is modelled as a
+> **scoring function** — the same core pattern production platforms (DoorDash,
+> Uber, Grab) use: every Active courier is scored and the best one wins
+> (`backend/lib/delivery.php`). Today the score weights only courier **load**
+> (fewest in-progress deliveries); it is structured so geographic/ETA, vehicle
+> and rating terms can be added as extra weighted terms without changing the
+> callers. When no courier is free the order is left in the **manual queue**
+> (unassigned `Pending`) for an admin to dispatch by hand. The production
+> extension would replace greedy one-order-at-a-time picking with **batched
+> min-cost assignment** across many orders/couriers at once — identified as
+> future work.
 
 ---
 

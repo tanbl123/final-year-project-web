@@ -14,6 +14,7 @@ import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
 import AdminBusinessChangesPage from './features/admin/pages/AdminBusinessChangesPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import AdminCommissionPage from './features/admin/pages/AdminCommissionPage';
+import AdminDeliveriesPage from './features/admin/pages/AdminDeliveriesPage';
 import ProfilePage from './features/profile/ProfilePage';
 import PayoutsPage from './features/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
@@ -46,6 +47,7 @@ function App() {
                 <Link className="nav-link" to="/admin/users">Users</Link>
                 <Link className="nav-link" to="/admin/products">Products</Link>
                 <Link className="nav-link" to="/admin/categories">Categories</Link>
+                <Link className="nav-link" to="/admin/deliveries">Deliveries</Link>
                 <Link className="nav-link" to="/admin/commission">Commission</Link>
               </>
             ) : user.status === 'Active' ? (
@@ -103,6 +105,9 @@ function App() {
         } />
         <Route path="/admin/users" element={
           <ProtectedRoute role="Admin"><AdminUsersPage /></ProtectedRoute>
+        } />
+        <Route path="/admin/deliveries" element={
+          <ProtectedRoute role="Admin"><AdminDeliveriesPage /></ProtectedRoute>
         } />
         <Route path="/admin/commission" element={
           <ProtectedRoute role="Admin"><AdminCommissionPage /></ProtectedRoute>

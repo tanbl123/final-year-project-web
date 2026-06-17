@@ -40,6 +40,7 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/../lib/db.php';                 // getPDO()
 require __DIR__ . '/../lib/ids.php';                // nextId()
 require __DIR__ . '/../lib/stripe.php';             // stripeApi(), stripeConfigured()
+require __DIR__ . '/../lib/delivery.php';           // assignDelivery() — auto-dispatch a courier
 
 $config = require __DIR__ . '/../config.php';        // app + Stripe config
 
@@ -330,6 +331,11 @@ try {
      VALUES (:pid, :oid, :txn, 'Stripe', :amt, NOW(), 'Successful')"
   )->execute(['pid' => $paymentId, 'oid' => $orderId, 'txn' => $pi['id'], 'amt' => $total]);
 
+  // Payment succeeded → auto-dispatch the order to the least-loaded courier
+  // (the same helper a real payment-success webhook would call). Falls back to
+  // the admin "needs assignment" queue if no courier is available.
+  $dispatch = assignDelivery($pdo, $orderId);
+
   foreach ($cart as $sid => $c) {
     $oitId = nextId($pdo, 'order_item', 'orderItemId', 'OIT');
     $pdo->prepare(
@@ -392,6 +398,15 @@ rule();
 line('  Customer paid (platform) : ' . money($total, $currency));
 line('  Admin commission kept    : ' . money($totalCommission, $currency));
 line('  Paid out to suppliers    : ' . money($totalNet, $currency));
+if (!empty($dispatch)) {
+  if ($dispatch['deliveryPersonnelId']) {
+    line('  Delivery auto-assigned   : ' . $dispatch['deliveryId'] .
+         ' → courier ' . $dispatch['deliveryPersonnelId'] . ' (' . $dispatch['deliveryStatus'] . ')');
+  } else {
+    line('  Delivery queued          : ' . $dispatch['deliveryId'] .
+         ' (no courier free — sent to admin assignment queue)');
+  }
+}
 line('');
 line('  Verify it:');
 line('   • Stripe Dashboard → Connect → Accounts → each supplier has a balance');

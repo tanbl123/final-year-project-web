@@ -81,6 +81,27 @@ export function setUserStatus(userId, status) {
   return apiPatch(`/admin/users/${userId}/status`, { status }, getToken());
 }
 
+// ── delivery dispatch ────────────────────────────────────────────────
+// filters: { status, unassigned } — any can be omitted/empty.
+export function getDeliveries(filters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.unassigned) qs.set('unassigned', '1');
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiGet(`/admin/deliveries${suffix}`, getToken());
+}
+
+// The Active courier roster, ranked best-first by current load (same scoring
+// the auto-assigner uses) — powers the manual-assign dropdown.
+export function getCouriers() {
+  return apiGet('/admin/couriers', getToken());
+}
+
+// Manually (re)assign a courier to a delivery.
+export function assignDelivery(deliveryId, deliveryPersonnelId) {
+  return apiPost(`/admin/deliveries/${deliveryId}/assign`, { deliveryPersonnelId }, getToken());
+}
+
 // ── reports ──────────────────────────────────────────────────────────
 // Platform commission across all suppliers (paid orders only).
 export function getCommissionReport() {

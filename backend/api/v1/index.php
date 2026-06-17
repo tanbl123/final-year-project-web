@@ -7,6 +7,7 @@ require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
 require __DIR__ . '/../../lib/storage.php';
 require __DIR__ . '/../../lib/stripe.php';
+require __DIR__ . '/../../lib/delivery.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
 require __DIR__ . '/../../controllers/ProductController.php';
@@ -15,6 +16,7 @@ require __DIR__ . '/../../controllers/UploadController.php';
 require __DIR__ . '/../../controllers/StripeController.php';
 require __DIR__ . '/../../controllers/ReportController.php';
 require __DIR__ . '/../../controllers/SupplierController.php';
+require __DIR__ . '/../../controllers/DeliveryController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -290,6 +292,28 @@ if ($method === 'PATCH' && preg_match('#^/admin/users/([^/]+)/status$#', $path, 
   requireAdmin($auth);
   $pdo  = getPDO();
   handleSetUserStatus($pdo, $auth, $m[1]);
+}
+
+// ── admin delivery dispatch (require an Admin token) ──
+if ($method === 'GET' && $path === '/admin/deliveries') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListDeliveries($pdo);
+}
+
+if ($method === 'GET' && $path === '/admin/couriers') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListCouriers($pdo);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/deliveries/([^/]+)/assign$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleAssignDelivery($pdo, $m[1]);
 }
 
 // ── file uploads (multipart): images + 3D models for products ──
