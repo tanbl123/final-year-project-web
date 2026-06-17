@@ -47,9 +47,8 @@ function ProductFilterBar({ filters, onChange }) {
         </div>
         <div className="col-md-2">
           <label className="form-label small text-muted mb-1">Max price (RM)</label>
-          <ClearableInput type="number" min="0" step="0.01" placeholder="Any"
-            value={filters.maxPrice} onChange={(e) => set('maxPrice', e.target.value)}
-            onClear={() => set('maxPrice', '')} />
+          <input type="number" min="0" step="0.01" className="form-control" placeholder="Any"
+            value={filters.maxPrice} onChange={(e) => set('maxPrice', e.target.value)} />
         </div>
         <div className="col-md-3">
           <label className="form-label small text-muted mb-1">Category</label>
