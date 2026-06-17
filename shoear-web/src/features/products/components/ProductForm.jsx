@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchCategories, uploadFile } from '../productService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
+import ClearableInput from '../../../components/ClearableInput';
 
 // A blank size row. Suppliers add one row per size they sell.
 const emptyVariant = () => ({ size: '', stock: '' });
@@ -279,19 +280,21 @@ function ProductForm({ onAdd, onCancel }) {
       <div className="row g-3">
         <div className="col-md-6">
           <label className="form-label">Shoe name</label>
-          <input type="text" maxLength="150" placeholder="e.g. Air Zoom Pegasus 40"
-            className={'form-control' + (showError('name') ? ' is-invalid' : '')}
+          <ClearableInput type="text" maxLength="150" placeholder="e.g. Air Zoom Pegasus 40"
+            className={showError('name') ? 'is-invalid' : ''}
             value={name} onChange={(e) => changeField('name', setName, e.target.value)}
-            onBlur={() => blurField('name')} />
-          {showError('name') && <div className="invalid-feedback">{fieldErrors.name}</div>}
+            onBlur={() => blurField('name')}
+            onClear={() => changeField('name', setName, '')} />
+          {showError('name') && <div className="invalid-feedback d-block">{fieldErrors.name}</div>}
         </div>
         <div className="col-md-3">
           <label className="form-label">Brand</label>
-          <input type="text" maxLength="80" placeholder="e.g. Nike"
-            className={'form-control' + (showError('brand') ? ' is-invalid' : '')}
+          <ClearableInput type="text" maxLength="80" placeholder="e.g. Nike"
+            className={showError('brand') ? 'is-invalid' : ''}
             value={brand} onChange={(e) => changeField('brand', setBrand, e.target.value)}
-            onBlur={() => blurField('brand')} />
-          {showError('brand') && <div className="invalid-feedback">{fieldErrors.brand}</div>}
+            onBlur={() => blurField('brand')}
+            onClear={() => changeField('brand', setBrand, '')} />
+          {showError('brand') && <div className="invalid-feedback d-block">{fieldErrors.brand}</div>}
         </div>
         <div className="col-md-3">
           <label className="form-label">Price (RM)</label>
