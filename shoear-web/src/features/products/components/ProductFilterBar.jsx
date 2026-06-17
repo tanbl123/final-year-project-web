@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchCategories } from '../productService';
+import ClearableInput from '../../../components/ClearableInput';
 
 // The old "add" bar lived here (name / brand / price / category). It now
 // FILTERS the product list instead of creating products. Changes are pushed
@@ -34,18 +35,21 @@ function ProductFilterBar({ filters, onChange }) {
       <div className="row g-2 align-items-end">
         <div className="col-md-3">
           <label className="form-label small text-muted mb-1">Search name</label>
-          <input type="text" className="form-control" placeholder="Shoe name"
-            value={filters.name} onChange={(e) => set('name', e.target.value)} />
+          <ClearableInput type="text" placeholder="Shoe name"
+            value={filters.name} onChange={(e) => set('name', e.target.value)}
+            onClear={() => set('name', '')} />
         </div>
         <div className="col-md-2">
           <label className="form-label small text-muted mb-1">Brand</label>
-          <input type="text" className="form-control" placeholder="Brand"
-            value={filters.brand} onChange={(e) => set('brand', e.target.value)} />
+          <ClearableInput type="text" placeholder="Brand"
+            value={filters.brand} onChange={(e) => set('brand', e.target.value)}
+            onClear={() => set('brand', '')} />
         </div>
         <div className="col-md-2">
           <label className="form-label small text-muted mb-1">Max price (RM)</label>
-          <input type="number" min="0" step="0.01" className="form-control" placeholder="Any"
-            value={filters.maxPrice} onChange={(e) => set('maxPrice', e.target.value)} />
+          <ClearableInput type="number" min="0" step="0.01" placeholder="Any"
+            value={filters.maxPrice} onChange={(e) => set('maxPrice', e.target.value)}
+            onClear={() => set('maxPrice', '')} />
         </div>
         <div className="col-md-3">
           <label className="form-label small text-muted mb-1">Category</label>
