@@ -62,6 +62,14 @@ function ProductsPage() {
     });
   }
 
+  // at-a-glance counts for the supplier (computed from the full list)
+  const stats = useMemo(() => ({
+    total: products.length,
+    approved: products.filter((p) => p.status === 'Approved').length,
+    pending: products.filter((p) => p.status === 'Pending').length,
+    outOfStock: products.filter((p) => typeof p.totalStock === 'number' && p.totalStock === 0).length,
+  }), [products]);
+
   // client-side filtering driven by the filter bar
   const visible = useMemo(() => {
     const name = filters.name.trim().toLowerCase();
@@ -78,13 +86,46 @@ function ProductsPage() {
   }, [products, filters]);
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="mb-0">👟 Supplier Products</h1>
+    <div className="container py-4 text-start">
+      <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+        <div>
+          <h1 className="mb-1">👟 Supplier Products</h1>
+          <p className="text-muted mb-0">Manage your catalogue — add, edit and track stock.</p>
+        </div>
         <Link to="/products/new" className="btn btn-primary">+ Add product</Link>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
+
+      {/* at-a-glance stats */}
+      {!isLoading && products.length > 0 && (
+        <div className="row g-3 mb-4">
+          <div className="col-6 col-md-3">
+            <div className="card card-body py-3">
+              <div className="text-muted small text-uppercase">Products</div>
+              <div className="fs-4 fw-bold">{stats.total}</div>
+            </div>
+          </div>
+          <div className="col-6 col-md-3">
+            <div className="card card-body py-3">
+              <div className="text-muted small text-uppercase">Approved</div>
+              <div className="fs-4 fw-bold text-success">{stats.approved}</div>
+            </div>
+          </div>
+          <div className="col-6 col-md-3">
+            <div className="card card-body py-3">
+              <div className="text-muted small text-uppercase">Pending</div>
+              <div className={`fs-4 fw-bold ${stats.pending ? 'text-warning' : ''}`}>{stats.pending}</div>
+            </div>
+          </div>
+          <div className="col-6 col-md-3">
+            <div className="card card-body py-3">
+              <div className="text-muted small text-uppercase">Out of stock</div>
+              <div className={`fs-4 fw-bold ${stats.outOfStock ? 'text-danger' : ''}`}>{stats.outOfStock}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ProductFilterBar filters={filters} onChange={setFilters} />
 
