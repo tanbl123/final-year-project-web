@@ -87,3 +87,37 @@ function handleSetRefundStatus(PDO $pdo, string $refundId): void {
 
   sendJson(200, true, ['refundId' => $refundId, 'status' => $status]);
 }
+
+// GET /supplier/refunds — refunds on orders that contain this supplier's
+// products (read-only). Optional ?status=. No customer PII (PDPA) — suppliers
+// monitor refunds but the admin processes them.
+function handleListSupplierRefunds(PDO $pdo, array $auth): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+  $status     = trim($_GET['status'] ?? '');
+  $allowed    = ['Pending', 'Approved', 'Rejected', 'Completed'];
+
+  $where  = ['EXISTS (
+               SELECT 1 FROM order_item oi
+               JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+               JOIN product p          ON p.productId = pv.productId
+              WHERE oi.orderId = r.orderId AND p.supplierId = :sid)'];
+  $params = ['sid' => $supplierId];
+  if (in_array($status, $allowed, true)) {
+    $where[] = 'r.refundStatus = :st'; $params['st'] = $status;
+  }
+
+  $sql =
+    "SELECT r.refundId, r.orderId, r.refundReason, r.refundAmount,
+            r.refundStatus, r.requestDate
+       FROM refund r
+      WHERE " . implode(' AND ', $where) . "
+      ORDER BY FIELD(r.refundStatus, 'Pending','Approved','Rejected','Completed'),
+               r.requestDate DESC";
+
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as &$r) { $r['refundAmount'] = (float) $r['refundAmount']; }
+  unset($r);
+  sendJson(200, true, ['refunds' => $rows]);
+}

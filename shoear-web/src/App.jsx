@@ -17,6 +17,7 @@ import SupplierOrdersPage from './features/orders/pages/SupplierOrdersPage';
 import SupplierOrderDetailPage from './features/orders/pages/SupplierOrderDetailPage';
 import AdminReviewsPage from './features/reviews/pages/AdminReviewsPage';
 import AdminRefundsPage from './features/refunds/pages/AdminRefundsPage';
+import SupplierRefundsPage from './features/refunds/pages/SupplierRefundsPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
@@ -68,6 +69,7 @@ function Layout() {
                 <Link className="nav-link" to="/products">Products</Link>
                 <Link className="nav-link" to="/inventory">Inventory</Link>
                 <Link className="nav-link" to="/orders">Orders</Link>
+                <Link className="nav-link" to="/refunds">Refunds</Link>
                 <Link className="nav-link" to="/reports">Reports</Link>
                 <Link className="nav-link" to="/payouts">Payouts</Link>
               </>
@@ -166,6 +168,9 @@ const router = createBrowserRouter(
       } />
       <Route path="/orders/:orderId" element={
         <ProtectedRoute role="Supplier"><SupplierOrderDetailPage /></ProtectedRoute>
+      } />
+      <Route path="/refunds" element={
+        <ProtectedRoute role="Supplier"><SupplierRefundsPage /></ProtectedRoute>
       } />
       <Route path="/products/:id/edit" element={
         <ProtectedRoute role="Supplier"><EditProductPage /></ProtectedRoute>

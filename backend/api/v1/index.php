@@ -346,7 +346,13 @@ if ($method === 'GET' && preg_match('#^/supplier/orders/([^/]+)$#', $path, $m)) 
   handleGetSupplierOrder($pdo, $auth, $m[1]);
 }
 
-// ── admin refunds ──
+// ── refunds ──
+if ($method === 'GET' && $path === '/supplier/refunds') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleListSupplierRefunds($pdo, $auth);
+}
+
 if ($method === 'GET' && $path === '/admin/refunds') {
   $auth = requireAuth($secret);
   requireAdmin($auth);
