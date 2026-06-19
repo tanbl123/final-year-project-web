@@ -17,12 +17,14 @@ function SupplierInventoryPage() {
   const [rows, setRows] = useState([]);          // server truth
   const [draft, setDraft] = useState({});        // variantId -> edited string value
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingIds, setSavingIds] = useState([]); // variantIds being written
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+
+  const saving = savingIds.length > 0;
 
   function load() {
     setLoading(true);
@@ -62,8 +64,7 @@ function SupplierInventoryPage() {
     out: rows.filter((r) => r.stock === 0).length,
   }), [rows]);
 
-  // search + stock-level filter (filtering uses the SAVED stock so rows don't
-  // jump around while you type)
+  // search + stock-level filter (uses SAVED stock so rows don't jump while typing)
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
@@ -77,20 +78,36 @@ function SupplierInventoryPage() {
   function setQty(variantId, value) {
     setDraft((d) => ({ ...d, [variantId]: value }));
   }
+  // +/- stepper, clamped at 0
+  function bump(r, delta) {
+    const cur = Number(valueOf(r));
+    const base = Number.isFinite(cur) ? cur : r.stock;
+    setQty(r.variantId, String(Math.max(0, base + delta)));
+  }
+  function revert(r) {
+    setDraft((d) => { const n = { ...d }; delete n[r.variantId]; return n; });
+  }
 
-  async function save() {
-    if (dirtyValid.length === 0 || anyInvalid) return;
-    setSaving(true);
+  // Save just the given rows; apply the result locally so OTHER in-progress
+  // edits are preserved (no full refetch that would wipe them).
+  async function saveRows(targets) {
+    const updates = targets
+      .filter((r) => isDirty(r) && !rowError(r))
+      .map((r) => ({ variantId: r.variantId, stock: Number(draft[r.variantId]) }));
+    if (updates.length === 0) return;
+
+    setSavingIds(updates.map((u) => u.variantId));
     setError('');
     try {
-      const updates = dirtyValid.map((r) => ({ variantId: r.variantId, stock: Number(draft[r.variantId]) }));
       await updateInventory(updates);
+      const saved = Object.fromEntries(updates.map((u) => [u.variantId, u.stock]));
+      setRows((prev) => prev.map((r) => (saved[r.variantId] !== undefined ? { ...r, stock: saved[r.variantId] } : r)));
+      setDraft((d) => { const n = { ...d }; updates.forEach((u) => delete n[u.variantId]); return n; });
       setToast(`Stock updated for ${updates.length} ${updates.length === 1 ? 'size' : 'sizes'}.`);
-      load();   // refetch resets the draft
     } catch (err) {
       setError(err.message);
     } finally {
-      setSaving(false);
+      setSavingIds([]);
     }
   }
 
@@ -105,7 +122,7 @@ function SupplierInventoryPage() {
       <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
         <div>
           <h1 className="mb-1">📦 Inventory</h1>
-          <p className="text-muted mb-0">Update stock for every size in one place — changes apply instantly, no re-approval.</p>
+          <p className="text-muted mb-0">Adjust stock for every size — changes apply instantly, no re-approval.</p>
         </div>
         <Link to="/products" className="btn btn-outline-secondary">← Products</Link>
       </div>
@@ -173,71 +190,101 @@ function SupplierInventoryPage() {
       ) : visible.length === 0 ? (
         <div className="card card-body text-center text-muted">No sizes match these filters.</div>
       ) : (
-        <div className="table-responsive">
-          <table className="table align-middle">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th style={{ width: 90 }}>Size</th>
-                <th className="text-end" style={{ width: 90 }}>In stock</th>
-                <th style={{ width: 150 }}>New qty</th>
-                <th className="text-center" style={{ width: 110 }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((r, i) => {
-                // show the product cell only on the first size of each product
-                const firstOfProduct = i === 0 || visible[i - 1].productId !== r.productId;
-                const err = rowError(r);
-                return (
-                  <tr key={r.variantId} className={isDirty(r) ? 'table-warning' : undefined}>
-                    <td>
-                      {firstOfProduct ? (
-                        <div className="d-flex align-items-center gap-2">
-                          {r.imageUrl
-                            ? <img src={r.imageUrl} alt="" style={{ width: 36, height: 36, objectFit: 'cover' }} className="rounded border" />
-                            : <span className="fs-5">👟</span>}
-                          <div>
-                            <Link to={`/products/${r.productId}`} className="fw-semibold text-decoration-none">
-                              {r.productName}
-                            </Link>
-                            <div className="text-muted small">
-                              {r.brand}
-                              <span className={`badge text-bg-${STATUS_COLORS[r.status] || 'secondary'} ms-2`}>{r.status}</span>
+        <div className="card">
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th>Product</th>
+                  <th style={{ width: 80 }}>Size</th>
+                  <th className="text-end" style={{ width: 80 }}>In stock</th>
+                  <th className="text-center" style={{ width: 170 }}>New quantity</th>
+                  <th className="text-center" style={{ width: 100 }}>Status</th>
+                  <th className="text-end" style={{ width: 150 }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((r, i) => {
+                  const firstOfProduct = i === 0 || visible[i - 1].productId !== r.productId;
+                  const err = rowError(r);
+                  const dirty = isDirty(r);
+                  const rowSaving = savingIds.includes(r.variantId);
+                  return (
+                    <tr key={r.variantId} className={dirty ? 'table-warning' : undefined}>
+                      <td>
+                        {firstOfProduct ? (
+                          <div className="d-flex align-items-center gap-2">
+                            {r.imageUrl
+                              ? <img src={r.imageUrl} alt="" style={{ width: 36, height: 36, objectFit: 'cover' }} className="rounded border" />
+                              : <span className="fs-5">👟</span>}
+                            <div>
+                              <Link to={`/products/${r.productId}`} className="fw-semibold text-decoration-none">
+                                {r.productName}
+                              </Link>
+                              <div className="text-muted small">
+                                {r.brand}
+                                <span className={`badge text-bg-${STATUS_COLORS[r.status] || 'secondary'} ms-2`}>{r.status}</span>
+                              </div>
                             </div>
                           </div>
+                        ) : (
+                          <span className="text-muted small ps-5">↳ same product</span>
+                        )}
+                      </td>
+                      <td className="fw-semibold">{r.size}</td>
+                      <td className="text-end">{r.stock}</td>
+                      <td>
+                        <div className="input-group input-group-sm mx-auto" style={{ width: 150 }}>
+                          <button type="button" className="btn btn-outline-secondary" disabled={saving}
+                            onClick={() => bump(r, -1)} title="Decrease">−</button>
+                          <input type="number" min="0" step="1"
+                            className={'form-control text-center' + (err ? ' is-invalid' : '')}
+                            value={valueOf(r)} disabled={saving}
+                            onChange={(e) => setQty(r.variantId, e.target.value)} />
+                          <button type="button" className="btn btn-outline-secondary" disabled={saving}
+                            onClick={() => bump(r, 1)} title="Increase">+</button>
                         </div>
-                      ) : (
-                        <span className="text-muted small ps-5">↳</span>
-                      )}
-                    </td>
-                    <td className="fw-semibold">{r.size}</td>
-                    <td className="text-end">{r.stock}</td>
-                    <td>
-                      <input type="number" min="0" step="1"
-                        className={'form-control form-control-sm' + (err ? ' is-invalid' : '')}
-                        value={valueOf(r)} onChange={(e) => setQty(r.variantId, e.target.value)} />
-                      {err && <div className="invalid-feedback">{err}</div>}
-                    </td>
-                    <td className="text-center">{stockBadge(effectiveStock(r))}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        {err && <div className="text-danger small text-center mt-1">{err}</div>}
+                      </td>
+                      <td className="text-center">{stockBadge(effectiveStock(r))}</td>
+                      <td className="text-end">
+                        {dirty && (
+                          <div className="d-inline-flex gap-1">
+                            <button className="btn btn-success btn-sm" disabled={saving || !!err}
+                              onClick={() => saveRows([r])}>
+                              {rowSaving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button className="btn btn-outline-secondary btn-sm" disabled={saving}
+                              onClick={() => revert(r)} title="Undo">↶</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* sticky-ish save bar */}
-      {rows.length > 0 && (
-        <div className="d-flex align-items-center gap-3 mt-3">
-          <button className="btn btn-primary" disabled={saving || dirtyValid.length === 0 || anyInvalid} onClick={save}>
-            {saving ? 'Saving…' : `Save changes${dirtyValid.length ? ` (${dirtyValid.length})` : ''}`}
-          </button>
-          {dirtyValid.length > 0 && !saving && (
-            <button className="btn btn-outline-secondary" onClick={() => setDraft({})}>Reset</button>
-          )}
-          {anyInvalid && <span className="text-danger small">Fix the highlighted quantities first.</span>}
+      {/* sticky save bar — only appears when there are unsaved changes */}
+      {dirtyValid.length > 0 && (
+        <div className="position-sticky bottom-0 mt-3">
+          <div className="card card-body shadow border-primary-subtle d-flex flex-row align-items-center justify-content-between flex-wrap gap-2">
+            <span className="fw-semibold">
+              {dirtyValid.length} unsaved {dirtyValid.length === 1 ? 'change' : 'changes'}
+              {anyInvalid && <span className="text-danger ms-2 fw-normal">— fix the highlighted quantities</span>}
+            </span>
+            <div className="d-flex gap-2">
+              <button className="btn btn-outline-secondary" disabled={saving} onClick={() => setDraft({})}>
+                Discard all
+              </button>
+              <button className="btn btn-primary" disabled={saving || anyInvalid} onClick={() => saveRows(dirtyValid)}>
+                {saving ? 'Saving…' : `Save all (${dirtyValid.length})`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
