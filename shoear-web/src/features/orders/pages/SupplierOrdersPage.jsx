@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getSupplierOrders, getSupplierOrder } from '../orderService';
+import { Link } from 'react-router-dom';
+import { getSupplierOrders } from '../orderService';
 import Pagination from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
 
@@ -10,7 +11,6 @@ const STATUS_COLORS = {
   Placed: 'secondary', Paid: 'info', Processing: 'primary', Shipped: 'primary',
   OutForDelivery: 'primary', Delivered: 'success', Completed: 'success', Cancelled: 'danger',
 };
-const PAY_COLORS = { Successful: 'success', Pending: 'warning', Failed: 'danger', Refunded: 'secondary' };
 const label = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2');   // OutForDelivery → Out For Delivery
 const money = (n) => `RM ${Number(n).toFixed(2)}`;
 
@@ -19,9 +19,6 @@ function SupplierOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
-
-  const [detail, setDetail] = useState(null);          // fetched order for the modal
-  const [detailLoading, setDetailLoading] = useState(false);
 
   const { page, setPage, totalPages, pageItems } = usePagination(orders, PAGE_SIZE);
 
@@ -38,20 +35,6 @@ function SupplierOrdersPage() {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
-
-  async function openDetail(orderId) {
-    setDetailLoading(true);
-    setDetail({});                       // open the modal in a loading state
-    try {
-      const data = await getSupplierOrder(orderId);
-      setDetail(data);
-    } catch (err) {
-      setError(err.message);
-      setDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }
 
   return (
     <div className="container py-4 text-start">
@@ -111,9 +94,9 @@ function SupplierOrdersPage() {
                   <td className="text-center">{o.itemCount}</td>
                   <td className="text-end fw-semibold">{money(o.supplierSubtotal)}</td>
                   <td className="text-center">
-                    <button className="btn btn-outline-primary btn-sm" onClick={() => openDetail(o.orderId)}>
+                    <Link to={`/orders/${o.orderId}`} className="btn btn-outline-primary btn-sm">
                       View
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -122,81 +105,6 @@ function SupplierOrdersPage() {
 
           <Pagination page={page} totalPages={totalPages} onChange={setPage}
             summary={`Page ${page} of ${totalPages} · ${orders.length} orders`} />
-        </div>
-      )}
-
-      {/* detail modal */}
-      {detail && (
-        <div className="modal show d-block" tabIndex="-1" style={{ background: 'rgba(0,0,0,.5)' }}
-          onClick={() => setDetail(null)}>
-          <div className="modal-dialog modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{detail.orderId ? `Order ${detail.orderId}` : 'Order'}</h5>
-                <button type="button" className="btn-close" onClick={() => setDetail(null)}></button>
-              </div>
-              <div className="modal-body">
-                {detailLoading || !detail.orderId ? (
-                  <p className="text-muted mb-0">Loading…</p>
-                ) : (
-                  <>
-                    <dl className="row mb-3">
-                      <dt className="col-sm-3">Customer</dt><dd className="col-sm-9">{detail.customerName}</dd>
-                      <dt className="col-sm-3">Deliver to</dt><dd className="col-sm-9">{detail.orderDeliveryAddress}</dd>
-                      <dt className="col-sm-3">Order date</dt><dd className="col-sm-9">{new Date(detail.orderDate).toLocaleString()}</dd>
-                      <dt className="col-sm-3">Order status</dt>
-                      <dd className="col-sm-9">
-                        <span className={`badge text-bg-${STATUS_COLORS[detail.orderStatus] || 'secondary'}`}>{label(detail.orderStatus)}</span>
-                      </dd>
-                      <dt className="col-sm-3">Payment</dt>
-                      <dd className="col-sm-9">
-                        {detail.paymentStatus
-                          ? <span className={`badge text-bg-${PAY_COLORS[detail.paymentStatus] || 'secondary'}`}>{detail.paymentStatus}</span>
-                          : <span className="text-muted">—</span>}
-                      </dd>
-                    </dl>
-
-                    <h6 className="text-muted">Your items in this order</h6>
-                    <table className="table table-sm align-middle">
-                      <thead>
-                        <tr>
-                          <th>Product</th>
-                          <th style={{ width: 70 }}>Size</th>
-                          <th className="text-end" style={{ width: 60 }}>Qty</th>
-                          <th className="text-end" style={{ width: 110 }}>Unit price</th>
-                          <th className="text-end" style={{ width: 110 }}>Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.items.map((it) => (
-                          <tr key={it.orderItemId}>
-                            <td>
-                              <div className="fw-semibold">{it.productName}</div>
-                              <div className="text-muted small">{it.brand}</div>
-                            </td>
-                            <td>{it.size}</td>
-                            <td className="text-end">{it.qty}</td>
-                            <td className="text-end">{money(it.unitPrice)}</td>
-                            <td className="text-end">{money(it.subtotal)}</td>
-                          </tr>
-                        ))}
-                        <tr className="fw-bold border-top">
-                          <td colSpan="4" className="text-end">Your subtotal</td>
-                          <td className="text-end">{money(detail.supplierSubtotal)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <p className="text-muted small mb-0">
-                      This is your share of the order. Other suppliers' items (if any) are not shown.
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDetail(null)}>Close</button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

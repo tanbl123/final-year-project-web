@@ -14,6 +14,7 @@ import AddProductPage from './features/products/pages/AddProductPage';
 import EditProductPage from './features/products/pages/EditProductPage';
 import SupplierInventoryPage from './features/products/pages/SupplierInventoryPage';
 import SupplierOrdersPage from './features/orders/pages/SupplierOrdersPage';
+import SupplierOrderDetailPage from './features/orders/pages/SupplierOrderDetailPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
@@ -152,6 +153,9 @@ const router = createBrowserRouter(
       } />
       <Route path="/orders" element={
         <ProtectedRoute role="Supplier"><SupplierOrdersPage /></ProtectedRoute>
+      } />
+      <Route path="/orders/:orderId" element={
+        <ProtectedRoute role="Supplier"><SupplierOrderDetailPage /></ProtectedRoute>
       } />
       <Route path="/products/:id/edit" element={
         <ProtectedRoute role="Supplier"><EditProductPage /></ProtectedRoute>
