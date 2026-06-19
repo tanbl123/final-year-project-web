@@ -278,7 +278,9 @@ and also writes in one transaction. Two behaviours:
 | POST  | `/orders` | Customer | Checkout: turn the cart into an order (`Placed`). Snapshots price + size into `order_item`. |
 | GET   | `/orders` | Customer | Logged-in customer's own orders. |
 | GET   | `/orders/{orderId}` | Customer(Owner)/Admin | Order detail + items + payment + delivery status. |
-| GET   | `/admin/orders` | Admin | All orders, filterable by status. |
+| GET   | `/admin/orders` | Admin | **(Implemented)** All orders; filters `?status=`, `?search=` (order id / customer). |
+| GET   | `/admin/orders/{orderId}` | Admin | **(Implemented)** Full detail: customer, **payment record** (FR 899), all items (every supplier), delivery + refunds. |
+| GET   | `/admin/inventory` | Admin | **(Implemented)** Product stock across all suppliers (FR 906); filters `?status=`, `?search=`. |
 | PATCH | `/admin/orders/{orderId}/status` | Admin | Manual status change if needed. |
 | GET   | `/supplier/orders` | Supplier | **(Implemented)** Orders containing this supplier's products; their item count + subtotal only. Optional `?status=`. |
 | GET   | `/supplier/orders/{orderId}` | Supplier | **(Implemented)** One order in detail — the supplier's own line items, customer **name**, order + payment status. Per PDPA, the delivery address/contact is **not** returned (delivery personnel get that, not suppliers). |

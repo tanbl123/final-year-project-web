@@ -108,6 +108,30 @@ export function getCommissionReport() {
   return apiGet('/admin/reports/commission', getToken());
 }
 
+// ── order oversight ──────────────────────────────────────────────────
+// filters: { status, search }
+export function getAdminOrders(filters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.search) qs.set('search', filters.search);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiGet(`/admin/orders${suffix}`, getToken());
+}
+
+export function getAdminOrder(orderId) {
+  return apiGet(`/admin/orders/${orderId}`, getToken());
+}
+
+// ── product inventory across all suppliers ───────────────────────────
+// filters: { status, search }
+export function getAdminInventory(filters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.search) qs.set('search', filters.search);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiGet(`/admin/inventory${suffix}`, getToken());
+}
+
 // ── commission rate configuration ────────────────────────────────────
 // Current active rate + the full change history.
 export function getCommission() {

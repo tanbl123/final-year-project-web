@@ -357,6 +357,29 @@ if ($method === 'GET' && preg_match('#^/supplier/orders/([^/]+)$#', $path, $m)) 
   handleGetSupplierOrder($pdo, $auth, $m[1]);
 }
 
+// ── admin order oversight ──
+if ($method === 'GET' && $path === '/admin/orders') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListAdminOrders($pdo);
+}
+
+if ($method === 'GET' && preg_match('#^/admin/orders/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleGetAdminOrder($pdo, $m[1]);
+}
+
+// ── admin product inventory view ──
+if ($method === 'GET' && $path === '/admin/inventory') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListAdminInventory($pdo);
+}
+
 // ── refunds ──
 if ($method === 'GET' && $path === '/supplier/refunds') {
   $auth = requireAuth($secret);

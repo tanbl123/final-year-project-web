@@ -108,3 +108,108 @@ function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId): void {
 
   sendJson(200, true, $order);
 }
+
+// ── Admin order oversight (sees everything — all suppliers, full detail) ──────
+
+// GET /admin/orders — every order. Filters: ?status= ?search= (order id / customer).
+function handleListAdminOrders(PDO $pdo): void {
+  $status  = trim($_GET['status'] ?? '');
+  $search  = trim($_GET['search'] ?? '');
+  $allowed = ['Placed', 'Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed', 'Cancelled'];
+
+  $where  = [];
+  $params = [];
+  if (in_array($status, $allowed, true)) { $where[] = 'o.orderStatus = :st'; $params['st'] = $status; }
+  if ($search !== '') {
+    $where[] = '(o.orderId LIKE :q OR buyer.fullName LIKE :q)';
+    $params['q'] = '%' . $search . '%';
+  }
+
+  $sql =
+    "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount,
+            buyer.fullName AS customerName,
+            (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount,
+            pay.paymentStatus,
+            (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId LIMIT 1) AS deliveryStatus
+       FROM `order` o
+       JOIN customer c   ON c.customerId = o.customerId
+       JOIN `user` buyer ON buyer.userId = c.userId
+       LEFT JOIN payment pay ON pay.orderId = o.orderId";
+  if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
+  $sql .= ' ORDER BY o.orderDate DESC';
+
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as &$r) {
+    $r['orderTotalAmount'] = (float) $r['orderTotalAmount'];
+    $r['itemCount']        = (int) $r['itemCount'];
+  }
+  unset($r);
+  sendJson(200, true, ['orders' => $rows]);
+}
+
+// GET /admin/orders/{orderId} — full detail: customer, payment, all items
+// (every supplier), delivery and refunds. Admins see full info for dispute handling.
+function handleGetAdminOrder(PDO $pdo, string $orderId): void {
+  $h = $pdo->prepare(
+    "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount, o.orderDeliveryAddress,
+            buyer.fullName AS customerName, buyer.email AS customerEmail, buyer.phoneNumber AS customerPhone,
+            pay.paymentMethod, pay.transactionId, pay.paymentAmount, pay.paymentStatus, pay.paymentDate
+       FROM `order` o
+       JOIN customer c   ON c.customerId = o.customerId
+       JOIN `user` buyer ON buyer.userId = c.userId
+       LEFT JOIN payment pay ON pay.orderId = o.orderId
+      WHERE o.orderId = :oid"
+  );
+  $h->execute(['oid' => $orderId]);
+  $order = $h->fetch();
+  if (!$order) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
+  }
+  $order['orderTotalAmount'] = (float) $order['orderTotalAmount'];
+  if ($order['paymentAmount'] !== null) { $order['paymentAmount'] = (float) $order['paymentAmount']; }
+
+  $it = $pdo->prepare(
+    "SELECT oi.orderItemId, p.productName, p.productBrand AS brand, s.companyName AS supplierName,
+            oi.orderSize AS size, oi.orderQuantity AS qty,
+            oi.orderUnitPrice AS unitPrice, oi.orderSubtotal AS subtotal
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+       JOIN supplier s         ON s.supplierId = p.supplierId
+      WHERE oi.orderId = :oid
+      ORDER BY oi.orderItemId"
+  );
+  $it->execute(['oid' => $orderId]);
+  $items = $it->fetchAll();
+  foreach ($items as &$x) {
+    $x['qty']       = (int) $x['qty'];
+    $x['unitPrice'] = (float) $x['unitPrice'];
+    $x['subtotal']  = (float) $x['subtotal'];
+  }
+  unset($x);
+  $order['items'] = $items;
+
+  $dl = $pdo->prepare(
+    "SELECT d.deliveryStatus, cu.fullName AS courierName
+       FROM delivery d
+       LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = d.deliveryPersonnelId
+       LEFT JOIN `user` cu ON cu.userId = dp.userId
+      WHERE d.orderId = :oid LIMIT 1"
+  );
+  $dl->execute(['oid' => $orderId]);
+  $order['delivery'] = $dl->fetch() ?: null;
+
+  $rf = $pdo->prepare(
+    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate
+       FROM refund WHERE orderId = :oid ORDER BY requestDate DESC"
+  );
+  $rf->execute(['oid' => $orderId]);
+  $refunds = $rf->fetchAll();
+  foreach ($refunds as &$x) { $x['refundAmount'] = (float) $x['refundAmount']; }
+  unset($x);
+  $order['refunds'] = $refunds;
+
+  sendJson(200, true, $order);
+}

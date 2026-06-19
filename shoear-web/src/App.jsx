@@ -18,6 +18,9 @@ import SupplierOrderDetailPage from './features/orders/pages/SupplierOrderDetail
 import AdminReviewsPage from './features/reviews/pages/AdminReviewsPage';
 import AdminRefundsPage from './features/refunds/pages/AdminRefundsPage';
 import SupplierRefundsPage from './features/refunds/pages/SupplierRefundsPage';
+import AdminOrdersPage from './features/admin/pages/AdminOrdersPage';
+import AdminOrderDetailPage from './features/admin/pages/AdminOrderDetailPage';
+import AdminInventoryPage from './features/admin/pages/AdminInventoryPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
@@ -58,7 +61,9 @@ function Layout() {
                 <Link className="nav-link" to="/admin/changes">Changes</Link>
                 <Link className="nav-link" to="/admin/users">Users</Link>
                 <Link className="nav-link" to="/admin/products">Products</Link>
+                <Link className="nav-link" to="/admin/inventory">Inventory</Link>
                 <Link className="nav-link" to="/admin/categories">Categories</Link>
+                <Link className="nav-link" to="/admin/orders">Orders</Link>
                 <Link className="nav-link" to="/admin/deliveries">Deliveries</Link>
                 <Link className="nav-link" to="/admin/reviews">Reviews</Link>
                 <Link className="nav-link" to="/admin/refunds">Refunds</Link>
@@ -143,6 +148,15 @@ const router = createBrowserRouter(
       } />
       <Route path="/admin/refunds" element={
         <ProtectedRoute role="Admin"><AdminRefundsPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/orders" element={
+        <ProtectedRoute role="Admin"><AdminOrdersPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/orders/:orderId" element={
+        <ProtectedRoute role="Admin"><AdminOrderDetailPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/inventory" element={
+        <ProtectedRoute role="Admin"><AdminInventoryPage /></ProtectedRoute>
       } />
       <Route path="/admin/commission" element={
         <ProtectedRoute role="Admin"><AdminCommissionPage /></ProtectedRoute>

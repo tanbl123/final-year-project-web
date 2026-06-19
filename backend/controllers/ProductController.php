@@ -515,3 +515,39 @@ function handleUpdateInventory(PDO $pdo, array $auth): void {
 
   sendJson(200, true, ['updated' => count($clean)]);
 }
+
+// GET /admin/inventory — product inventory across ALL suppliers (read-only).
+// Filters: ?search= (product/supplier) ?status=. Covers FR 906 / UC 3.25.
+function handleListAdminInventory(PDO $pdo): void {
+  $search  = trim($_GET['search'] ?? '');
+  $status  = trim($_GET['status'] ?? '');
+  $allowed = ['Pending', 'Approved', 'Rejected'];
+
+  $where  = ['p.productStatus <> "Removed"'];
+  $params = [];
+  if (in_array($status, $allowed, true)) { $where[] = 'p.productStatus = :st'; $params['st'] = $status; }
+  if ($search !== '') {
+    $where[] = '(p.productName LIKE :q OR s.companyName LIKE :q)';
+    $params['q'] = '%' . $search . '%';
+  }
+
+  $sql =
+    "SELECT p.productId, p.productName, p.productBrand AS brand, p.productStatus AS status,
+            s.companyName AS supplierName,
+            (SELECT COALESCE(SUM(pv.stockQuantity), 0) FROM product_variant pv WHERE pv.productId = p.productId) AS totalStock,
+            (SELECT COUNT(*) FROM product_variant pv WHERE pv.productId = p.productId) AS sizeCount
+       FROM product p
+       JOIN supplier s ON s.supplierId = p.supplierId
+      WHERE " . implode(' AND ', $where) . "
+      ORDER BY p.productName";
+
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as &$r) {
+    $r['totalStock'] = (int) $r['totalStock'];
+    $r['sizeCount']  = (int) $r['sizeCount'];
+  }
+  unset($r);
+  sendJson(200, true, ['inventory' => $rows]);
+}
