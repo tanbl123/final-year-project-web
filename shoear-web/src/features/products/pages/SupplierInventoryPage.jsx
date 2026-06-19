@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getInventory, updateInventory } from '../productService';
+import { useUnsavedChangesWarning } from '../../../hooks/useUnsavedChangesWarning';
 import Toast from '../../../components/Toast';
 
 const LOW_STOCK = 10;   // at or below this (but > 0) counts as "low"
@@ -57,6 +58,10 @@ function SupplierInventoryPage() {
 
   const dirtyValid = rows.filter((r) => isDirty(r) && !rowError(r));
   const anyInvalid = rows.some((r) => rowError(r) !== '');
+  const hasUnsaved = rows.some((r) => isDirty(r));
+
+  // warn on refresh / tab-close / URL change while there are unsaved edits
+  useUnsavedChangesWarning(hasUnsaved);
 
   const counts = useMemo(() => ({
     sizes: rows.length,
@@ -197,10 +202,10 @@ function SupplierInventoryPage() {
                 <tr>
                   <th>Product</th>
                   <th style={{ width: 80 }}>Size</th>
-                  <th className="text-end" style={{ width: 80 }}>In stock</th>
+                  <th className="text-end text-nowrap" style={{ width: 90 }}>In stock</th>
                   <th className="text-center" style={{ width: 170 }}>New quantity</th>
                   <th className="text-center" style={{ width: 100 }}>Status</th>
-                  <th className="text-end" style={{ width: 150 }}>Action</th>
+                  <th className="text-center" style={{ width: 150 }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,7 +252,7 @@ function SupplierInventoryPage() {
                         {err && <div className="text-danger small text-center mt-1">{err}</div>}
                       </td>
                       <td className="text-center">{stockBadge(effectiveStock(r))}</td>
-                      <td className="text-end">
+                      <td className="text-center">
                         <div className="d-inline-flex gap-1">
                           <button className="btn btn-success btn-sm" disabled={!dirty || saving || !!err}
                             onClick={() => saveRows([r])}>
