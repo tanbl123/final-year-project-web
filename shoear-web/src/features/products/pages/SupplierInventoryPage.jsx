@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useBlocker } from 'react-router-dom';
 import { getInventory, updateInventory } from '../productService';
 import { useUnsavedChangesWarning } from '../../../hooks/useUnsavedChangesWarning';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 
 const LOW_STOCK = 10;   // at or below this (but > 0) counts as "low"
@@ -62,6 +63,12 @@ function SupplierInventoryPage() {
 
   // warn on refresh / tab-close / URL change while there are unsaved edits
   useUnsavedChangesWarning(hasUnsaved);
+
+  // block in-app navigation (clicking a nav link) while there are unsaved edits,
+  // and show our own confirm dialog instead of the browser's plain one
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => hasUnsaved && currentLocation.pathname !== nextLocation.pathname
+  );
 
   const counts = useMemo(() => ({
     sizes: rows.length,
@@ -290,6 +297,17 @@ function SupplierInventoryPage() {
           </div>
         </div>
       )}
+
+      {/* in-app navigation guard (only when there are unsaved edits) */}
+      <ConfirmDialog
+        isOpen={blocker.state === 'blocked'}
+        title="Leave without saving?"
+        message="You have unsaved stock changes. If you leave this page now, they’ll be lost."
+        confirmText="Leave"
+        confirmColor="danger"
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      />
 
       <Toast message={toast} onClose={() => setToast('')} />
     </div>

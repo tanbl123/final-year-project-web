@@ -1,4 +1,7 @@
-import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
+import {
+  createBrowserRouter, createRoutesFromElements, RouterProvider,
+  Route, Outlet, Link, Navigate, useNavigate,
+} from 'react-router-dom';
 import { useAuth } from './features/auth/AuthContext';
 import ProductsPage from './features/products/pages/ProductsPage';
 import ReportsPage from './features/reports/pages/ReportsPage';
@@ -21,7 +24,9 @@ import ProfilePage from './features/profile/ProfilePage';
 import PayoutsPage from './features/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
 
-function App() {
+// Top bar + the active route's content. As a layout route it renders <Outlet/>,
+// so every page below shares this chrome. (Data router → enables useBlocker.)
+function Layout() {
   const { user, logout } = useAuth();   // 👈 tune in to the auth broadcast
   const navigate = useNavigate();
 
@@ -78,74 +83,89 @@ function App() {
         </nav>
       )}
 
-      <Routes>
-        <Route path="/login" element={<LoginPage variant="supplier" />} />
-        <Route path="/admin/login" element={<LoginPage variant="admin" />} />
-        <Route path="/register" element={<RegisterPage />} />
-
-        {/* rejected suppliers fix & resubmit their application here */}
-        <Route path="/resubmit" element={
-          <ProtectedRoute role="Supplier" allowInactive><ResubmitApplicationPage /></ProtectedRoute>
-        } />
-
-        {/* "/" sends each user to their own home */}
-        <Route path="/" element={
-          <ProtectedRoute><Navigate to={homePathFor(user)} replace /></ProtectedRoute>
-        } />
-
-        {/* admin */}
-        <Route path="/admin" element={
-          <ProtectedRoute role="Admin"><AdminDashboardPage /></ProtectedRoute>
-        } />
-        <Route path="/admin/products" element={
-          <ProtectedRoute role="Admin"><AdminProductApprovalsPage /></ProtectedRoute>
-        } />
-        <Route path="/admin/categories" element={
-          <ProtectedRoute role="Admin"><AdminCategoriesPage /></ProtectedRoute>
-        } />
-        <Route path="/admin/changes" element={
-          <ProtectedRoute role="Admin"><AdminBusinessChangesPage /></ProtectedRoute>
-        } />
-        <Route path="/admin/users" element={
-          <ProtectedRoute role="Admin"><AdminUsersPage /></ProtectedRoute>
-        } />
-        <Route path="/admin/deliveries" element={
-          <ProtectedRoute role="Admin"><AdminDeliveriesPage /></ProtectedRoute>
-        } />
-        <Route path="/admin/commission" element={
-          <ProtectedRoute role="Admin"><AdminCommissionPage /></ProtectedRoute>
-        } />
-
-        {/* any signed-in user's own profile */}
-        <Route path="/profile" element={
-          <ProtectedRoute><ProfilePage /></ProtectedRoute>
-        } />
-
-        {/* supplier */}
-        <Route path="/products" element={
-          <ProtectedRoute role="Supplier"><ProductsPage /></ProtectedRoute>
-        } />
-        <Route path="/products/new" element={
-          <ProtectedRoute role="Supplier"><AddProductPage /></ProtectedRoute>
-        } />
-        <Route path="/inventory" element={
-          <ProtectedRoute role="Supplier"><SupplierInventoryPage /></ProtectedRoute>
-        } />
-        <Route path="/products/:id/edit" element={
-          <ProtectedRoute role="Supplier"><EditProductPage /></ProtectedRoute>
-        } />
-        <Route path="/products/:id" element={
-          <ProtectedRoute role="Supplier"><ProductDetailPage /></ProtectedRoute>
-        } />
-        <Route path="/reports" element={
-          <ProtectedRoute role="Supplier"><ReportsPage /></ProtectedRoute>
-        } />
-        <Route path="/payouts" element={
-          <ProtectedRoute role="Supplier"><PayoutsPage /></ProtectedRoute>
-        } />
-      </Routes>
+      <Outlet />
     </>
   );
+}
+
+// "/" sends each user to their own home (reads auth at render time).
+function HomeRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={homePathFor(user)} replace />;
+}
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<Layout />}>
+      <Route path="/login" element={<LoginPage variant="supplier" />} />
+      <Route path="/admin/login" element={<LoginPage variant="admin" />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      {/* rejected suppliers fix & resubmit their application here */}
+      <Route path="/resubmit" element={
+        <ProtectedRoute role="Supplier" allowInactive><ResubmitApplicationPage /></ProtectedRoute>
+      } />
+
+      <Route path="/" element={
+        <ProtectedRoute><HomeRedirect /></ProtectedRoute>
+      } />
+
+      {/* admin */}
+      <Route path="/admin" element={
+        <ProtectedRoute role="Admin"><AdminDashboardPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/products" element={
+        <ProtectedRoute role="Admin"><AdminProductApprovalsPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/categories" element={
+        <ProtectedRoute role="Admin"><AdminCategoriesPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/changes" element={
+        <ProtectedRoute role="Admin"><AdminBusinessChangesPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/users" element={
+        <ProtectedRoute role="Admin"><AdminUsersPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/deliveries" element={
+        <ProtectedRoute role="Admin"><AdminDeliveriesPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/commission" element={
+        <ProtectedRoute role="Admin"><AdminCommissionPage /></ProtectedRoute>
+      } />
+
+      {/* any signed-in user's own profile */}
+      <Route path="/profile" element={
+        <ProtectedRoute><ProfilePage /></ProtectedRoute>
+      } />
+
+      {/* supplier */}
+      <Route path="/products" element={
+        <ProtectedRoute role="Supplier"><ProductsPage /></ProtectedRoute>
+      } />
+      <Route path="/products/new" element={
+        <ProtectedRoute role="Supplier"><AddProductPage /></ProtectedRoute>
+      } />
+      <Route path="/inventory" element={
+        <ProtectedRoute role="Supplier"><SupplierInventoryPage /></ProtectedRoute>
+      } />
+      <Route path="/products/:id/edit" element={
+        <ProtectedRoute role="Supplier"><EditProductPage /></ProtectedRoute>
+      } />
+      <Route path="/products/:id" element={
+        <ProtectedRoute role="Supplier"><ProductDetailPage /></ProtectedRoute>
+      } />
+      <Route path="/reports" element={
+        <ProtectedRoute role="Supplier"><ReportsPage /></ProtectedRoute>
+      } />
+      <Route path="/payouts" element={
+        <ProtectedRoute role="Supplier"><PayoutsPage /></ProtectedRoute>
+      } />
+    </Route>
+  )
+);
+
+function App() {
+  return <RouterProvider router={router} />;
 }
 
 export default App;
