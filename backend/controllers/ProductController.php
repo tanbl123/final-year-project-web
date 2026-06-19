@@ -194,11 +194,12 @@ function handleGetProduct(PDO $pdo, array $auth, string $id): void {
 // PUT /products/{id}  — edit one of this supplier's products. Mirrors create:
 // same validation, same one-transaction write. Two behaviours worth noting:
 //
-//  1. RE-APPROVAL: changing the product's *content* (name/brand/price/category/
+//  1. RE-APPROVAL: changing a product's *identity* (name/brand/category/
 //     description/images/3D model/try-on) sends an Approved or Rejected product
-//     back to `Pending` so an admin re-checks it — the same moderation rule the
-//     supplier business-detail changes already use. A stock-only change (just
-//     quantities on existing sizes) keeps the current status.
+//     back to `Pending` so an admin re-checks it — this guards against
+//     bait-and-switch, the same reason real marketplaces re-review these fields.
+//     PRICE and STOCK are commercial/inventory fields and apply instantly
+//     (no re-approval), matching how Amazon/Shopee/Lazada handle live edits.
 //  2. SIZES are reconciled, not wiped: existing sizes have their stock updated,
 //     new sizes are inserted, and a removed size is deleted — unless it has
 //     already been ordered (order_item FK is RESTRICT), in which case it is kept
@@ -278,22 +279,23 @@ function handleUpdateProduct(PDO $pdo, array $auth, string $id): void {
   $curMdl->execute(['id' => $id]);
   $currentModel = (string) ($curMdl->fetchColumn() ?: '');
 
-  // Did any moderation-relevant (content) field change? Stock/size changes are
-  // inventory, not content, so they are deliberately excluded here.
-  $contentChanged =
+  // Did any *identity* field change? PRICE and STOCK are deliberately excluded
+  // here — they're commercial/inventory fields that apply instantly with no
+  // re-approval (matching real marketplaces).
+  $identityChanged =
        $name        !== $current['productName']
     || $brand       !== $current['productBrand']
     || $description !== (string) ($current['productDescription'] ?? '')
-    || (float) $price !== (float) $current['productPrice']
     || $categoryId  !== $current['categoryId']
     || ($tryOn ? 1 : 0) !== (int) $current['virtualTryOnEnable']
     || $cleanImages !== $currentImages
     || $modelUrl    !== $currentModel;
 
-  // Re-approval: an Approved/Rejected product goes back to Pending on a content
-  // change; a Pending product stays Pending. Pure stock edits keep the status.
+  // Re-approval: an Approved/Rejected product goes back to Pending on an
+  // identity change; a Pending product stays Pending. Price/stock-only edits
+  // keep the current status.
   $newStatus = $current['productStatus'];
-  if ($contentChanged && in_array($current['productStatus'], ['Approved', 'Rejected'], true)) {
+  if ($identityChanged && in_array($current['productStatus'], ['Approved', 'Rejected'], true)) {
     $newStatus = 'Pending';
   }
 

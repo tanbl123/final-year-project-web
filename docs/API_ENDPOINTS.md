@@ -219,11 +219,12 @@ moderation").
 
 **`PUT /products/{productId}` (edit)** takes the **same body shape** as create
 and also writes in one transaction. Two behaviours:
-- **Re-approval:** changing the product's *content* (name, brand, price,
-  category, description, images, 3D model, try-on) sends an `Approved`/`Rejected`
-  product back to `Pending`. A **stock-only** change (quantities on existing
-  sizes) keeps the current status — inventory isn't a moderation concern. The
-  response includes `"reapproval": true` when this reset happens.
+- **Re-approval:** changing a product's *identity* (name, brand, category,
+  description, images, 3D model, try-on) sends an `Approved`/`Rejected` product
+  back to `Pending` — this guards against bait-and-switch, the same reason real
+  marketplaces re-review these fields. **Price and stock apply instantly** (no
+  re-approval), matching how Amazon/Shopee/Lazada handle live edits. The
+  response includes `"reapproval": true` when a reset happens.
 - **Sizes are reconciled, not wiped:** existing sizes have their stock updated,
   new sizes are inserted, and a removed size is deleted — unless it has already
   been ordered (`order_item` FK is `RESTRICT`), in which case it's kept at `0`

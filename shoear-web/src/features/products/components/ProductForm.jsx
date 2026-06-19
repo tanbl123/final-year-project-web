@@ -315,7 +315,9 @@ function ProductForm({ onAdd, onCancel, initialValues = null, mode = 'create' })
       <h5 className="mb-3">{isEdit ? 'Edit product' : 'New product'}</h5>
       {isEdit && (
         <p className="text-muted small mb-3">
-          Changing product details (not just stock) will send it back to admin for re-approval.
+          Price and stock updates apply instantly. Changing product details
+          (name, brand, description, category, images or 3D model) will send it
+          back to admin for re-approval.
         </p>
       )}
 
