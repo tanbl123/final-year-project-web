@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchCategories, uploadFile } from '../productService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import ClearableInput from '../../../components/ClearableInput';
@@ -9,17 +9,58 @@ const emptyVariant = () => ({ size: '', stock: '' });
 // Letters, numbers, spaces and a little punctuation — blocks junk like "??".
 const NAME_RE = /^[\p{L}\p{N} .,&'/+-]+$/u;
 
-function ProductForm({ onAdd, onCancel }) {
-  const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [price, setPrice] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [description, setDescription] = useState('');
-  const [variants, setVariants] = useState([emptyVariant()]);
-  const [images, setImages] = useState([]);          // [{ url }]
-  const [modelUrl, setModelUrl] = useState('');       // single .glb/.gltf
-  const [modelName, setModelName] = useState('');     // shown to the supplier
-  const [tryOn, setTryOn] = useState(false);
+// Build the form's starting state from an existing product (edit) or blanks
+// (create). `init` is also used as the baseline for the "unsaved changes" check.
+function makeInit(initialValues) {
+  return {
+    name: initialValues?.name ?? '',
+    brand: initialValues?.brand ?? '',
+    price: initialValues?.price != null ? String(initialValues.price) : '',
+    categoryId: initialValues?.categoryId ?? '',
+    description: initialValues?.description ?? '',
+    variants: initialValues?.variants?.length
+      ? initialValues.variants.map((v) => ({ size: v.size, stock: String(v.stock) }))
+      : [emptyVariant()],
+    images: (initialValues?.images ?? []).map((url) => ({ url })),
+    modelUrl: initialValues?.modelUrl ?? '',
+    modelName: initialValues?.modelUrl ? '3D model uploaded' : '',
+    tryOn: !!initialValues?.virtualTryOnEnable,
+  };
+}
+
+// A normalised, order-independent fingerprint of the form, so we can tell
+// whether anything actually changed (drives the discard-changes prompt).
+function signatureOf(s) {
+  return JSON.stringify({
+    name: s.name.trim(),
+    brand: s.brand.trim(),
+    price: String(s.price),
+    categoryId: s.categoryId,
+    description: s.description.trim(),
+    variants: s.variants
+      .map((v) => ({ size: v.size.trim().toLowerCase(), stock: String(v.stock) }))
+      .filter((v) => v.size !== '' || v.stock !== '')
+      .sort((a, b) => a.size.localeCompare(b.size)),
+    images: s.images.map((i) => i.url),
+    modelUrl: s.modelUrl,
+    tryOn: !!s.tryOn,
+  });
+}
+
+function ProductForm({ onAdd, onCancel, initialValues = null, mode = 'create' }) {
+  const init = useMemo(() => makeInit(initialValues), [initialValues]);
+  const isEdit = mode === 'edit';
+
+  const [name, setName] = useState(init.name);
+  const [brand, setBrand] = useState(init.brand);
+  const [price, setPrice] = useState(init.price);
+  const [categoryId, setCategoryId] = useState(init.categoryId);
+  const [description, setDescription] = useState(init.description);
+  const [variants, setVariants] = useState(init.variants);
+  const [images, setImages] = useState(init.images);  // [{ url }]
+  const [modelUrl, setModelUrl] = useState(init.modelUrl);   // single .glb/.gltf
+  const [modelName, setModelName] = useState(init.modelName); // shown to the supplier
+  const [tryOn, setTryOn] = useState(init.tryOn);
 
   const [categories, setCategories] = useState([]);
   const [uploading, setUploading] = useState(false);  // an upload is in flight
@@ -185,11 +226,10 @@ function ProductForm({ onAdd, onCancel }) {
     setSubmitAttempted(false);
   }
 
-  // has the supplier entered anything? (used to confirm before discarding)
+  // has anything changed from the starting state? (confirm before discarding)
   const dirty =
-    name !== '' || brand !== '' || price !== '' || categoryId !== '' ||
-    description !== '' || images.length > 0 || modelUrl !== '' || tryOn ||
-    variants.some((v) => v.size !== '' || v.stock !== '');
+    signatureOf({ name, brand, price, categoryId, description, variants, images, modelUrl, tryOn })
+    !== signatureOf(init);
 
   // cancel: confirm first if there's unsaved work, otherwise leave straight away
   function handleCancel() {
@@ -260,7 +300,7 @@ function ProductForm({ onAdd, onCancel }) {
         images: images.map((img) => img.url),
         modelUrl,
       });
-      resetForm();
+      if (!isEdit) resetForm();   // edit navigates away; create clears for the next one
       // onAdd owns what happens next (e.g. navigate away + show a toast)
     } catch (err) {
       setError(err.message);
@@ -272,7 +312,12 @@ function ProductForm({ onAdd, onCancel }) {
   return (
     <>
     <form onSubmit={handleSubmit} className="card card-body mb-4 bg-light" noValidate>
-      <h5 className="mb-3">New product</h5>
+      <h5 className="mb-3">{isEdit ? 'Edit product' : 'New product'}</h5>
+      {isEdit && (
+        <p className="text-muted small mb-3">
+          Changing product details (not just stock) will send it back to admin for re-approval.
+        </p>
+      )}
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
 
@@ -414,7 +459,7 @@ function ProductForm({ onAdd, onCancel }) {
 
       <div className="d-flex gap-2">
         <button type="submit" className="btn btn-primary" disabled={uploading || submitting}>
-          {submitting ? 'Saving…' : uploading ? 'Uploading…' : 'Save product'}
+          {submitting ? 'Saving…' : uploading ? 'Uploading…' : isEdit ? 'Save changes' : 'Save product'}
         </button>
         {onCancel && (
           <button type="button" className="btn btn-outline-secondary" onClick={handleCancel}>Cancel</button>
@@ -424,8 +469,10 @@ function ProductForm({ onAdd, onCancel }) {
 
     <ConfirmDialog
       isOpen={confirmCancel}
-      title="Discard product?"
-      message="You have unsaved changes. Are you sure you want to discard this product?"
+      title={isEdit ? 'Discard changes?' : 'Discard product?'}
+      message={isEdit
+        ? 'You have unsaved changes. Are you sure you want to discard them?'
+        : 'You have unsaved changes. Are you sure you want to discard this product?'}
       confirmText="Discard"
       confirmColor="danger"
       onCancel={() => setConfirmCancel(false)}

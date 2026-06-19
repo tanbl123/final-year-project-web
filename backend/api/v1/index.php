@@ -344,6 +344,7 @@ if (preg_match('#^/products/([^/]+)$#', $path, $m)) {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   if ($method === 'GET')    handleGetProduct($pdo, $auth, $id);
+  if ($method === 'PUT')    handleUpdateProduct($pdo, $auth, $id);
   if ($method === 'DELETE') handleDeleteProduct($pdo, $auth, $id);
   sendJson(405, false, null, ['code' => 'METHOD', 'message' => 'Method not allowed.']);
 }

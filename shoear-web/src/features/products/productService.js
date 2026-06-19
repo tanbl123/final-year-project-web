@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete, apiUpload, getToken } from '../../api/client';
+import { apiGet, apiPost, apiPut, apiDelete, apiUpload, getToken } from '../../api/client';
 
 // All product data now comes from the real PHP API (with the JWT token).
 
@@ -12,6 +12,10 @@ export function fetchProductById(id) {
 
 export function createProduct(data) {
   return apiPost('/products', data, getToken());
+}
+
+export function updateProduct(id, data) {
+  return apiPut('/products/' + id, data, getToken());
 }
 
 export function deleteProduct(id) {

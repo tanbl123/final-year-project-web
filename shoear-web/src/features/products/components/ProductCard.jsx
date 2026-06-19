@@ -36,6 +36,9 @@ function ProductCard(props) {
         <Link to={'/products/' + props.id} className="btn btn-outline-primary btn-sm me-2">
           View
         </Link>
+        <Link to={'/products/' + props.id + '/edit'} className="btn btn-outline-secondary btn-sm me-2">
+          Edit
+        </Link>
         <button className="btn btn-outline-danger btn-sm" onClick={() => props.onDelete(props.id)}>
           Delete
         </button>

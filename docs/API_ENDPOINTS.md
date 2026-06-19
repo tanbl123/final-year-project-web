@@ -181,15 +181,15 @@ modified through this endpoint.
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
 | GET    | `/supplier/products` | Supplier | List the logged-in supplier's own products (any status). |
-| POST   | `/products` | Supplier | Create product → starts as `Pending`. |
-| PUT    | `/products/{productId}` | Supplier(Owner) | Edit own product. |
-| DELETE | `/products/{productId}` | Supplier(Owner)/Admin | Soft delete → `Removed`. |
-| POST   | `/products/{productId}/variants` | Supplier(Owner) | Add a size + stock. |
-| PUT    | `/variants/{productVariantId}` | Supplier(Owner) | Update a size's stock. |
-| DELETE | `/variants/{productVariantId}` | Supplier(Owner) | Remove a size. |
-| POST   | `/products/{productId}/images` | Supplier(Owner) | Attach an image URL (uploaded to Firebase first). |
-| DELETE | `/images/{productImageId}` | Supplier(Owner) | Remove an image. |
-| POST   | `/products/{productId}/models` | Supplier(Owner) | Attach a 3D model URL (Firebase). |
+| POST   | `/products` | Supplier | **(Implemented)** Create product → starts as `Pending`. |
+| PUT    | `/products/{productId}` | Supplier(Owner) | **(Implemented)** Edit own product — details, sizes/stock, images and 3D model in one call (see note below). |
+| DELETE | `/products/{productId}` | Supplier(Owner)/Admin | **(Implemented)** Soft delete → `Removed`. |
+| POST   | `/products/{productId}/variants` | Supplier(Owner) | Add a size + stock. *(Folded into the `PUT` above.)* |
+| PUT    | `/variants/{productVariantId}` | Supplier(Owner) | Update a size's stock. *(Folded into the `PUT` above.)* |
+| DELETE | `/variants/{productVariantId}` | Supplier(Owner) | Remove a size. *(Folded into the `PUT` above.)* |
+| POST   | `/products/{productId}/images` | Supplier(Owner) | Attach an image URL (uploaded to Firebase first). *(Folded into the `PUT` above.)* |
+| DELETE | `/images/{productImageId}` | Supplier(Owner) | Remove an image. *(Folded into the `PUT` above.)* |
+| POST   | `/products/{productId}/models` | Supplier(Owner) | Attach a 3D model URL (Firebase). *(Folded into the `PUT` above.)* |
 | DELETE | `/models/{productModelId}` | Supplier(Owner) | Remove a 3D model. |
 
 ### File uploads (Supplier web) — IMPLEMENTED
@@ -216,6 +216,18 @@ modified through this endpoint.
 Product, variants, images and model are written in **one transaction**; the
 product starts as `Pending` (awaiting admin approval, Section "Admin — product
 moderation").
+
+**`PUT /products/{productId}` (edit)** takes the **same body shape** as create
+and also writes in one transaction. Two behaviours:
+- **Re-approval:** changing the product's *content* (name, brand, price,
+  category, description, images, 3D model, try-on) sends an `Approved`/`Rejected`
+  product back to `Pending`. A **stock-only** change (quantities on existing
+  sizes) keeps the current status — inventory isn't a moderation concern. The
+  response includes `"reapproval": true` when this reset happens.
+- **Sizes are reconciled, not wiped:** existing sizes have their stock updated,
+  new sizes are inserted, and a removed size is deleted — unless it has already
+  been ordered (`order_item` FK is `RESTRICT`), in which case it's kept at `0`
+  stock so order history is preserved.
 
 ### Admin — product moderation (Admin web)
 | Method | Path | Access | Purpose |

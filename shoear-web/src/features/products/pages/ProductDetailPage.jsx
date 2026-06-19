@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { fetchProductById } from '../productService';
 import BackButton from '../../../components/BackButton';
+import Toast from '../../../components/Toast';
 
 const STATUS_COLORS = { Approved: 'success', Pending: 'warning', Rejected: 'danger' };
 
@@ -11,6 +12,18 @@ function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
+
+  // an edit redirect lands here with a toast message to show
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (location.state?.toast) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setToast(location.state.toast);
+      navigate(location.pathname, { replace: true });   // clear it so it won't reappear
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -68,6 +81,9 @@ function ProductDetailPage() {
             <h2 className="mb-0">{product.name}</h2>
             <span className={`badge text-bg-${statusColor}`}>{product.status}</span>
           </div>
+          <Link to={`/products/${id}/edit`} className="btn btn-outline-primary btn-sm mt-2">
+            ✎ Edit product
+          </Link>
           <h6 className="text-muted mt-1">{product.brand}</h6>
           <p className="fs-2 fw-bold text-primary mb-2">RM {Number(product.price).toFixed(2)}</p>
           <p className="mb-3">
@@ -116,6 +132,8 @@ function ProductDetailPage() {
           ></model-viewer>
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast('')} />
     </div>
   );
 }

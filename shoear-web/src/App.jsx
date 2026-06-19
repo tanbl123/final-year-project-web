@@ -8,6 +8,7 @@ import RegisterPage from './features/auth/pages/RegisterPage';
 import ResubmitApplicationPage from './features/auth/pages/ResubmitApplicationPage';
 import ProductDetailPage from './features/products/pages/ProductDetailPage';
 import AddProductPage from './features/products/pages/AddProductPage';
+import EditProductPage from './features/products/pages/EditProductPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprovalsPage';
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
@@ -124,6 +125,9 @@ function App() {
         } />
         <Route path="/products/new" element={
           <ProtectedRoute role="Supplier"><AddProductPage /></ProtectedRoute>
+        } />
+        <Route path="/products/:id/edit" element={
+          <ProtectedRoute role="Supplier"><EditProductPage /></ProtectedRoute>
         } />
         <Route path="/products/:id" element={
           <ProtectedRoute role="Supplier"><ProductDetailPage /></ProtectedRoute>
