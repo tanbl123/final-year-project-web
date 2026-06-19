@@ -20,6 +20,7 @@ require __DIR__ . '/../../controllers/DeliveryController.php';
 require __DIR__ . '/../../controllers/OrderController.php';
 require __DIR__ . '/../../controllers/ReviewController.php';
 require __DIR__ . '/../../controllers/RefundController.php';
+require __DIR__ . '/../../controllers/CommissionController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -172,6 +173,16 @@ if ($method === 'GET' && $path === '/admin/reports/commission') {
   requireAdmin($auth);
   $pdo  = getPDO();
   handleAdminCommissionReport($pdo);
+}
+
+// ── admin commission rate configuration ──
+if ($path === '/admin/commission') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  if ($method === 'GET')  handleGetCommission($pdo);
+  if ($method === 'POST') handleSetCommission($pdo, $auth);
+  sendJson(405, false, null, ['code' => 'METHOD', 'message' => 'Method not allowed.']);
 }
 
 // ── admin routes (require an Admin token) ──

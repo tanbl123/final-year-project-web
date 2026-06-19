@@ -384,9 +384,8 @@ updates (Section 11) drive the later stages.
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET  | `/admin/commission` | Admin | Current active commission rate. |
-| GET  | `/admin/commission/history` | Admin | All rate changes over time. |
-| POST | `/admin/commission` | Admin | Set a new rate. Body: `{ "commissionRateValue": 10.00, "effectiveDate": "2026-07-01" }` (deactivates the old one). |
+| GET  | `/admin/commission` | Admin | **(Implemented)** Current active rate + full change `history` (with who set each). |
+| POST | `/admin/commission` | Admin | **(Implemented)** Set a new rate. Body: `{ "commissionRateValue": 10.00 }` (0–100). Effective now; deactivates the previous rate but keeps it as history. |
 
 ---
 

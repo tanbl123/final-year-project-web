@@ -107,3 +107,14 @@ export function assignDelivery(deliveryId, deliveryPersonnelId) {
 export function getCommissionReport() {
   return apiGet('/admin/reports/commission', getToken());
 }
+
+// ── commission rate configuration ────────────────────────────────────
+// Current active rate + the full change history.
+export function getCommission() {
+  return apiGet('/admin/commission', getToken());
+}
+
+// Set a new active rate (percentage 0–100); deactivates the previous one.
+export function setCommission(commissionRateValue) {
+  return apiPost('/admin/commission', { commissionRateValue }, getToken());
+}
