@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import ProductForm from '../components/ProductForm';
 import { fetchProductById, updateProduct } from '../productService';
 import BackButton from '../../../components/BackButton';
@@ -9,6 +9,11 @@ import BackButton from '../../../components/BackButton';
 function EditProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Return to wherever the user opened the editor from (the products list or
+  // this product's detail page); default to the detail page if opened directly.
+  const from = location.state?.from || `/products/${id}`;
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,13 +29,14 @@ function EditProductPage() {
   }, [id]);
 
   // Throw on failure so ProductForm shows the error inline and stays open.
-  // On success, go to the detail page with a toast that reflects re-approval.
+  // On success, return to where the user came from with a toast (the list and
+  // the detail page both display it) that reflects any re-approval.
   async function saveProduct(data) {
     const res = await updateProduct(id, data);
     const msg = res?.reapproval
       ? `“${data.name}” was updated — it’s back to pending admin approval.`
       : `“${data.name}” was updated.`;
-    navigate(`/products/${id}`, { state: { toast: msg } });
+    navigate(from, { state: { toast: msg } });
   }
 
   if (loading) {
@@ -39,7 +45,7 @@ function EditProductPage() {
   if (error) {
     return (
       <div className="container py-4 text-start">
-        <BackButton to="/products" />
+        <BackButton to={from} />
         <div className="alert alert-danger mt-3">{error}</div>
       </div>
     );
@@ -47,13 +53,13 @@ function EditProductPage() {
 
   return (
     <div className="container py-4 text-start">
-      <BackButton to={`/products/${id}`} />
+      <BackButton to={from} />
       <h1 className="mb-4">Edit product</h1>
       <ProductForm
         mode="edit"
         initialValues={product}
         onAdd={saveProduct}
-        onCancel={() => navigate(`/products/${id}`)}
+        onCancel={() => navigate(from)}
       />
     </div>
   );

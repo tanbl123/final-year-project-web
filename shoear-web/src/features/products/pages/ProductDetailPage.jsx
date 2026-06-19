@@ -80,7 +80,7 @@ function ProductDetailPage() {
             )}
           </div>
         </div>
-        <Link to={`/products/${id}/edit`} className="btn btn-primary">
+        <Link to={`/products/${id}/edit`} state={{ from: `/products/${id}` }} className="btn btn-primary">
           ✎ Edit product
         </Link>
       </div>

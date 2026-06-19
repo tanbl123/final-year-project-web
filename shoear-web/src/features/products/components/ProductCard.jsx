@@ -57,7 +57,8 @@ function ProductCard(props) {
           <Link to={'/products/' + props.id} className="btn btn-outline-primary btn-sm flex-fill">
             View
           </Link>
-          <Link to={'/products/' + props.id + '/edit'} className="btn btn-outline-secondary btn-sm flex-fill">
+          <Link to={'/products/' + props.id + '/edit'} state={{ from: '/products' }}
+            className="btn btn-outline-secondary btn-sm flex-fill">
             Edit
           </Link>
           <button className="btn btn-outline-danger btn-sm" title="Delete product"
