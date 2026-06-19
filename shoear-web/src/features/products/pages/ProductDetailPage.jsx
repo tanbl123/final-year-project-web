@@ -56,6 +56,8 @@ function ProductDetailPage() {
 
   const statusColor = STATUS_COLORS[product.status] || 'secondary';
   const sizeCount = product.variants?.length || 0;
+  const inStockSizes = product.variants?.filter((v) => v.stock > 0).length || 0;
+  const allSizesAvailable = sizeCount > 0 && inStockSizes === sizeCount;
   const outOfStock = sizeCount > 0 && product.totalStock === 0;
 
   return (
@@ -97,12 +99,18 @@ function ProductDetailPage() {
             <div className={`fs-4 fw-bold ${outOfStock ? 'text-danger' : ''}`}>
               {product.totalStock}
             </div>
+            <div className="text-muted small">
+              across {sizeCount} size{sizeCount === 1 ? '' : 's'}
+            </div>
           </div>
         </div>
         <div className="col-6 col-md-3">
           <div className="card card-body py-3">
             <div className="text-muted small text-uppercase">Sizes</div>
             <div className="fs-4 fw-bold">{sizeCount}</div>
+            <div className={`small ${sizeCount === 0 ? 'text-muted' : allSizesAvailable ? 'text-success' : 'text-warning'}`}>
+              {sizeCount === 0 ? 'none added' : `${inStockSizes} of ${sizeCount} in stock`}
+            </div>
           </div>
         </div>
         <div className="col-6 col-md-3">
