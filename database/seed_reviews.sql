@@ -38,3 +38,12 @@ VALUES
   ('REV0007', 'CUS0003', 'PRD0004', 5, 'Very responsive, worth the price.',                     '2026-05-20 10:15:00', 'Published'),
   ('REV0008', 'CUS0001', 'PRD0006', 2, 'Not as durable as I expected for the price.',           '2026-06-01 13:25:00', 'Published'),
   ('REV0009', 'CUS0003', 'PRD0003', 1, 'Spam / inappropriate content example.',                 '2026-06-05 08:00:00', 'Removed');
+
+-- Example supplier replies (needs the supplierReply columns — apply
+-- migrations/2026_06_19_review_supplier_reply.sql first on existing databases).
+UPDATE review SET supplierReply = 'Thank you for the kind words — glad you love them!',
+                  supplierReplyDate = '2026-04-23 10:00:00'
+ WHERE reviewId = 'REV0002';
+UPDATE review SET supplierReply = 'Sorry to hear that. Please contact us so we can make it right.',
+                  supplierReplyDate = '2026-06-02 09:30:00'
+ WHERE reviewId = 'REV0008';

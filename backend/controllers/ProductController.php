@@ -192,6 +192,7 @@ function handleGetProduct(PDO $pdo, array $auth, string $id): void {
   // supplier sees them here rather than on a separate page)
   $rev = $pdo->prepare(
     "SELECT r.reviewId, r.ratingScore, r.reviewComment, r.reviewDate,
+            r.supplierReply, r.supplierReplyDate,
             buyer.fullName AS customerName
        FROM review r
        JOIN customer c   ON c.customerId = r.customerId

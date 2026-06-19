@@ -357,6 +357,8 @@ CREATE TABLE review (
     reviewComment TEXT        NULL,
     reviewDate    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reviewStatus  ENUM('Published','Removed') NOT NULL DEFAULT 'Published',
+    supplierReply     TEXT     NULL,                     -- supplier's public reply (one per review)
+    supplierReplyDate DATETIME NULL,
     PRIMARY KEY (reviewId),
     UNIQUE KEY uq_review_customer_product (customerId, productId), -- one review per product
     KEY idx_review_product (productId),

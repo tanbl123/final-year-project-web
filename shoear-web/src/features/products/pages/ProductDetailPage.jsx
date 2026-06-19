@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { fetchProductById } from '../productService';
+import { replyToReview, deleteReviewReply } from '../../reviews/reviewService';
 import BackButton from '../../../components/BackButton';
 import Toast from '../../../components/Toast';
 import StarRating from '../../../components/StarRating';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 
 const STATUS_COLORS = { Approved: 'success', Pending: 'warning', Rejected: 'danger', Removed: 'secondary' };
 const LOW_STOCK = 5;   // at or below this (but > 0) we flag a size as running low
@@ -15,6 +17,51 @@ function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+
+  // supplier reply-to-review state
+  const [replyingId, setReplyingId] = useState('');     // review being replied to
+  const [replyText, setReplyText] = useState('');
+  const [savingReply, setSavingReply] = useState(false);
+  const [removingReply, setRemovingReply] = useState(null);  // review pending reply-delete
+
+  // silently refetch the product (keeps the page mounted) after a reply change
+  function reloadProduct() {
+    return fetchProductById(id).then(setProduct).catch((err) => setError(err.message));
+  }
+
+  function startReply(review) {
+    setReplyingId(review.reviewId);
+    setReplyText(review.supplierReply || '');
+  }
+  function cancelReply() {
+    setReplyingId('');
+    setReplyText('');
+  }
+  async function saveReply(reviewId) {
+    if (!replyText.trim()) return;
+    setSavingReply(true);
+    setError('');
+    try {
+      await replyToReview(reviewId, replyText.trim());
+      cancelReply();
+      await reloadProduct();
+      setToast('Reply saved.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingReply(false);
+    }
+  }
+  async function doDeleteReply(reviewId) {
+    setError('');
+    try {
+      await deleteReviewReply(reviewId);
+      await reloadProduct();
+      setToast('Reply deleted.');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   // an edit redirect lands here with a toast message to show
   const location = useLocation();
@@ -243,13 +290,47 @@ function ProductDetailPage() {
           {product.reviews?.length > 0 ? (
             <div className="d-flex flex-column gap-3">
               {product.reviews.map((r) => (
-                <div key={r.reviewId} className="border-bottom pb-2">
+                <div key={r.reviewId} className="border-bottom pb-3">
                   <div className="d-flex justify-content-between align-items-center">
                     <StarRating score={r.ratingScore} />
                     <span className="text-muted small">{new Date(r.reviewDate).toLocaleDateString()}</span>
                   </div>
                   {r.reviewComment && <p className="mb-1 mt-1">{r.reviewComment}</p>}
                   <div className="text-muted small">{r.customerName}</div>
+
+                  {/* supplier reply: show it, or the controls to add/edit/delete */}
+                  {replyingId === r.reviewId ? (
+                    <div className="mt-2">
+                      <textarea className="form-control" rows="2" maxLength="1000"
+                        placeholder="Write a public reply to this review…"
+                        value={replyText} onChange={(e) => setReplyText(e.target.value)} />
+                      <div className="mt-2 d-flex gap-2">
+                        <button className="btn btn-primary btn-sm"
+                          disabled={savingReply || !replyText.trim()}
+                          onClick={() => saveReply(r.reviewId)}>
+                          {savingReply ? 'Saving…' : 'Save reply'}
+                        </button>
+                        <button className="btn btn-outline-secondary btn-sm" disabled={savingReply}
+                          onClick={cancelReply}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : r.supplierReply ? (
+                    <div className="mt-2 ms-3 ps-3 border-start">
+                      <div className="small fw-semibold text-primary">Your reply</div>
+                      <p className="mb-1">{r.supplierReply}</p>
+                      <div className="d-flex align-items-center gap-2">
+                        {r.supplierReplyDate && (
+                          <span className="text-muted small">{new Date(r.supplierReplyDate).toLocaleDateString()}</span>
+                        )}
+                        <button className="btn btn-link btn-sm p-0" onClick={() => startReply(r)}>Edit</button>
+                        <button className="btn btn-link btn-sm p-0 text-danger" onClick={() => setRemovingReply(r)}>Delete</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="btn btn-outline-primary btn-sm mt-2" onClick={() => startReply(r)}>
+                      Reply
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -260,6 +341,16 @@ function ProductDetailPage() {
       </div>
 
       <p className="text-muted small mt-4 mb-0">Product ID: {product.id}</p>
+
+      <ConfirmDialog
+        isOpen={!!removingReply}
+        title="Delete your reply?"
+        message="Remove your reply to this review? This can't be undone."
+        confirmText="Delete"
+        confirmColor="danger"
+        onCancel={() => setRemovingReply(null)}
+        onConfirm={() => { const r = removingReply; setRemovingReply(null); doDeleteReply(r.reviewId); }}
+      />
 
       <Toast message={toast} onClose={() => setToast('')} />
     </div>

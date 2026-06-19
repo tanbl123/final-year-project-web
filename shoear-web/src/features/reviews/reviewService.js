@@ -1,4 +1,14 @@
-import { apiGet, apiPatch, getToken } from '../../api/client';
+import { apiGet, apiPut, apiPatch, apiDelete, getToken } from '../../api/client';
+
+// Supplier: add or edit their reply to a review on their product.
+export function replyToReview(reviewId, reply) {
+  return apiPut(`/supplier/reviews/${reviewId}/reply`, { reply }, getToken());
+}
+
+// Supplier: delete their own reply.
+export function deleteReviewReply(reviewId) {
+  return apiDelete(`/supplier/reviews/${reviewId}/reply`, getToken());
+}
 
 // Admin: all reviews. filters: { status, rating, search }.
 export function getAdminReviews(filters = {}) {

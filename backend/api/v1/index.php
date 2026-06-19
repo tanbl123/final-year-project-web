@@ -382,6 +382,19 @@ if ($method === 'PATCH' && preg_match('#^/admin/reviews/([^/]+)/status$#', $path
   handleSetReviewStatus($pdo, $m[1]);
 }
 
+// supplier reply to a review on their own product (create/update + delete)
+if ($method === 'PUT' && preg_match('#^/supplier/reviews/([^/]+)/reply$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleReplyToReview($pdo, $auth, $m[1]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/supplier/reviews/([^/]+)/reply$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleDeleteReviewReply($pdo, $auth, $m[1]);
+}
+
 // ── supplier inventory (quick stock management) ──
 if ($path === '/supplier/inventory') {
   $auth = requireAuth($secret);

@@ -62,3 +62,53 @@ function handleSetReviewStatus(PDO $pdo, string $reviewId): void {
       ->execute(['s' => $status, 'id' => $reviewId]);
   sendJson(200, true, ['reviewId' => $reviewId, 'status' => $status]);
 }
+
+// Shared: confirm a review is on one of this supplier's products (or 404).
+function requireOwnReview(PDO $pdo, string $supplierId, string $reviewId): array {
+  $stmt = $pdo->prepare(
+    "SELECT r.reviewStatus
+       FROM review r
+       JOIN product p ON p.productId = r.productId
+      WHERE r.reviewId = :id AND p.supplierId = :sid"
+  );
+  $stmt->execute(['id' => $reviewId, 'sid' => $supplierId]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Review not found.']);
+  }
+  return $row;
+}
+
+// PUT /supplier/reviews/{reviewId}/reply — add or edit the supplier's own reply
+// (one per review). Body: { reply }. Only on a Published review on the
+// supplier's product. The supplier can never touch the customer's review text.
+function handleReplyToReview(PDO $pdo, array $auth, string $reviewId): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+  $body  = getJsonBody();
+  $reply = trim($body['reply'] ?? '');
+  if ($reply === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Reply cannot be empty.']);
+  }
+  if (mb_strlen($reply) > 1000) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Reply is too long (max 1000 characters).']);
+  }
+
+  $review = requireOwnReview($pdo, $supplierId, $reviewId);
+  if ($review['reviewStatus'] !== 'Published') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'Cannot reply to a removed review.']);
+  }
+
+  $pdo->prepare('UPDATE review SET supplierReply = :rep, supplierReplyDate = NOW() WHERE reviewId = :id')
+      ->execute(['rep' => $reply, 'id' => $reviewId]);
+  sendJson(200, true, ['reviewId' => $reviewId, 'supplierReply' => $reply]);
+}
+
+// DELETE /supplier/reviews/{reviewId}/reply — remove the supplier's own reply.
+function handleDeleteReviewReply(PDO $pdo, array $auth, string $reviewId): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+  requireOwnReview($pdo, $supplierId, $reviewId);
+
+  $pdo->prepare('UPDATE review SET supplierReply = NULL, supplierReplyDate = NULL WHERE reviewId = :id')
+      ->execute(['id' => $reviewId]);
+  sendJson(200, true, ['reviewId' => $reviewId, 'deleted' => true]);
+}
