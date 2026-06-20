@@ -50,11 +50,12 @@ function Layout() {
       {/* the top bar only makes sense once you're signed in; the login and
           register pages are full-screen on their own */}
       {user && (
-        <nav className="navbar navbar-expand navbar-dark bg-dark px-4">
-          <span className="navbar-brand">👟 ShoeAR {isAdmin ? 'Admin' : 'Supplier'}</span>
+        <nav className="navbar navbar-expand navbar-dark bg-dark px-4 flex-nowrap">
+          <span className="navbar-brand flex-shrink-0">👟 ShoeAR {isAdmin ? 'Admin' : 'Supplier'}</span>
 
-          {/* admins manage approvals; suppliers manage their catalogue */}
-          <div className="navbar-nav me-auto">
+          {/* admins manage approvals; suppliers manage their catalogue.
+              The link row scrolls horizontally when it can't fit. */}
+          <div className="navbar-nav flex-row flex-nowrap nav-scroll me-auto" style={{ minWidth: 0 }}>
             {isAdmin ? (
               <>
                 <Link className="nav-link" to="/admin">Suppliers</Link>
@@ -84,9 +85,9 @@ function Layout() {
             )}
           </div>
 
-          <div className="navbar-nav align-items-center">
+          <div className="navbar-nav flex-row align-items-center flex-shrink-0 ms-3">
             <Link to="/profile"
-              className="navbar-text text-light me-3 d-inline-flex align-items-center text-decoration-none">
+              className="navbar-text text-light me-3 d-inline-flex align-items-center text-decoration-none text-nowrap">
               <Avatar name={user.fullName} size={32} className="me-2" />
               <span>Hi, {user.fullName}</span>
             </Link>
