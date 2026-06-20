@@ -22,6 +22,7 @@ require __DIR__ . '/../../controllers/ReviewController.php';
 require __DIR__ . '/../../controllers/RefundController.php';
 require __DIR__ . '/../../controllers/CommissionController.php';
 require __DIR__ . '/../../controllers/CatalogController.php';
+require __DIR__ . '/../../controllers/CartController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -68,6 +69,31 @@ if ($method === 'GET' && $path === '/db-test') {
   $stmt = $pdo->query('SELECT COUNT(*) AS total FROM product');
   $row  = $stmt->fetch();
   sendJson(200, true, ['productCount' => (int) $row['total']]);
+}
+
+// ── customer cart (require a Customer token) ──
+if ($method === 'GET' && $path === '/cart') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetCart($pdo, $auth);
+}
+
+if ($method === 'POST' && $path === '/cart/items') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleAddCartItem($pdo, $auth);
+}
+
+if ($method === 'PUT' && preg_match('#^/cart/items/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpdateCartItem($pdo, $auth, $m[1]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/cart/items/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRemoveCartItem($pdo, $auth, $m[1]);
 }
 
 // ── public catalog (customer app browsing; guests allowed — no token) ──

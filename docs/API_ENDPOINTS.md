@@ -249,11 +249,10 @@ and also writes in one transaction. Two behaviours:
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET    | `/cart` | Customer | Current customer's cart + items + computed total. |
-| POST   | `/cart/items` | Customer | Add a **variant** (size) to cart. Body: `{ "productVariantId": "VAR0001", "quantity": 1 }`. |
-| PUT    | `/cart/items/{cartItemId}` | Customer(Owner) | Change quantity. |
-| DELETE | `/cart/items/{cartItemId}` | Customer(Owner) | Remove a line. |
-| DELETE | `/cart` | Customer | Empty the whole cart. |
+| GET    | `/cart` | Customer | **(Implemented)** Cart + items (live price/subtotal) + total. Creates an empty cart on first use. |
+| POST   | `/cart/items` | Customer | **(Implemented)** Add a **variant** (size). Body: `{ "variantId": "VAR0001", "quantity": 1 }`. Tops up an existing line; rejects exceeding stock (409). |
+| PUT    | `/cart/items/{cartItemId}` | Customer(Owner) | **(Implemented)** Set exact quantity. Body: `{ "quantity": 2 }`. Stock-checked. |
+| DELETE | `/cart/items/{cartItemId}` | Customer(Owner) | **(Implemented)** Remove a line. |
 
 > Cart items reference `productVariantId` (the chosen **size**), matching the
 > schema's per-size stock design. Adding the same variant twice updates quantity

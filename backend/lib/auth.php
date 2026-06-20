@@ -21,6 +21,20 @@ function requireAdmin(array $auth): void {
   }
 }
 
+// Ensure the caller is a Customer and return their customerId (or 403).
+function requireCustomerId(PDO $pdo, array $auth): string {
+  if (($auth['role'] ?? '') !== 'Customer') {
+    sendJson(403, false, null, ['code' => 'FORBIDDEN', 'message' => 'Customer access only.']);
+  }
+  $stmt = $pdo->prepare('SELECT customerId FROM customer WHERE userId = :userId');
+  $stmt->execute(['userId' => $auth['userId']]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    sendJson(403, false, null, ['code' => 'NO_CUSTOMER', 'message' => 'No customer profile for this user.']);
+  }
+  return $row['customerId'];
+}
+
 // Ensure the caller is a Supplier and return their supplierId (or 403).
 function requireSupplierId(PDO $pdo, array $auth): string {
   if (($auth['role'] ?? '') !== 'Supplier') {
