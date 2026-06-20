@@ -362,8 +362,10 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
   unset($x);
   $order['items'] = $items;
 
+  // the customer sees their own OTP (they read it out to the courier on arrival)
   $dl = $pdo->prepare(
-    'SELECT deliveryStatus, estimatedDeliveryTime FROM delivery WHERE orderId = :oid LIMIT 1'
+    'SELECT deliveryStatus, estimatedDeliveryTime, otpCode, proofOfDelivery
+       FROM delivery WHERE orderId = :oid LIMIT 1'
   );
   $dl->execute(['oid' => $orderId]);
   $order['delivery'] = $dl->fetch() ?: null;

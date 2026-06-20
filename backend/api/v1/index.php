@@ -162,6 +162,43 @@ if ($method === 'GET' && $path === '/refunds') {
   handleListCustomerRefunds($pdo, $auth);
 }
 
+// ── delivery personnel / courier (require a DeliveryPersonnel token) ──
+if ($method === 'GET' && $path === '/delivery/assignments') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleListAssignments($pdo, $auth);
+}
+
+if ($method === 'GET' && $path === '/delivery/history') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleListDeliveryHistory($pdo, $auth);
+}
+
+if ($method === 'GET' && preg_match('#^/deliveries/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetCourierDelivery($pdo, $auth, $m[1]);
+}
+
+if ($method === 'PATCH' && preg_match('#^/deliveries/([^/]+)/status$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpdateDeliveryStatus($pdo, $auth, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/deliveries/([^/]+)/verify-otp$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleVerifyOtp($pdo, $auth, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/deliveries/([^/]+)/proof$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUploadProof($pdo, $auth, $m[1]);
+}
+
 // ── customer wishlist (require a Customer token) ──
 if ($method === 'GET' && $path === '/wishlist') {
   $auth = requireAuth($secret);

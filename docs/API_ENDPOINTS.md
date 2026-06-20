@@ -329,11 +329,16 @@ updates (Section 11) drive the later stages.
 | GET   | `/admin/deliveries` | Admin | All deliveries; filters `?status=` and `?unassigned=1` (unassigned = needs assigning). Unassigned/`Pending` are listed first. |
 | GET   | `/admin/couriers` | Admin | Active courier roster ranked best-first by current load (the same scoring the auto-assigner uses) — powers the manual-assign dropdown. |
 | POST  | `/admin/deliveries/{deliveryId}/assign` | Admin | Manually (re)assign a courier. Body: `{ "deliveryPersonnelId": "DEL0001" }`. `Pending` → `Assigned`; allowed until the delivery is `Delivered`/`Failed`. |
-| GET   | `/delivery/assignments` | Delivery | Deliveries assigned to the logged-in delivery person. |
-| GET   | `/deliveries/{deliveryId}` | Delivery(Owner)/Admin | One delivery's detail (address, customer, items). |
-| PATCH | `/deliveries/{deliveryId}/status` | Delivery(Owner) | Update: `PickedUp` → `OutForDelivery` → `Delivered`/`Failed`. |
-| POST  | `/deliveries/{deliveryId}/verify-otp` | Delivery(Owner) | Confirm hand-off. Body: `{ "otpCode": "1234" }`. On match → `Delivered`, order → `Delivered`. |
-| POST  | `/deliveries/{deliveryId}/proof` | Delivery(Owner) | Attach proof-of-delivery photo URL (Firebase). |
+| GET   | `/delivery/assignments` | Delivery | **(Implemented)** The courier's active deliveries (Assigned/PickedUp/OutForDelivery) with customer address + phone. |
+| GET   | `/delivery/history` | Delivery | **(Implemented)** The courier's finished deliveries (Delivered/Failed). |
+| GET   | `/deliveries/{deliveryId}` | Delivery(Owner) | **(Implemented)** Detail: customer contact, address, items (OTP **not** returned to the courier). |
+| PATCH | `/deliveries/{deliveryId}/status` | Delivery(Owner) | **(Implemented)** `Assigned→PickedUp→OutForDelivery` (or `→Failed`); order status kept in step; going `OutForDelivery` generates the customer's OTP. |
+| POST  | `/deliveries/{deliveryId}/verify-otp` | Delivery(Owner) | **(Implemented)** Body: `{ "otpCode": "1234" }`. On match (must be OutForDelivery) → `Delivered`, order → `Delivered`. |
+| POST  | `/deliveries/{deliveryId}/proof` | Delivery(Owner) | **(Implemented)** Attach a proof-of-delivery photo URL (uploaded via `/uploads`). |
+
+> The customer reads their OTP from order tracking (`GET /orders/{id}` →
+> `delivery.otpCode`, set when the delivery goes OutForDelivery) and reads it to
+> the courier, who enters it to confirm receipt.
 
 > OTP + proof-of-delivery satisfy the delivery app's confirmation requirement.
 

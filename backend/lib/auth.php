@@ -35,6 +35,20 @@ function requireCustomerId(PDO $pdo, array $auth): string {
   return $row['customerId'];
 }
 
+// Ensure the caller is Delivery Personnel and return their id (or 403).
+function requireDeliveryPersonnelId(PDO $pdo, array $auth): string {
+  if (($auth['role'] ?? '') !== 'DeliveryPersonnel') {
+    sendJson(403, false, null, ['code' => 'FORBIDDEN', 'message' => 'Delivery personnel access only.']);
+  }
+  $stmt = $pdo->prepare('SELECT deliveryPersonnelId FROM delivery_personnel WHERE userId = :userId');
+  $stmt->execute(['userId' => $auth['userId']]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    sendJson(403, false, null, ['code' => 'NO_COURIER', 'message' => 'No delivery profile for this user.']);
+  }
+  return $row['deliveryPersonnelId'];
+}
+
 // Ensure the caller is a Supplier and return their supplierId (or 403).
 function requireSupplierId(PDO $pdo, array $auth): string {
   if (($auth['role'] ?? '') !== 'Supplier') {

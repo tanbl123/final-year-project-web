@@ -105,3 +105,191 @@ function handleAssignDelivery(PDO $pdo, string $deliveryId): void {
     'deliveryStatus'      => $newStatus,
   ]);
 }
+
+// ── Delivery personnel (courier) endpoints ───────────────────────────────────
+// The courier works their assigned deliveries: pick up → out for delivery →
+// confirm with the customer's OTP (or mark failed), and attach proof.
+
+// GET /delivery/assignments — this courier's ACTIVE deliveries. Couriers DO get
+// the customer's address + phone (they need it to deliver).
+function handleListAssignments(PDO $pdo, array $auth): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $stmt = $pdo->prepare(
+    "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.estimatedDeliveryTime,
+            o.orderDeliveryAddress, buyer.fullName AS customerName, buyer.phoneNumber AS customerPhone,
+            (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount
+       FROM delivery d
+       JOIN `order` o    ON o.orderId = d.orderId
+       JOIN customer c   ON c.customerId = o.customerId
+       JOIN `user` buyer ON buyer.userId = c.userId
+      WHERE d.deliveryPersonnelId = :dp
+        AND d.deliveryStatus IN ('Assigned', 'PickedUp', 'OutForDelivery')
+      ORDER BY FIELD(d.deliveryStatus, 'OutForDelivery','PickedUp','Assigned'), d.deliveryId"
+  );
+  $stmt->execute(['dp' => $courierId]);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as &$r) { $r['itemCount'] = (int) $r['itemCount']; }
+  unset($r);
+  sendJson(200, true, ['deliveries' => $rows]);
+}
+
+// GET /delivery/history — this courier's finished deliveries (Delivered/Failed).
+function handleListDeliveryHistory(PDO $pdo, array $auth): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $stmt = $pdo->prepare(
+    "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.deliveryDate,
+            o.orderDeliveryAddress, buyer.fullName AS customerName
+       FROM delivery d
+       JOIN `order` o    ON o.orderId = d.orderId
+       JOIN customer c   ON c.customerId = o.customerId
+       JOIN `user` buyer ON buyer.userId = c.userId
+      WHERE d.deliveryPersonnelId = :dp AND d.deliveryStatus IN ('Delivered', 'Failed')
+      ORDER BY d.deliveryDate DESC"
+  );
+  $stmt->execute(['dp' => $courierId]);
+  sendJson(200, true, ['deliveries' => $stmt->fetchAll()]);
+}
+
+// Shared: load one of this courier's deliveries (or 404).
+function requireOwnDelivery(PDO $pdo, string $courierId, string $deliveryId): array {
+  $stmt = $pdo->prepare(
+    'SELECT deliveryId, orderId, deliveryStatus, otpCode FROM delivery
+      WHERE deliveryId = :id AND deliveryPersonnelId = :dp'
+  );
+  $stmt->execute(['id' => $deliveryId, 'dp' => $courierId]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Delivery not found.']);
+  }
+  return $row;
+}
+
+// GET /deliveries/{deliveryId} — full detail for the courier (customer contact,
+// address, items). The OTP is NOT returned — the customer holds it; the courier
+// enters it to confirm.
+function handleGetCourierDelivery(PDO $pdo, array $auth, string $deliveryId): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $h = $pdo->prepare(
+    "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.deliveryDate,
+            d.estimatedDeliveryTime, d.proofOfDelivery,
+            o.orderDeliveryAddress, o.orderTotalAmount,
+            buyer.fullName AS customerName, buyer.phoneNumber AS customerPhone
+       FROM delivery d
+       JOIN `order` o    ON o.orderId = d.orderId
+       JOIN customer c   ON c.customerId = o.customerId
+       JOIN `user` buyer ON buyer.userId = c.userId
+      WHERE d.deliveryId = :id AND d.deliveryPersonnelId = :dp"
+  );
+  $h->execute(['id' => $deliveryId, 'dp' => $courierId]);
+  $del = $h->fetch();
+  if (!$del) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Delivery not found.']);
+  }
+  $del['orderTotalAmount'] = (float) $del['orderTotalAmount'];
+
+  $it = $pdo->prepare(
+    "SELECT p.productName, p.productBrand AS brand, oi.orderSize AS size, oi.orderQuantity AS qty
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+      WHERE oi.orderId = :oid
+      ORDER BY oi.orderItemId"
+  );
+  $it->execute(['oid' => $del['orderId']]);
+  $items = $it->fetchAll();
+  foreach ($items as &$x) { $x['qty'] = (int) $x['qty']; }
+  unset($x);
+  $del['items'] = $items;
+
+  sendJson(200, true, $del);
+}
+
+// PATCH /deliveries/{deliveryId}/status — body: { status }. Transitions:
+// Assigned→PickedUp, PickedUp→OutForDelivery, OutForDelivery→Failed.
+// (Delivered is reached only through verify-otp.) The order status is kept in
+// step; going OutForDelivery generates the customer's confirmation OTP.
+function handleUpdateDeliveryStatus(PDO $pdo, array $auth, string $deliveryId): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $body   = getJsonBody();
+  $status = trim($body['status'] ?? '');
+
+  $del = requireOwnDelivery($pdo, $courierId, $deliveryId);
+  $allowed = [
+    'Assigned'       => ['PickedUp'],
+    'PickedUp'       => ['OutForDelivery'],
+    'OutForDelivery' => ['Failed'],
+  ];
+  if (!in_array($status, $allowed[$del['deliveryStatus']] ?? [], true)) {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => "Cannot move a {$del['deliveryStatus']} delivery to {$status}."]);
+  }
+
+  // keep the order status in step with the milestone
+  $orderStatusFor = ['PickedUp' => 'Shipped', 'OutForDelivery' => 'OutForDelivery'];
+
+  try {
+    $pdo->beginTransaction();
+    if ($status === 'OutForDelivery') {
+      $otp = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+      $pdo->prepare("UPDATE delivery SET deliveryStatus = 'OutForDelivery', otpCode = :otp WHERE deliveryId = :id")
+          ->execute(['otp' => $otp, 'id' => $deliveryId]);
+    } else {
+      $pdo->prepare('UPDATE delivery SET deliveryStatus = :s WHERE deliveryId = :id')
+          ->execute(['s' => $status, 'id' => $deliveryId]);
+    }
+    if (isset($orderStatusFor[$status])) {
+      $pdo->prepare('UPDATE `order` SET orderStatus = :os WHERE orderId = :oid')
+          ->execute(['os' => $orderStatusFor[$status], 'oid' => $del['orderId']]);
+    }
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+    sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not update the delivery.']);
+  }
+
+  sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => $status]);
+}
+
+// POST /deliveries/{deliveryId}/verify-otp — body: { otpCode }. On a match
+// (delivery must be OutForDelivery) → Delivered, order → Delivered.
+function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $body = getJsonBody();
+  $otp  = trim($body['otpCode'] ?? '');
+
+  $del = requireOwnDelivery($pdo, $courierId, $deliveryId);
+  if ($del['deliveryStatus'] !== 'OutForDelivery') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This delivery is not out for delivery.']);
+  }
+  if ($otp === '' || $otp !== (string) $del['otpCode']) {
+    sendJson(400, false, null, ['code' => 'BAD_OTP', 'message' => 'Incorrect OTP. Ask the customer for the code shown in their app.']);
+  }
+
+  try {
+    $pdo->beginTransaction();
+    $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW() WHERE deliveryId = :id")
+        ->execute(['id' => $deliveryId]);
+    $pdo->prepare("UPDATE `order` SET orderStatus = 'Delivered' WHERE orderId = :oid")
+        ->execute(['oid' => $del['orderId']]);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+    sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not confirm the delivery.']);
+  }
+
+  sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => 'Delivered']);
+}
+
+// POST /deliveries/{deliveryId}/proof — body: { proofUrl }. Attach a
+// proof-of-delivery photo (uploaded via /uploads first).
+function handleUploadProof(PDO $pdo, array $auth, string $deliveryId): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $body = getJsonBody();
+  $url  = trim($body['proofUrl'] ?? '');
+  if ($url === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A proof image URL is required.']);
+  }
+  requireOwnDelivery($pdo, $courierId, $deliveryId);
+  $pdo->prepare('UPDATE delivery SET proofOfDelivery = :url WHERE deliveryId = :id')
+      ->execute(['url' => $url, 'id' => $deliveryId]);
+  sendJson(200, true, ['deliveryId' => $deliveryId, 'proofOfDelivery' => $url]);
+}
