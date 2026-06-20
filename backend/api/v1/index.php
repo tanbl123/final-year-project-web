@@ -97,6 +97,25 @@ if ($method === 'DELETE' && preg_match('#^/cart/items/([^/]+)$#', $path, $m)) {
   handleRemoveCartItem($pdo, $auth, $m[1]);
 }
 
+// ── customer checkout + orders (require a Customer token) ──
+if ($method === 'POST' && $path === '/orders') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCheckout($pdo, $auth);
+}
+
+if ($method === 'GET' && $path === '/orders') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleListCustomerOrders($pdo, $auth);
+}
+
+if ($method === 'GET' && preg_match('#^/orders/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetCustomerOrder($pdo, $auth, $m[1]);
+}
+
 // ── customer wishlist (require a Customer token) ──
 if ($method === 'GET' && $path === '/wishlist') {
   $auth = requireAuth($secret);

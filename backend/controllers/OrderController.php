@@ -214,3 +214,169 @@ function handleGetAdminOrder(PDO $pdo, string $orderId): void {
 
   sendJson(200, true, $order);
 }
+
+// ── Customer checkout + order tracking (Customer token) ──────────────────────
+
+// POST /orders — turn the customer's cart into an order. Model A: the order is
+// created as `Placed` and the cart is cleared, but STOCK IS NOT TOUCHED here —
+// it's decremented atomically at payment success (see HANDOFF/NOTES). Body:
+// { deliveryAddress? } (falls back to the customer's saved shipping address).
+function handleCheckout(PDO $pdo, array $auth): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $body    = getJsonBody();
+  $address = trim($body['deliveryAddress'] ?? '');
+  if ($address === '') {
+    $a = $pdo->prepare('SELECT shippingAddress FROM customer WHERE customerId = :cid');
+    $a->execute(['cid' => $customerId]);
+    $address = trim((string) ($a->fetchColumn() ?: ''));
+  }
+  if ($address === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A delivery address is required.']);
+  }
+
+  $cartId = getOrCreateCartId($pdo, $customerId);
+  $stmt = $pdo->prepare(
+    "SELECT ci.cartItemQuantity AS qty, pv.productVariantId AS variantId, pv.size,
+            pv.stockQuantity AS stock, p.productName, p.productPrice AS price, p.productStatus AS status
+       FROM cart_item ci
+       JOIN product_variant pv ON pv.productVariantId = ci.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+      WHERE ci.cartId = :cid"
+  );
+  $stmt->execute(['cid' => $cartId]);
+  $items = $stmt->fetchAll();
+  if (count($items) === 0) {
+    sendJson(400, false, null, ['code' => 'EMPTY_CART', 'message' => 'Your cart is empty.']);
+  }
+
+  // sanity-check availability (the real guard is the atomic decrement at payment)
+  foreach ($items as $it) {
+    if ($it['status'] !== 'Approved') {
+      sendJson(409, false, null, ['code' => 'UNAVAILABLE', 'message' => "\"{$it['productName']}\" is no longer available."]);
+    }
+    if ((int) $it['qty'] > (int) $it['stock']) {
+      sendJson(409, false, null, ['code' => 'OUT_OF_STOCK', 'message' => "Only {$it['stock']} left of \"{$it['productName']}\" ({$it['size']})."]);
+    }
+  }
+
+  $total = 0.0;
+  foreach ($items as $it) { $total += round((float) $it['price'] * (int) $it['qty'], 2); }
+  $total = round($total, 2);
+
+  try {
+    $pdo->beginTransaction();
+    $orderId = nextId($pdo, 'order', 'orderId', 'ORD');
+    $pdo->prepare(
+      "INSERT INTO `order` (orderId, customerId, orderDate, orderStatus, orderTotalAmount, orderDeliveryAddress)
+       VALUES (:id, :cid, NOW(), 'Placed', :total, :addr)"
+    )->execute(['id' => $orderId, 'cid' => $customerId, 'total' => $total, 'addr' => $address]);
+
+    foreach ($items as $it) {
+      $sub  = round((float) $it['price'] * (int) $it['qty'], 2);
+      $oiId = nextId($pdo, 'order_item', 'orderItemId', 'OIT');
+      $pdo->prepare(
+        "INSERT INTO order_item (orderItemId, orderId, productVariantId, orderSize, orderQuantity, orderUnitPrice, orderSubtotal)
+         VALUES (:oi, :oid, :var, :size, :qty, :price, :sub)"
+      )->execute([
+        'oi' => $oiId, 'oid' => $orderId, 'var' => $it['variantId'], 'size' => $it['size'],
+        'qty' => (int) $it['qty'], 'price' => (float) $it['price'], 'sub' => $sub,
+      ]);
+    }
+
+    $pdo->prepare('DELETE FROM cart_item WHERE cartId = :cid')->execute(['cid' => $cartId]);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+    sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not place the order.']);
+  }
+
+  sendJson(201, true, [
+    'orderId'         => $orderId,
+    'status'          => 'Placed',
+    'total'           => $total,
+    'deliveryAddress' => $address,
+    'itemCount'       => count($items),
+  ]);
+}
+
+// GET /orders — the customer's own orders (newest first).
+function handleListCustomerOrders(PDO $pdo, array $auth): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $stmt = $pdo->prepare(
+    "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount,
+            (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount,
+            pay.paymentStatus,
+            (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId LIMIT 1) AS deliveryStatus
+       FROM `order` o
+       LEFT JOIN payment pay ON pay.orderId = o.orderId
+      WHERE o.customerId = :cid
+      ORDER BY o.orderDate DESC"
+  );
+  $stmt->execute(['cid' => $customerId]);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as &$r) {
+    $r['orderTotalAmount'] = (float) $r['orderTotalAmount'];
+    $r['itemCount']        = (int) $r['itemCount'];
+  }
+  unset($r);
+  sendJson(200, true, ['orders' => $rows]);
+}
+
+// GET /orders/{orderId} — one of the customer's own orders, in full (items,
+// payment, delivery tracking, refunds).
+function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $h = $pdo->prepare(
+    "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount, o.orderDeliveryAddress,
+            pay.paymentMethod, pay.paymentStatus, pay.paymentDate
+       FROM `order` o
+       LEFT JOIN payment pay ON pay.orderId = o.orderId
+      WHERE o.orderId = :oid AND o.customerId = :cid"
+  );
+  $h->execute(['oid' => $orderId, 'cid' => $customerId]);
+  $order = $h->fetch();
+  if (!$order) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
+  }
+  $order['orderTotalAmount'] = (float) $order['orderTotalAmount'];
+
+  $it = $pdo->prepare(
+    "SELECT oi.orderItemId, p.productId, p.productName, p.productBrand AS brand,
+            oi.orderSize AS size, oi.orderQuantity AS qty,
+            oi.orderUnitPrice AS unitPrice, oi.orderSubtotal AS subtotal,
+            (SELECT pi.productImageUrl FROM product_image pi
+              WHERE pi.productId = p.productId ORDER BY pi.productImageId LIMIT 1) AS imageUrl
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+      WHERE oi.orderId = :oid
+      ORDER BY oi.orderItemId"
+  );
+  $it->execute(['oid' => $orderId]);
+  $items = $it->fetchAll();
+  foreach ($items as &$x) {
+    $x['qty']       = (int) $x['qty'];
+    $x['unitPrice'] = (float) $x['unitPrice'];
+    $x['subtotal']  = (float) $x['subtotal'];
+  }
+  unset($x);
+  $order['items'] = $items;
+
+  $dl = $pdo->prepare(
+    'SELECT deliveryStatus, estimatedDeliveryTime FROM delivery WHERE orderId = :oid LIMIT 1'
+  );
+  $dl->execute(['oid' => $orderId]);
+  $order['delivery'] = $dl->fetch() ?: null;
+
+  $rf = $pdo->prepare(
+    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate
+       FROM refund WHERE orderId = :oid ORDER BY requestDate DESC"
+  );
+  $rf->execute(['oid' => $orderId]);
+  $refunds = $rf->fetchAll();
+  foreach ($refunds as &$x) { $x['refundAmount'] = (float) $x['refundAmount']; }
+  unset($x);
+  $order['refunds'] = $refunds;
+
+  sendJson(200, true, $order);
+}

@@ -276,9 +276,9 @@ and also writes in one transaction. Two behaviours:
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| POST  | `/orders` | Customer | Checkout: turn the cart into an order (`Placed`). Snapshots price + size into `order_item`. |
-| GET   | `/orders` | Customer | Logged-in customer's own orders. |
-| GET   | `/orders/{orderId}` | Customer(Owner)/Admin | Order detail + items + payment + delivery status. |
+| POST  | `/orders` | Customer | **(Implemented)** Checkout: cart → order (`Placed`), snapshots price+size into `order_item`, clears the cart. Body: `{ deliveryAddress? }` (falls back to saved shipping address). **No stock change** — that's at payment. |
+| GET   | `/orders` | Customer | **(Implemented)** Logged-in customer's own orders (with payment + delivery status). |
+| GET   | `/orders/{orderId}` | Customer(Owner) | **(Implemented)** Order detail: items, payment, delivery tracking, refunds. |
 | GET   | `/admin/orders` | Admin | **(Implemented)** All orders; filters `?status=`, `?search=` (order id / customer). |
 | GET   | `/admin/orders/{orderId}` | Admin | **(Implemented)** Full detail: customer, **payment record** (FR 899), all items (every supplier), delivery + refunds. |
 | GET   | `/admin/inventory` | Admin | **(Implemented)** Product stock across all suppliers (FR 906); filters `?status=`, `?search=`. |
