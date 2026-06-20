@@ -121,3 +121,76 @@ function handleListSupplierRefunds(PDO $pdo, array $auth): void {
   unset($r);
   sendJson(200, true, ['refunds' => $rows]);
 }
+
+// ── Customer refund requests (Customer token) ────────────────────────────────
+
+// POST /orders/{orderId}/refund — request a refund on a PAID order. Body:
+// { refundReason, refundAmount?, refundProof? }. Creates a Pending refund that
+// then flows to the admin processing queue + the supplier's refund views.
+function handleCreateRefund(PDO $pdo, array $auth, string $orderId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $body   = getJsonBody();
+  $reason = trim($body['refundReason'] ?? '');
+  $proof  = trim($body['refundProof'] ?? '');
+  if ($reason === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A refund reason is required.']);
+  }
+  if (mb_strlen($reason) > 255) { $reason = mb_substr($reason, 0, 255); }
+
+  $o = $pdo->prepare("SELECT orderStatus, orderTotalAmount FROM `order` WHERE orderId = :oid AND customerId = :cid");
+  $o->execute(['oid' => $orderId, 'cid' => $customerId]);
+  $order = $o->fetch();
+  if (!$order) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
+  }
+  $paid = ['Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed'];
+  if (!in_array($order['orderStatus'], $paid, true)) {
+    sendJson(409, false, null, ['code' => 'NOT_REFUNDABLE', 'message' => 'Only a paid order can be refunded.']);
+  }
+  $orderTotal = (float) $order['orderTotalAmount'];
+
+  $amount = $body['refundAmount'] ?? $orderTotal;       // default: full refund
+  if (!is_numeric($amount) || (float) $amount <= 0 || (float) $amount > $orderTotal) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Refund amount must be between 0 and the order total.']);
+  }
+  $amount = round((float) $amount, 2);
+
+  // don't allow a second active refund on the same order
+  $ex = $pdo->prepare("SELECT 1 FROM refund WHERE orderId = :oid AND refundStatus IN ('Pending','Approved','Completed') LIMIT 1");
+  $ex->execute(['oid' => $orderId]);
+  if ($ex->fetch()) {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'A refund for this order is already in progress.']);
+  }
+
+  $id = nextId($pdo, 'refund', 'refundId', 'REF');
+  $pdo->prepare(
+    "INSERT INTO refund (refundId, orderId, customerId, refundReason, refundAmount, refundStatus, requestDate, refundProof)
+     VALUES (:id, :oid, :cid, :reason, :amt, 'Pending', NOW(), :proof)"
+  )->execute([
+    'id' => $id, 'oid' => $orderId, 'cid' => $customerId,
+    'reason' => $reason, 'amt' => $amount, 'proof' => $proof !== '' ? $proof : null,
+  ]);
+
+  sendJson(201, true, ['refundId' => $id, 'orderId' => $orderId, 'refundAmount' => $amount, 'refundStatus' => 'Pending']);
+}
+
+// GET /refunds — the customer's own refund requests + status.
+function handleListCustomerRefunds(PDO $pdo, array $auth): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $stmt = $pdo->prepare(
+    "SELECT r.refundId, r.orderId, r.refundReason, r.refundAmount, r.refundStatus,
+            r.requestDate, r.refundProof, o.orderTotalAmount
+       FROM refund r
+       JOIN `order` o ON o.orderId = r.orderId
+      WHERE r.customerId = :cid
+      ORDER BY FIELD(r.refundStatus, 'Pending','Approved','Rejected','Completed'), r.requestDate DESC"
+  );
+  $stmt->execute(['cid' => $customerId]);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as &$r) {
+    $r['refundAmount']     = (float) $r['refundAmount'];
+    $r['orderTotalAmount'] = (float) $r['orderTotalAmount'];
+  }
+  unset($r);
+  sendJson(200, true, ['refunds' => $rows]);
+}

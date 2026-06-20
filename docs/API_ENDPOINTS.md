@@ -374,7 +374,8 @@ updates (Section 11) drive the later stages.
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| POST  | `/orders/{orderId}/refund` | Customer(Owner) | Request refund. Body: `{ "refundReason": "...", "refundAmount": 120.00, "refundProof": "https://.../proof.jpg" }`. |
+| POST  | `/orders/{orderId}/refund` | Customer(Owner) | **(Implemented)** Request a refund on a **paid** order. Body: `{ refundReason, refundAmount?, refundProof? }` (amount defaults to the order total; must be ≤ it). 409 if one is already in progress. Creates a `Pending` refund → admin queue + supplier views. |
+| GET   | `/refunds` | Customer | **(Implemented)** The customer's own refund requests + status. |
 | GET   | `/admin/refunds` | Admin | **(Implemented)** All refund requests (Pending first); optional `?status=`. |
 | GET   | `/supplier/refunds` | Supplier | **(Implemented)** Refunds on orders containing the supplier's products (read-only, no customer PII); optional `?status=`. |
 | PATCH | `/admin/refunds/{refundId}/status` | Admin | **(Implemented)** Transitions: `Pending`→`Approved`/`Rejected`, `Approved`→`Completed`. On `Completed` → payment becomes `Refunded`. |

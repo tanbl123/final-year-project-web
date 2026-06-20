@@ -149,6 +149,19 @@ if ($method === 'DELETE' && preg_match('#^/reviews/([^/]+)$#', $path, $m)) {
   handleDeleteReview($pdo, $auth, $m[1]);
 }
 
+// ── customer refund requests (require a Customer token) ──
+if ($method === 'POST' && preg_match('#^/orders/([^/]+)/refund$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCreateRefund($pdo, $auth, $m[1]);
+}
+
+if ($method === 'GET' && $path === '/refunds') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleListCustomerRefunds($pdo, $auth);
+}
+
 // ── customer wishlist (require a Customer token) ──
 if ($method === 'GET' && $path === '/wishlist') {
   $auth = requireAuth($secret);
