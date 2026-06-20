@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { register, uploadRegistrationDoc, checkUsername } from '../authService';
+import { register, sendRegisterCode, uploadRegistrationDoc, checkUsername } from '../authService';
 import EyeIcon from '../../../components/EyeIcon';
 import ClearableInput from '../../../components/ClearableInput';
 
@@ -112,6 +112,24 @@ function RegisterPage() {
   const [licenseName, setLicenseName] = useState('');   // uploaded document filename
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
+  // ── email verification (step 2) ──
+  // The form no longer registers directly: first we email a 6-digit code, then
+  // the supplier enters it here and the account is only then created.
+  const [step, setStep] = useState('form');        // 'form' → 'verify'
+  const [code, setCode] = useState('');            // the 6 digits typed in
+  const [codeError, setCodeError] = useState('');  // error shown on the verify screen
+  const [resendInfo, setResendInfo] = useState(''); // "a new code has been sent"
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendIn, setResendIn] = useState(0);     // resend cooldown countdown (s)
+
+  // tick the resend cooldown down to zero
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
   async function handleLicenseFile(event) {
     const file = event.target.files[0];
     event.target.value = '';              // let the same file be re-picked later
@@ -216,6 +234,23 @@ function RegisterPage() {
     return () => clearTimeout(timer);
   }, [form.username]);
 
+  // everything the register endpoint needs (not the confirm field, no code)
+  function buildPayload() {
+    return {
+      username: form.username.trim(),
+      email: form.email.trim(),
+      phoneNumber: form.phoneNumber.trim(),
+      companyName: form.companyName.trim(),
+      companyAddress: form.companyAddress.trim(),
+      businessRegNo: form.businessRegNo.trim(),
+      businessLicenseUrl: form.businessLicenseUrl,
+      taxNumber: form.taxNumber.trim(),
+      password: form.password,
+    };
+  }
+
+  // Step 1 → validate the whole form, then email a verification code and move
+  // to the verify screen. The account is NOT created yet.
   async function handleSubmit(event) {
     event.preventDefault();   // AJAX submit — no page reload
     setFormError('');
@@ -233,27 +268,67 @@ function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      // send everything the backend needs (not the confirm field)
-      await register({
-        username: form.username.trim(),
-        email: form.email.trim(),
-        phoneNumber: form.phoneNumber.trim(),
-        companyName: form.companyName.trim(),
-        companyAddress: form.companyAddress.trim(),
-        businessRegNo: form.businessRegNo.trim(),
-        businessLicenseUrl: form.businessLicenseUrl,
-        taxNumber: form.taxNumber.trim(),
-        password: form.password,
-      });
-      setDone(true);   // success → show pending-approval message
+      await sendRegisterCode(form.email.trim());
+      setCode('');
+      setCodeError('');
+      setResendInfo('');
+      setStep('verify');
+      setResendIn(60);   // mirror the backend's 60s resend cooldown
     } catch (err) {
-      // map known duplicate errors back onto the offending field
+      // an already-registered email is the only field-specific error here
       const msg = err.message || 'Something went wrong. Please try again.';
-      if (/username/i.test(msg)) setErrors({ username: msg });
-      else if (/email/i.test(msg)) setErrors({ email: msg });
+      if (/email/i.test(msg)) setErrors({ email: msg });
       else setFormError(msg);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  // Step 2 → submit the code together with the form; the backend verifies the
+  // code and only then creates the Pending account.
+  async function handleVerify(event) {
+    event.preventDefault();
+    setCodeError('');
+    if (!/^\d{6}$/.test(code.trim())) {
+      setCodeError('Enter the 6-digit code from your email.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      await register({ ...buildPayload(), verificationCode: code.trim() });
+      setDone(true);   // success → show pending-approval message
+    } catch (err) {
+      const msg = err.message || 'Something went wrong. Please try again.';
+      // a form-level clash (someone took the username/email since step 1) sends
+      // them back to fix it; everything else is a code problem shown in place
+      if (/username/i.test(msg)) {
+        setErrors({ username: msg });
+        setStep('form');
+      } else if (/already registered/i.test(msg)) {
+        setErrors({ email: msg });
+        setStep('form');
+      } else {
+        setCodeError(msg);
+      }
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  // Resend a fresh code (respecting the cooldown).
+  async function handleResend() {
+    if (resendIn > 0 || resending) return;
+    setCodeError('');
+    setResendInfo('');
+    setResending(true);
+    try {
+      await sendRegisterCode(form.email.trim());
+      setResendIn(60);
+      setResendInfo('A new code has been sent to your email.');
+    } catch (err) {
+      setCodeError(err.message || 'Could not resend the code. Please try again.');
+    } finally {
+      setResending(false);
     }
   }
 
@@ -268,6 +343,54 @@ function RegisterPage() {
           able to log in once an admin approves it.
         </p>
         <Link to="/login" className="btn btn-primary mt-2">Back to Login</Link>
+      </div>
+    );
+  }
+
+  // step 2: the supplier entered valid details and we emailed a 6-digit code.
+  // The account is created only when they enter that code here.
+  if (step === 'verify') {
+    return (
+      <div className="container py-5" style={{ maxWidth: '480px' }}>
+        <h1 className="mb-3 text-center">📧 Verify your email</h1>
+        <form onSubmit={handleVerify} className="card card-body shadow-sm" noValidate>
+          <p className="text-muted">
+            We've sent a 6-digit code to <strong>{form.email.trim()}</strong>. Enter it
+            below to finish creating your account.
+          </p>
+          {codeError && <div className="alert alert-danger py-2">{codeError}</div>}
+          {resendInfo && <div className="alert alert-success py-2">{resendInfo}</div>}
+
+          <div className="mb-3">
+            <label className="form-label">Verification code</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              autoFocus
+              className={`form-control text-center ${codeError ? 'is-invalid' : ''}`}
+              style={{ letterSpacing: '0.5em', fontSize: '1.4rem' }}
+              value={code}
+              onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setCodeError(''); }}
+            />
+          </div>
+
+          <button type="submit" className="btn btn-primary w-100 text-center" disabled={verifying || code.length !== 6}>
+            {verifying ? 'Verifying…' : 'Verify & complete registration'}
+          </button>
+
+          <div className="d-flex justify-content-between align-items-center mt-3">
+            <button type="button" className="btn btn-link p-0"
+              onClick={() => { setStep('form'); setCodeError(''); setResendInfo(''); }}>
+              ← Edit details
+            </button>
+            <button type="button" className="btn btn-link p-0"
+              onClick={handleResend} disabled={resendIn > 0 || resending}>
+              {resending ? 'Sending…' : resendIn > 0 ? `Resend code (${resendIn}s)` : 'Resend code'}
+            </button>
+          </div>
+        </form>
       </div>
     );
   }
@@ -418,7 +541,7 @@ function RegisterPage() {
         {passwordField('confirm', 'Confirm password')}
 
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting || uploadingDoc}>
-          {isSubmitting ? 'Registering...' : 'Register'}
+          {isSubmitting ? 'Sending code...' : 'Continue'}
         </button>
       </form>
       <p className="text-center mt-3">

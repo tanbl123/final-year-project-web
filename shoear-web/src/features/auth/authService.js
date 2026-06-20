@@ -13,7 +13,15 @@ export function logout() {
   localStorage.removeItem('user');
 }
 
+// Email a 6-digit verification code to the address being registered
+// (POST /auth/register/send-code). Must succeed before register() will work.
+// Resolves with a { message } on success.
+export function sendRegisterCode(email) {
+  return apiPost('/auth/register/send-code', { email });
+}
+
 // REAL supplier registration (POST /auth/register).
+// Requires the verification code emailed by sendRegisterCode().
 // Creates a Pending account; resolves with a { message } on success.
 export function register(data) {
   return apiPost('/auth/register', data);

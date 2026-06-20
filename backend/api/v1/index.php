@@ -7,6 +7,7 @@ require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
 require __DIR__ . '/../../lib/storage.php';
 require __DIR__ . '/../../lib/stripe.php';
+require __DIR__ . '/../../lib/mail.php';
 require __DIR__ . '/../../lib/delivery.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
@@ -227,6 +228,12 @@ if ($method === 'GET' && $path === '/catalog/products') {
 if ($method === 'GET' && preg_match('#^/catalog/products/([^/]+)$#', $path, $m)) {
   $pdo = getPDO();
   handleGetCatalogProduct($pdo, $m[1]);
+}
+
+// email a verification code before the account is created (public)
+if ($method === 'POST' && $path === '/auth/register/send-code') {
+  $pdo = getPDO();
+  handleSendRegisterCode($pdo, $config);
 }
 
 if ($method === 'POST' && $path === '/auth/register') {

@@ -76,7 +76,8 @@ List responses include paging info:
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| POST | `/auth/register` | Public | Register. Customer → `Active` immediately. Supplier/Delivery → `Pending` (await admin). |
+| POST | `/auth/register/send-code` | Public | **(Implemented)** Email a 6-digit verification code to a supplier's address before the account is created. Requires SMTP configured. |
+| POST | `/auth/register` | Public | **(Implemented, supplier)** Register. Supplier → `Pending` (await admin); requires a valid `verificationCode`. Customer/Delivery register on their mobile apps. |
 | POST | `/auth/login` | Public | Returns JWT + role + basic profile. |
 | POST | `/auth/logout` | Any | Client-side token discard (and optional server token blacklist). |
 | GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). |
@@ -100,6 +101,15 @@ For `"role": "Supplier"` send `companyName`, `companyAddress`,
 `"role": "DeliveryPersonnel"` send `vehicleInfo`. Server hashes the password
 (bcrypt/argon2) before storing — never stores plain text. Bank/payout details
 are NOT collected here — suppliers add them later via Stripe Connect.
+
+**Email verification (supplier sign-up).** The supplier portal is a two-step
+flow: `POST /auth/register/send-code { email }` emails a 6-digit code (10-min
+expiry, 60s resend cooldown, max 5 wrong guesses), then `POST /auth/register`
+must include that `verificationCode`. The account (`user` + `supplier`) is only
+created once the code checks out; only a hash of the code is ever stored, in the
+`email_verification` table. SMTP is configured in `backend/config.local.php`
+(see `config.local.example.php`); with no SMTP, `send-code` returns
+`MAIL_NOT_CONFIGURED`.
 
 The supplier's `businessLicenseUrl` comes from first uploading the document:
 

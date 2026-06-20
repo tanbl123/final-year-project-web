@@ -25,6 +25,20 @@ $config = [
 
   // Where Stripe sends the supplier back after hosted onboarding.
   'app_url' => getenv('APP_URL') ?: 'http://localhost:5173',
+
+  // SMTP — used to email supplier registration verification codes. Keep the
+  // password OUT of git: set these in config.local.php (see the example file).
+  // For Gmail: host smtp.gmail.com, port 587, secure 'tls', username your
+  // address, password a 16-char App Password (not your normal password).
+  'smtp' => [
+    'host'      => getenv('SMTP_HOST')      ?: '',
+    'port'      => getenv('SMTP_PORT')      ?: 587,
+    'secure'    => getenv('SMTP_SECURE')    ?: 'tls',   // 'tls' (587) or 'ssl' (465)
+    'username'  => getenv('SMTP_USERNAME')  ?: '',
+    'password'  => getenv('SMTP_PASSWORD')  ?: '',
+    'from'      => getenv('SMTP_FROM')      ?: (getenv('SMTP_USERNAME') ?: ''),
+    'from_name' => getenv('SMTP_FROM_NAME') ?: 'ShoeAR',
+  ],
 ];
 
 // Local, gitignored overrides (real secrets live here on each machine).

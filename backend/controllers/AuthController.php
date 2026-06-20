@@ -67,11 +67,75 @@ function handleUsernameAvailable(PDO $pdo): void {
   sendJson(200, true, ['available' => true]);
 }
 
+// Email-verification tuning (shared by send-code and register).
+const VERIFY_CODE_TTL_MIN  = 10;   // a code is valid for 10 minutes
+const VERIFY_RESEND_SECS   = 60;   // min gap between sends to one email
+const VERIFY_MAX_ATTEMPTS  = 5;    // wrong-code guesses before the code is burned
+
+// POST /auth/register/send-code — email a 6-digit verification code to the
+// address a supplier is registering with. The account is NOT created here; it's
+// created by /auth/register once the supplier enters this code. One pending
+// code per email (a new request overwrites the previous one).
+function handleSendRegisterCode(PDO $pdo, array $config): void {
+  $body  = getJsonBody();
+  $email = trim($body['email'] ?? '');
+
+  if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
+  }
+
+  // don't send a code for an address that already has an account
+  $chk = $pdo->prepare('SELECT 1 FROM `user` WHERE email = :e');
+  $chk->execute(['e' => $email]);
+  if ($chk->fetch()) {
+    sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That email is already registered.']);
+  }
+
+  // SMTP must be configured — there's no other way to deliver the code
+  if (!mailConfigured($config)) {
+    sendJson(503, false, null, ['code' => 'MAIL_NOT_CONFIGURED',
+      'message' => 'Email sending is not configured on the server. Please contact the administrator.']);
+  }
+
+  // resend cooldown: don't let someone hammer the send button (or our SMTP)
+  $cool = $pdo->prepare('SELECT TIMESTAMPDIFF(SECOND, last_sent_at, NOW()) AS secs
+                           FROM email_verification WHERE email = :e');
+  $cool->execute(['e' => $email]);
+  $existing = $cool->fetch();
+  if ($existing && $existing['secs'] !== null && (int) $existing['secs'] < VERIFY_RESEND_SECS) {
+    $wait = VERIFY_RESEND_SECS - (int) $existing['secs'];
+    sendJson(429, false, null, ['code' => 'COOLDOWN',
+      'message' => "Please wait {$wait}s before requesting another code."]);
+  }
+
+  // generate the code, store only its hash, reset the attempt counter + expiry
+  $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+  $hash = password_hash($code, PASSWORD_BCRYPT);
+  $pdo->prepare(
+    'INSERT INTO email_verification (email, codeHash, attempts, expires_at, last_sent_at)
+       VALUES (:e, :h, 0, DATE_ADD(NOW(), INTERVAL ' . VERIFY_CODE_TTL_MIN . ' MINUTE), NOW())
+     ON DUPLICATE KEY UPDATE
+       codeHash = VALUES(codeHash), attempts = 0,
+       expires_at = VALUES(expires_at), last_sent_at = VALUES(last_sent_at)'
+  )->execute(['e' => $email, 'h' => $hash]);
+
+  try {
+    sendVerificationCodeEmail($config, $email, $code, VERIFY_CODE_TTL_MIN);
+  } catch (Throwable $ex) {
+    sendJson(502, false, null, ['code' => 'MAIL_FAILED',
+      'message' => 'Could not send the verification email. Please check the address and try again.']);
+  }
+
+  sendJson(200, true, ['message' => 'A 6-digit verification code has been sent to your email.']);
+}
+
 // POST /auth/register — create a new SUPPLIER account (status Pending,
 // awaiting admin approval). Creates a `user` row + a `supplier` row together.
+// Requires a valid verification code emailed via /auth/register/send-code.
 function handleRegister(PDO $pdo): void {
-  $body           = getJsonBody();
-  $email          = trim($body['email'] ?? '');
+  $body             = getJsonBody();
+  $email            = trim($body['email'] ?? '');
+  $verificationCode = trim($body['verificationCode'] ?? '');
   $phoneNumber    = trim($body['phoneNumber'] ?? '');
   $companyName    = trim($body['companyName'] ?? '');
   $companyAddress = trim($body['companyAddress'] ?? '');
@@ -135,6 +199,36 @@ function handleRegister(PDO $pdo): void {
     }
   }
 
+  // ── email ownership: require a valid, unexpired verification code ──
+  // Checked last (after the cheap form validation) so a form typo never burns
+  // a code-guess attempt. The code was emailed via /auth/register/send-code.
+  if ($verificationCode === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A verification code is required.']);
+  }
+  $vstmt = $pdo->prepare('SELECT codeHash, attempts, (expires_at < NOW()) AS expired
+                            FROM email_verification WHERE email = :e');
+  $vstmt->execute(['e' => $email]);
+  $vrow = $vstmt->fetch();
+  if (!$vrow) {
+    sendJson(400, false, null, ['code' => 'NO_CODE',
+      'message' => 'Please request a verification code for this email first.']);
+  }
+  if ((int) $vrow['attempts'] >= VERIFY_MAX_ATTEMPTS) {
+    $pdo->prepare('DELETE FROM email_verification WHERE email = :e')->execute(['e' => $email]);
+    sendJson(429, false, null, ['code' => 'TOO_MANY',
+      'message' => 'Too many incorrect attempts. Please request a new code.']);
+  }
+  if ((int) $vrow['expired'] === 1) {
+    sendJson(400, false, null, ['code' => 'CODE_EXPIRED',
+      'message' => 'Your verification code has expired. Please request a new one.']);
+  }
+  if (!password_verify($verificationCode, $vrow['codeHash'])) {
+    $pdo->prepare('UPDATE email_verification SET attempts = attempts + 1 WHERE email = :e')->execute(['e' => $email]);
+    $left = VERIFY_MAX_ATTEMPTS - ((int) $vrow['attempts'] + 1);
+    $msg  = $left > 0 ? "Incorrect code. $left attempt(s) left." : 'Incorrect code. Please request a new one.';
+    sendJson(400, false, null, ['code' => 'BAD_CODE', 'message' => $msg]);
+  }
+
   // create user + supplier together (roll back if either fails)
   $pdo->beginTransaction();
   try {
@@ -165,6 +259,9 @@ function handleRegister(PDO $pdo): void {
     $pdo->rollBack();
     sendJson(500, false, null, ['code' => 'SERVER', 'message' => 'Could not create the account. Please try again.']);
   }
+
+  // code consumed — clear it so it can't be replayed
+  $pdo->prepare('DELETE FROM email_verification WHERE email = :e')->execute(['e' => $email]);
 
   sendJson(201, true, ['message' => 'Registration submitted. Your account is pending admin approval.']);
 }

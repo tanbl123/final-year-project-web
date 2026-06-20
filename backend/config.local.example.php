@@ -18,4 +18,19 @@ return [
   // each supplier (only needed if Stripe rejects the built-in default for your
   // country — see Stripe's "test bank account numbers" docs).
   // 'demo_bank' => ['routing_number' => '110000000', 'account_number' => '000123456789'],
+
+  // SMTP — required to email supplier registration verification codes.
+  // GMAIL SETUP: 1) turn on 2-Step Verification on your Google account,
+  // 2) go to Google Account → Security → App passwords, generate one for
+  // "Mail", 3) paste the 16-character password below (spaces don't matter).
+  // Use your Gmail address for both 'username' and 'from'.
+  'smtp' => [
+    'host'      => 'smtp.gmail.com',
+    'port'      => 587,
+    'secure'    => 'tls',                 // 'tls' for port 587, or 'ssl' for 465
+    'username'  => 'you@gmail.com',
+    'password'  => 'your-16-char-app-password',
+    'from'      => 'you@gmail.com',
+    'from_name' => 'ShoeAR',
+  ],
 ];
