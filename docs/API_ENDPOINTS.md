@@ -356,9 +356,9 @@ updates (Section 11) drive the later stages.
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
 | GET    | `/products/{productId}/reviews` | Public | List published reviews for a product. |
-| POST   | `/products/{productId}/reviews` | Customer | Leave a review. Body: `{ "ratingScore": 5, "reviewComment": "..." }`. |
-| PUT    | `/reviews/{reviewId}` | Customer(Owner) | Edit own review. |
-| DELETE | `/reviews/{reviewId}` | Customer(Owner)/Admin | Remove own review. |
+| POST   | `/products/{productId}/reviews` | Customer | **(Implemented)** Leave a review. Body: `{ "ratingScore": 5, "reviewComment": "..." }`. **Only if the customer purchased the product** (403 otherwise); one review per product (409 if a duplicate). |
+| PUT    | `/reviews/{reviewId}` | Customer(Owner) | **(Implemented)** Edit own review (rating/comment). |
+| DELETE | `/reviews/{reviewId}` | Customer(Owner) | **(Implemented)** Delete own review (its supplier reply goes with it). |
 | GET    | `/products/{productId}` | Supplier(Owner) | **(Implemented)** Product detail embeds `reviews` (incl. any `supplierReply`) + `ratingAverage`/`ratingCount`, so a supplier sees a product's reviews on its own page. |
 | PUT    | `/supplier/reviews/{reviewId}/reply` | Supplier(Owner) | **(Implemented)** Add/edit the supplier's public reply (one per review; only on a Published review on their product). Cannot touch the customer's review text. |
 | DELETE | `/supplier/reviews/{reviewId}/reply` | Supplier(Owner) | **(Implemented)** Delete the supplier's own reply. |

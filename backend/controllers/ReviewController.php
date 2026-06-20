@@ -114,3 +114,98 @@ function handleDeleteReviewReply(PDO $pdo, array $auth, string $reviewId): void 
       ->execute(['id' => $reviewId]);
   sendJson(200, true, ['reviewId' => $reviewId, 'deleted' => true]);
 }
+
+// ── Customer reviews (create / edit / delete your OWN review) ─────────────────
+// Business rule (proposal): a customer may only review a product they have
+// actually purchased (an order of theirs, past payment, contains that product).
+// One review per customer per product (enforced by a unique key).
+
+const PURCHASED_STATUSES = "'Paid','Processing','Shipped','OutForDelivery','Delivered','Completed'";
+
+function customerHasPurchased(PDO $pdo, string $customerId, string $productId): bool {
+  $stmt = $pdo->prepare(
+    "SELECT 1
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN `order` o          ON o.orderId = oi.orderId
+      WHERE pv.productId = :pid AND o.customerId = :cid
+        AND o.orderStatus IN (" . PURCHASED_STATUSES . ")
+      LIMIT 1"
+  );
+  $stmt->execute(['pid' => $productId, 'cid' => $customerId]);
+  return (bool) $stmt->fetch();
+}
+
+// Validate a rating (1–5) + optional comment, or 400.
+function validatedReviewInput(): array {
+  $body   = getJsonBody();
+  $rating = filter_var($body['ratingScore'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 5]]);
+  $comment = trim($body['reviewComment'] ?? '');
+  if ($rating === false) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Rating must be a whole number from 1 to 5.']);
+  }
+  if (mb_strlen($comment) > 1000) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Comment is too long (max 1000 characters).']);
+  }
+  return [$rating, $comment !== '' ? $comment : null];
+}
+
+// POST /products/{productId}/reviews — leave a review for a purchased product.
+function handleCreateReview(PDO $pdo, array $auth, string $productId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  [$rating, $comment] = validatedReviewInput();
+
+  $p = $pdo->prepare("SELECT 1 FROM product WHERE productId = :id AND productStatus = 'Approved'");
+  $p->execute(['id' => $productId]);
+  if (!$p->fetch()) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Product not available.']);
+  }
+
+  if (!customerHasPurchased($pdo, $customerId, $productId)) {
+    sendJson(403, false, null, ['code' => 'NOT_PURCHASED', 'message' => 'You can only review products you have purchased.']);
+  }
+
+  $ex = $pdo->prepare('SELECT 1 FROM review WHERE customerId = :cid AND productId = :pid');
+  $ex->execute(['cid' => $customerId, 'pid' => $productId]);
+  if ($ex->fetch()) {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'You have already reviewed this product — edit your review instead.']);
+  }
+
+  $id = nextId($pdo, 'review', 'reviewId', 'REV');
+  $pdo->prepare(
+    "INSERT INTO review (reviewId, customerId, productId, ratingScore, reviewComment, reviewDate, reviewStatus)
+     VALUES (:id, :cid, :pid, :rating, :comment, NOW(), 'Published')"
+  )->execute(['id' => $id, 'cid' => $customerId, 'pid' => $productId, 'rating' => $rating, 'comment' => $comment]);
+
+  sendJson(201, true, ['reviewId' => $id, 'productId' => $productId, 'ratingScore' => $rating, 'reviewComment' => $comment]);
+}
+
+// PUT /reviews/{reviewId} — edit your own review.
+function handleUpdateReview(PDO $pdo, array $auth, string $reviewId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  [$rating, $comment] = validatedReviewInput();
+
+  $stmt = $pdo->prepare('SELECT 1 FROM review WHERE reviewId = :id AND customerId = :cid');
+  $stmt->execute(['id' => $reviewId, 'cid' => $customerId]);
+  if (!$stmt->fetch()) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Review not found.']);
+  }
+
+  // status is left as-is (an admin-removed review stays removed)
+  $pdo->prepare('UPDATE review SET ratingScore = :rating, reviewComment = :comment, reviewDate = NOW() WHERE reviewId = :id')
+      ->execute(['rating' => $rating, 'comment' => $comment, 'id' => $reviewId]);
+
+  sendJson(200, true, ['reviewId' => $reviewId, 'ratingScore' => $rating, 'reviewComment' => $comment]);
+}
+
+// DELETE /reviews/{reviewId} — delete your own review (its supplier reply, being
+// on the same row, goes with it — no orphan).
+function handleDeleteReview(PDO $pdo, array $auth, string $reviewId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $del = $pdo->prepare('DELETE FROM review WHERE reviewId = :id AND customerId = :cid');
+  $del->execute(['id' => $reviewId, 'cid' => $customerId]);
+  if ($del->rowCount() === 0) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Review not found.']);
+  }
+  sendJson(200, true, ['reviewId' => $reviewId, 'deleted' => true]);
+}

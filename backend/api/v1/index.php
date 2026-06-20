@@ -130,6 +130,25 @@ if ($method === 'GET' && preg_match('#^/orders/([^/]+)/receipt$#', $path, $m)) {
   handleGetReceipt($pdo, $auth, $m[1]);
 }
 
+// ── customer reviews (create on a purchased product; edit/delete your own) ──
+if ($method === 'POST' && preg_match('#^/products/([^/]+)/reviews$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCreateReview($pdo, $auth, $m[1]);
+}
+
+if ($method === 'PUT' && preg_match('#^/reviews/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUpdateReview($pdo, $auth, $m[1]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/reviews/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleDeleteReview($pdo, $auth, $m[1]);
+}
+
 // ── customer wishlist (require a Customer token) ──
 if ($method === 'GET' && $path === '/wishlist') {
   $auth = requireAuth($secret);
