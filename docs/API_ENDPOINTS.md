@@ -264,9 +264,9 @@ and also writes in one transaction. Two behaviours:
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| GET    | `/wishlist` | Customer | Current customer's wishlist + items. |
-| POST   | `/wishlist/items` | Customer | Add a **product**. Body: `{ "productId": "PRD0001" }`. |
-| DELETE | `/wishlist/items/{wishlistItemId}` | Customer(Owner) | Remove an item. |
+| GET    | `/wishlist` | Customer | **(Implemented)** Wishlist + saved products (each with an `available` flag). |
+| POST   | `/wishlist/items` | Customer | **(Implemented)** Save a **product**. Body: `{ "productId": "PRD0001" }`. Idempotent. |
+| DELETE | `/wishlist/items/{productId}` | Customer(Owner) | **(Implemented)** Remove by product (the heart-toggle). |
 
 > Wishlist references `productId` (you wishlist a product, not a size) — matches schema.
 

@@ -23,6 +23,7 @@ require __DIR__ . '/../../controllers/RefundController.php';
 require __DIR__ . '/../../controllers/CommissionController.php';
 require __DIR__ . '/../../controllers/CatalogController.php';
 require __DIR__ . '/../../controllers/CartController.php';
+require __DIR__ . '/../../controllers/WishlistController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -94,6 +95,25 @@ if ($method === 'DELETE' && preg_match('#^/cart/items/([^/]+)$#', $path, $m)) {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleRemoveCartItem($pdo, $auth, $m[1]);
+}
+
+// ── customer wishlist (require a Customer token) ──
+if ($method === 'GET' && $path === '/wishlist') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetWishlist($pdo, $auth);
+}
+
+if ($method === 'POST' && $path === '/wishlist/items') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleAddWishlistItem($pdo, $auth);
+}
+
+if ($method === 'DELETE' && preg_match('#^/wishlist/items/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRemoveWishlistItem($pdo, $auth, $m[1]);
 }
 
 // ── public catalog (customer app browsing; guests allowed — no token) ──
