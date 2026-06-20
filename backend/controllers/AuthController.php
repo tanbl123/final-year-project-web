@@ -423,3 +423,118 @@ function handleChangePassword(PDO $pdo, array $auth): void {
 
   sendJson(200, true, ['message' => 'Password changed.']);
 }
+
+// POST /auth/forgot-password — start the "forgot password" flow. Emails a
+// 6-digit reset code to the address IF it belongs to an account. The response
+// is always the same generic success, so it never reveals whether an email is
+// registered (prevents account enumeration). The code is finished at
+// /auth/reset-password.
+function handleForgotPassword(PDO $pdo, array $config): void {
+  $body  = getJsonBody();
+  $email = trim($body['email'] ?? '');
+
+  if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
+  }
+
+  // SMTP must be configured — there's no other way to deliver the code. This is
+  // a server-level fact (not account-specific), so it's safe to surface.
+  if (!mailConfigured($config)) {
+    sendJson(503, false, null, ['code' => 'MAIL_NOT_CONFIGURED',
+      'message' => 'Email sending is not configured on the server. Please contact the administrator.']);
+  }
+
+  // the one and only response when the email is well-formed — same whether or
+  // not an account exists, so attackers can't probe which emails are registered
+  $generic = ['message' => 'If an account exists for that email, a reset code has been sent.'];
+
+  $stmt = $pdo->prepare('SELECT userId FROM `user` WHERE email = :e');
+  $stmt->execute(['e' => $email]);
+  if (!$stmt->fetch()) {
+    sendJson(200, true, $generic);
+  }
+
+  // resend cooldown — silently honour it (the previously sent code still works)
+  $cool = $pdo->prepare('SELECT TIMESTAMPDIFF(SECOND, last_sent_at, NOW()) AS secs
+                           FROM password_reset WHERE email = :e');
+  $cool->execute(['e' => $email]);
+  $existing = $cool->fetch();
+  if ($existing && $existing['secs'] !== null && (int) $existing['secs'] < VERIFY_RESEND_SECS) {
+    sendJson(200, true, $generic);
+  }
+
+  $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+  $hash = password_hash($code, PASSWORD_BCRYPT);
+  $pdo->prepare(
+    'INSERT INTO password_reset (email, codeHash, attempts, expires_at, last_sent_at)
+       VALUES (:e, :h, 0, DATE_ADD(NOW(), INTERVAL ' . VERIFY_CODE_TTL_MIN . ' MINUTE), NOW())
+     ON DUPLICATE KEY UPDATE
+       codeHash = VALUES(codeHash), attempts = 0,
+       expires_at = VALUES(expires_at), last_sent_at = VALUES(last_sent_at)'
+  )->execute(['e' => $email, 'h' => $hash]);
+
+  try {
+    sendPasswordResetCodeEmail($config, $email, $code, VERIFY_CODE_TTL_MIN);
+  } catch (Throwable $ex) {
+    sendJson(502, false, null, ['code' => 'MAIL_FAILED',
+      'message' => 'Could not send the reset email. Please try again.']);
+  }
+
+  sendJson(200, true, $generic);
+}
+
+// POST /auth/reset-password — finish the flow: verify the emailed code for the
+// address, then set a new password. Body: { email, code, newPassword }.
+function handleResetPassword(PDO $pdo): void {
+  $body  = getJsonBody();
+  $email = trim($body['email'] ?? '');
+  $code  = trim($body['code'] ?? '');
+  $new   = (string) ($body['newPassword'] ?? '');
+
+  if ($email === '' || $code === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Email and code are required.']);
+  }
+
+  $vstmt = $pdo->prepare('SELECT codeHash, attempts, (expires_at < NOW()) AS expired
+                            FROM password_reset WHERE email = :e');
+  $vstmt->execute(['e' => $email]);
+  $vrow = $vstmt->fetch();
+  if (!$vrow) {
+    sendJson(400, false, null, ['code' => 'NO_CODE',
+      'message' => 'Please request a password reset code first.']);
+  }
+  if ((int) $vrow['attempts'] >= VERIFY_MAX_ATTEMPTS) {
+    $pdo->prepare('DELETE FROM password_reset WHERE email = :e')->execute(['e' => $email]);
+    sendJson(429, false, null, ['code' => 'TOO_MANY',
+      'message' => 'Too many incorrect attempts. Please request a new code.']);
+  }
+  if ((int) $vrow['expired'] === 1) {
+    sendJson(400, false, null, ['code' => 'CODE_EXPIRED',
+      'message' => 'Your reset code has expired. Please request a new one.']);
+  }
+  if (!password_verify($code, $vrow['codeHash'])) {
+    $pdo->prepare('UPDATE password_reset SET attempts = attempts + 1 WHERE email = :e')->execute(['e' => $email]);
+    $left = VERIFY_MAX_ATTEMPTS - ((int) $vrow['attempts'] + 1);
+    $msg  = $left > 0 ? "Incorrect code. $left attempt(s) left." : 'Incorrect code. Please request a new one.';
+    sendJson(400, false, null, ['code' => 'BAD_CODE', 'message' => $msg]);
+  }
+
+  // code checks out — now the new password must satisfy the policy
+  $pwErr = passwordPolicyError($new);
+  if ($pwErr) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $pwErr]);
+  }
+
+  $hash = password_hash($new, PASSWORD_BCRYPT);
+  $upd  = $pdo->prepare('UPDATE `user` SET password = :p WHERE email = :e');
+  $upd->execute(['p' => $hash, 'e' => $email]);
+  if ($upd->rowCount() === 0) {
+    // account vanished mid-flow (very unlikely) — clear the code and bail
+    $pdo->prepare('DELETE FROM password_reset WHERE email = :e')->execute(['e' => $email]);
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Account not found.']);
+  }
+
+  // code consumed — clear it so it can't be replayed
+  $pdo->prepare('DELETE FROM password_reset WHERE email = :e')->execute(['e' => $email]);
+  sendJson(200, true, ['message' => 'Your password has been reset. You can now log in.']);
+}

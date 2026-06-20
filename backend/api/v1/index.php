@@ -246,6 +246,17 @@ if ($method === 'POST' && $path === '/auth/login') {
   handleLogin($pdo, $secret);
 }
 
+// forgot-password: email a reset code, then reset with that code (both public)
+if ($method === 'POST' && $path === '/auth/forgot-password') {
+  $pdo = getPDO();
+  handleForgotPassword($pdo, $config);
+}
+
+if ($method === 'POST' && $path === '/auth/reset-password') {
+  $pdo = getPDO();
+  handleResetPassword($pdo);
+}
+
 // live username availability for the sign-up / profile forms (public)
 if ($method === 'GET' && $path === '/auth/username-available') {
   $pdo = getPDO();

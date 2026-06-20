@@ -476,6 +476,21 @@ CREATE TABLE email_verification (
     PRIMARY KEY (email)
 ) ENGINE=InnoDB;
 
+-- Password-reset codes ("forgot password" flow). Same shape as
+-- email_verification but kept separate so a reset code and a sign-up code for
+-- the same address never collide. A user requests a code (emailed to their
+-- registered address) then enters it with a new password. Only a HASH of the
+-- code is stored. See migrations/2026_06_20_password_reset.sql.
+CREATE TABLE password_reset (
+    email        VARCHAR(120) NOT NULL,                 -- the account's email
+    codeHash     VARCHAR(255) NOT NULL,                 -- bcrypt hash of the 6-digit code
+    attempts     INT          NOT NULL DEFAULT 0,       -- failed verify attempts (cap at 5)
+    expires_at   DATETIME     NOT NULL,                 -- code is invalid after this
+    last_sent_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP, -- for the resend cooldown
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (email)
+) ENGINE=InnoDB;
+
 -- =====================================================================
 --  END OF SCHEMA
 -- =====================================================================

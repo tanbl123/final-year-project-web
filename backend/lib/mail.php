@@ -150,3 +150,23 @@ function sendVerificationCodeEmail(array $config, string $toEmail, string $code,
     '</div>';
   sendMail($config, $toEmail, '', $subject, $text, $html);
 }
+
+// Compose + send the "forgot password" reset-code email.
+function sendPasswordResetCodeEmail(array $config, string $toEmail, string $code, int $ttlMinutes): void {
+  $subject = 'Your ShoeAR password reset code';
+  $text =
+    "We received a request to reset your ShoeAR password.\n\n" .
+    "Your password reset code is: $code\n\n" .
+    "Enter this code to choose a new password. It expires in $ttlMinutes minutes.\n\n" .
+    "If you didn't request this, you can ignore this email — your password won't change.";
+  $safeCode = htmlspecialchars($code, ENT_QUOTES);
+  $html =
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:auto">' .
+    '<h2 style="margin:0 0 12px">👟 ShoeAR</h2>' .
+    '<p>We received a request to reset your password. Use this code to continue:</p>' .
+    '<p style="font-size:32px;font-weight:bold;letter-spacing:6px;margin:16px 0">' . $safeCode . '</p>' .
+    "<p style=\"color:#666\">It expires in $ttlMinutes minutes. If you didn't request this, " .
+    'you can ignore this email — your password won\'t change.</p>' .
+    '</div>';
+  sendMail($config, $toEmail, '', $subject, $text, $html);
+}

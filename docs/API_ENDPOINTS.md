@@ -83,6 +83,8 @@ List responses include paging info:
 | GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). |
 | PUT  | `/auth/me` | Any | **(Implemented)** Update own profile (`fullName`, `phoneNumber`). |
 | POST | `/auth/change-password` | Any | **(Implemented)** Change own password — verifies `currentPassword` before setting `newPassword`. |
+| POST | `/auth/forgot-password` | Public | **(Implemented)** Email a 6-digit reset code to a registered address. Always returns a generic success (no account enumeration). Requires SMTP. |
+| POST | `/auth/reset-password` | Public | **(Implemented)** Finish reset: body `{ email, code, newPassword }` — verifies the code (10-min expiry, max 5 attempts) then sets the new password. |
 
 **`POST /auth/register` request (customer):**
 ```json

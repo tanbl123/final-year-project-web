@@ -13,6 +13,19 @@ export function logout() {
   localStorage.removeItem('user');
 }
 
+// Start "forgot password" (POST /auth/forgot-password). Emails a reset code if
+// the address has an account. Always resolves with a generic { message } —
+// never reveals whether the email is registered.
+export function forgotPassword(email) {
+  return apiPost('/auth/forgot-password', { email });
+}
+
+// Finish "forgot password" (POST /auth/reset-password): verify the emailed code
+// and set a new password. Resolves with a { message } on success.
+export function resetPassword(email, code, newPassword) {
+  return apiPost('/auth/reset-password', { email, code, newPassword });
+}
+
 // Email a 6-digit verification code to the address being registered
 // (POST /auth/register/send-code). Must succeed before register() will work.
 // Resolves with a { message } on success.

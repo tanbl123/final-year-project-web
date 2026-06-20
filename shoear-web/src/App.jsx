@@ -8,6 +8,7 @@ import ReportsPage from './features/reports/pages/ReportsPage';
 import LoginPage from './features/auth/pages/LoginPage';
 import ProtectedRoute, { homePathFor } from './features/auth/ProtectedRoute';
 import RegisterPage from './features/auth/pages/RegisterPage';
+import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
 import ResubmitApplicationPage from './features/auth/pages/ResubmitApplicationPage';
 import ProductDetailPage from './features/products/pages/ProductDetailPage';
 import AddProductPage from './features/products/pages/AddProductPage';
@@ -93,6 +94,7 @@ const router = createBrowserRouter(
       <Route path="/login" element={<LoginPage variant="supplier" />} />
       <Route path="/admin/login" element={<LoginPage variant="admin" />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* rejected suppliers fix & resubmit their application here */}
       <Route path="/resubmit" element={

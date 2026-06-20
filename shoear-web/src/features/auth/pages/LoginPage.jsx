@@ -150,6 +150,10 @@ function LoginPage({ variant = 'supplier' }) {
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={isSubmitting}>
           {isSubmitting ? 'Logging in...' : 'Login'}
         </button>
+
+        <div className="text-center mt-3">
+          <Link to="/forgot-password" className="small">Forgot password?</Link>
+        </div>
       </form>
 
       {/* switch between the two portals — current one is highlighted */}
