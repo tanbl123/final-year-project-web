@@ -527,8 +527,9 @@ function handleListAdminInventory(PDO $pdo): void {
   $params = [];
   if (in_array($status, $allowed, true)) { $where[] = 'p.productStatus = :st'; $params['st'] = $status; }
   if ($search !== '') {
-    $where[] = '(p.productName LIKE :q OR s.companyName LIKE :q)';
-    $params['q'] = '%' . $search . '%';
+    $where[] = '(p.productName LIKE :q1 OR s.companyName LIKE :q2)';
+    $params['q1'] = '%' . $search . '%';
+    $params['q2'] = '%' . $search . '%';
   }
 
   $sql =

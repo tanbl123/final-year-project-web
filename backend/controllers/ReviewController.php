@@ -19,8 +19,10 @@ function handleListAdminReviews(PDO $pdo): void {
     $where[] = 'r.ratingScore = :rt'; $params['rt'] = (int) $rating;
   }
   if ($search !== '') {
-    $where[] = '(p.productName LIKE :q OR r.reviewComment LIKE :q OR buyer.fullName LIKE :q)';
-    $params['q'] = '%' . $search . '%';
+    $where[] = '(p.productName LIKE :q1 OR r.reviewComment LIKE :q2 OR buyer.fullName LIKE :q3)';
+    $params['q1'] = '%' . $search . '%';
+    $params['q2'] = '%' . $search . '%';
+    $params['q3'] = '%' . $search . '%';
   }
 
   $sql =

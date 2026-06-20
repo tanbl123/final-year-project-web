@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getAdminInventory } from '../adminService';
 import Pagination from '../../../components/Pagination';
+import ClearableInput from '../../../components/ClearableInput';
 import { usePagination } from '../../../hooks/usePagination';
 
 const PAGE_SIZE = 12;
@@ -54,8 +55,10 @@ function AdminInventoryPage() {
         <div className="row g-2 align-items-end">
           <div className="col-md-7">
             <label className="form-label small text-muted mb-1">Search</label>
-            <input type="text" className="form-control" placeholder="Product or supplier"
-              value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+            <ClearableInput type="text" placeholder="Product or supplier"
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              onClear={() => setFilters((f) => ({ ...f, search: '' }))} />
           </div>
           <div className="col-md-5">
             <label className="form-label small text-muted mb-1">Status</label>

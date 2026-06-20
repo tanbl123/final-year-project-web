@@ -4,6 +4,7 @@ import StarRating from '../../../components/StarRating';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
+import ClearableInput from '../../../components/ClearableInput';
 import { usePagination } from '../../../hooks/usePagination';
 
 const PAGE_SIZE = 10;
@@ -71,8 +72,10 @@ function AdminReviewsPage() {
         <div className="row g-2 align-items-end">
           <div className="col-md-5">
             <label className="form-label small text-muted mb-1">Search</label>
-            <input type="text" className="form-control" placeholder="Product, comment or customer"
-              value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+            <ClearableInput type="text" placeholder="Product, comment or customer"
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              onClear={() => setFilters((f) => ({ ...f, search: '' }))} />
           </div>
           <div className="col-md-4">
             <label className="form-label small text-muted mb-1">Rating</label>

@@ -127,8 +127,10 @@ function handleListUsers(PDO $pdo): void {
     $where[] = 'status = :status'; $params['status'] = $status;
   }
   if ($search !== '') {
-    $where[] = '(fullName LIKE :q OR username LIKE :q OR email LIKE :q)';
-    $params['q'] = '%' . $search . '%';
+    $where[] = '(fullName LIKE :q1 OR username LIKE :q2 OR email LIKE :q3)';
+    $params['q1'] = '%' . $search . '%';
+    $params['q2'] = '%' . $search . '%';
+    $params['q3'] = '%' . $search . '%';
   }
 
   $sql = 'SELECT userId, username, fullName, email, phoneNumber, role, status, created_at FROM `user`';

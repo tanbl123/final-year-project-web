@@ -3,6 +3,7 @@ import { getUsers, getUser, setUserStatus } from '../adminService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
+import ClearableInput from '../../../components/ClearableInput';
 import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
 import { useTableSort } from '../../../hooks/useTableSort';
@@ -144,8 +145,9 @@ function AdminUsersPage() {
         <div className="row g-2 align-items-end">
           <div className="col-md-5">
             <label className="form-label small text-muted mb-1">Search</label>
-            <input type="text" className="form-control" placeholder="Name, username or email"
-              value={filters.search} onChange={(e) => setFilter({ search: e.target.value })} />
+            <ClearableInput type="text" placeholder="Name, username or email"
+              value={filters.search} onChange={(e) => setFilter({ search: e.target.value })}
+              onClear={() => setFilter({ search: '' })} />
           </div>
           <div className="col-md-4">
             <label className="form-label small text-muted mb-1">Role</label>

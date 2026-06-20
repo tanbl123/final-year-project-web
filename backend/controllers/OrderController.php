@@ -121,8 +121,9 @@ function handleListAdminOrders(PDO $pdo): void {
   $params = [];
   if (in_array($status, $allowed, true)) { $where[] = 'o.orderStatus = :st'; $params['st'] = $status; }
   if ($search !== '') {
-    $where[] = '(o.orderId LIKE :q OR buyer.fullName LIKE :q)';
-    $params['q'] = '%' . $search . '%';
+    $where[] = '(o.orderId LIKE :q1 OR buyer.fullName LIKE :q2)';
+    $params['q1'] = '%' . $search . '%';
+    $params['q2'] = '%' . $search . '%';
   }
 
   $sql =
