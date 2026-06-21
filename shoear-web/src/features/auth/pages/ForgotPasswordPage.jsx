@@ -259,6 +259,7 @@ function ForgotPasswordPage() {
   // ── Step 3: set the new password ──
   return (
     <div className="container py-5" style={{ maxWidth: '440px' }}>
+      <BackButton onClick={() => { setStep('verify'); setResetError(''); }} />
       <h1 className="mb-3 text-center">🔑 New password</h1>
       <form onSubmit={handleReset} className="card card-body shadow-sm text-start" noValidate>
         <p className="text-muted">
@@ -272,13 +273,6 @@ function ForgotPasswordPage() {
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={resetting}>
           {resetting ? 'Resetting...' : 'Reset password'}
         </button>
-
-        <div className="mt-3">
-          <button type="button" className="btn btn-link p-0"
-            onClick={() => { setStep('verify'); setResetError(''); }}>
-            ← Back
-          </button>
-        </div>
       </form>
     </div>
   );

@@ -353,6 +353,7 @@ function RegisterPage() {
   if (step === 'verify') {
     return (
       <div className="container py-5" style={{ maxWidth: '480px' }}>
+        <BackButton onClick={() => { setStep('form'); setCodeError(''); setResendInfo(''); }} />
         <h1 className="mb-3 text-center">📧 Verify your email</h1>
         <form onSubmit={handleVerify} className="card card-body shadow-sm" noValidate>
           <p className="text-muted">
@@ -382,16 +383,10 @@ function RegisterPage() {
             {verifying ? 'Verifying…' : 'Verify & complete registration'}
           </button>
 
-          <div className="d-flex justify-content-between align-items-center mt-3">
-            <button type="button" className="btn btn-link p-0"
-              onClick={() => { setStep('form'); setCodeError(''); setResendInfo(''); }}>
-              ← Edit details
-            </button>
-            <button type="button" className="btn btn-link p-0"
-              onClick={handleResend} disabled={resendIn > 0 || resending}>
-              {resending ? 'Sending…' : resendIn > 0 ? `Resend code (${resendIn}s)` : 'Resend code'}
-            </button>
-          </div>
+          <button type="button" className="btn btn-outline-secondary w-100 mt-2 text-center"
+            onClick={handleResend} disabled={resendIn > 0 || resending}>
+            {resending ? 'Sending…' : resendIn > 0 ? `Resend code (${resendIn}s)` : 'Resend code'}
+          </button>
         </form>
       </div>
     );
