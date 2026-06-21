@@ -4,6 +4,7 @@ import { useAuth } from '../AuthContext';
 import { homePathFor } from '../ProtectedRoute';
 import EyeIcon from '../../../components/EyeIcon';
 import ClearableInput from '../../../components/ClearableInput';
+import Toast from '../../../components/Toast';
 
 // Validate the login fields, returning a { field: message } object.
 function validateForm(form) {
@@ -40,10 +41,10 @@ function LoginPage({ variant = 'supplier' }) {
 
   const { login, logout } = useAuth();
   const navigate = useNavigate();
-  // a one-off success notice passed via navigation state (e.g. after a password
-  // reset). Captured once at mount so it doesn't linger on later navigations.
+  // a one-off success message passed via navigation state (e.g. after a
+  // password reset), shown as an auto-dismissing toast. Captured once at mount.
   const location = useLocation();
-  const [notice] = useState(() => location.state?.notice || '');
+  const [toast, setToast] = useState(() => location.state?.toast || '');
 
   // update the changed field; re-check it live once it's already erroring
   function handleChange(event) {
@@ -106,10 +107,10 @@ function LoginPage({ variant = 'supplier' }) {
 
   return (
     <div className="container py-5" style={{ maxWidth: '420px' }}>
+      <Toast message={toast} onClose={() => setToast('')} />
       <h1 className="mb-4 text-center">{config.title}</h1>
 
       <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
-        {notice && <div className="alert alert-success py-2">{notice}</div>}
         <div className="mb-3">
           <label className="form-label">Email or username</label>
           <ClearableInput

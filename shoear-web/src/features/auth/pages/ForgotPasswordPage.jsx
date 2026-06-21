@@ -158,8 +158,8 @@ function ForgotPasswordPage() {
     setResetting(true);
     try {
       await resetPassword(email.trim(), code.trim(), password);
-      // standard e-commerce pattern: send them to login with a success notice
-      navigate('/login', { state: { notice: 'Your password has been reset — please log in.' } });
+      // standard e-commerce pattern: send them to login with a success toast
+      navigate('/login', { state: { toast: 'Your password has been reset — please log in.' } });
     } catch (err) {
       const msg = err.message || 'Something went wrong. Please try again.';
       setResetError(msg);
