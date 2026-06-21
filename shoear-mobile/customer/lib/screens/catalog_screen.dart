@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/category.dart';
 import '../models/product.dart';
 import '../services/catalog_service.dart';
 import '../state/auth_provider.dart';
@@ -28,10 +29,23 @@ class _CatalogScreenState extends State<CatalogScreen> {
   String _search = '';
   Timer? _debounce;   // debounces the live search so we don't hit the API on every keystroke
 
+  // filters
+  List<Category> _categories = [];
+  String? _categoryId;
+  double? _minPrice;
+  double? _maxPrice;
+  String? _sort;   // price_asc | price_desc | newest
+
+  bool get _filtersActive => _categoryId != null || _minPrice != null || _maxPrice != null || _sort != null;
+
   @override
   void initState() {
     super.initState();
     _future = _load();
+    // categories for the filter dropdown (best-effort)
+    context.read<CatalogService>().listCategories().then((cats) {
+      if (mounted) setState(() => _categories = cats);
+    }).catchError((_) {});
   }
 
   @override
@@ -41,7 +55,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
     super.dispose();
   }
 
-  Future<CatalogPage> _load() => context.read<CatalogService>().listProducts(search: _search);
+  Future<CatalogPage> _load() => context.read<CatalogService>().listProducts(
+        search: _search,
+        categoryId: _categoryId,
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
+        sort: _sort,
+      );
 
   Future<void> _refresh() async {
     final next = _load();
@@ -72,7 +92,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('👟 ShoeAR'),
-        actions: [_cartAction(context), _accountAction(context)],
+        actions: [_filterAction(context), _cartAction(context), _accountAction(context)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -138,6 +158,121 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
       ),
     );
+  }
+
+  Widget _filterAction(BuildContext context) {
+    return Badge(
+      isLabelVisible: _filtersActive,
+      smallSize: 8,
+      child: IconButton(
+        icon: const Icon(Icons.tune),
+        tooltip: 'Filters',
+        onPressed: _openFilters,
+      ),
+    );
+  }
+
+  Future<void> _openFilters() async {
+    // local copies so Cancel discards
+    String? cat = _categoryId;
+    String? sort = _sort;
+    final minCtrl = TextEditingController(text: _minPrice?.toStringAsFixed(0) ?? '');
+    final maxCtrl = TextEditingController(text: _maxPrice?.toStringAsFixed(0) ?? '');
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 16 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: StatefulBuilder(
+          builder: (ctx, setSheet) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Filters', style: Theme.of(ctx).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String?>(
+                value: cat,
+                decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('All categories')),
+                  for (final c in _categories) DropdownMenuItem<String?>(value: c.id, child: Text(c.name)),
+                ],
+                onChanged: (v) => setSheet(() => cat = v),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: sort,
+                decoration: const InputDecoration(labelText: 'Sort by', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem<String?>(value: null, child: Text('Newest')),
+                  DropdownMenuItem<String?>(value: 'price_asc', child: Text('Price: low to high')),
+                  DropdownMenuItem<String?>(value: 'price_desc', child: Text('Price: high to low')),
+                ],
+                onChanged: (v) => setSheet(() => sort = v),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: minCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Min price', prefixText: 'RM ', border: OutlineInputBorder()),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: maxCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Max price', prefixText: 'RM ', border: OutlineInputBorder()),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setSheet(() {
+                          cat = null;
+                          sort = null;
+                          minCtrl.clear();
+                          maxCtrl.clear();
+                        });
+                      },
+                      child: const Text('Clear'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Apply'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (applied == true) {
+      setState(() {
+        _categoryId = cat;
+        _sort = sort;
+        _minPrice = double.tryParse(minCtrl.text.trim());
+        _maxPrice = double.tryParse(maxCtrl.text.trim());
+        _future = _load();
+      });
+    }
+    minCtrl.dispose();
+    maxCtrl.dispose();
   }
 
   Widget _cartAction(BuildContext context) {

@@ -441,7 +441,8 @@ if ($method === 'POST' && preg_match('#^/admin/products/([^/]+)/reject$#', $path
 
 // ── category routes (require a valid token) ──
 if ($method === 'GET' && $path === '/categories') {
-  $auth = requireAuth($secret);
+  // public: the category list is public taxonomy used by the catalog filters
+  // (guests browse + filter without signing in)
   $pdo  = getPDO();
   handleListCategories($pdo);
 }
