@@ -23,13 +23,15 @@ function handleListDeliveries(PDO $pdo): void {
   }
 
   $sql =
-    "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.deliveryPersonnelId,
+    "SELECT d.deliveryId, d.orderId, d.supplierId, d.deliveryStatus, d.deliveryPersonnelId,
             d.deliveryDate, d.estimatedDeliveryTime,
             cu.fullName  AS courierName,
+            s.companyName AS supplierName, s.operationalAddress AS pickupAddress,
             o.orderDate, o.orderStatus, o.orderTotalAmount, o.orderDeliveryAddress,
             buyer.fullName AS customerName
        FROM delivery d
        JOIN `order` o          ON o.orderId = d.orderId
+       JOIN supplier s         ON s.supplierId = d.supplierId
        JOIN customer c         ON c.customerId = o.customerId
        JOIN `user` buyer       ON buyer.userId = c.userId
        LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = d.deliveryPersonnelId
@@ -117,9 +119,14 @@ function handleListAssignments(PDO $pdo, array $auth): void {
   $stmt = $pdo->prepare(
     "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.estimatedDeliveryTime,
             o.orderDeliveryAddress, buyer.fullName AS customerName, buyer.phoneNumber AS customerPhone,
-            (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount
+            s.companyName AS supplierName, s.operationalAddress AS pickupAddress,
+            (SELECT COUNT(*) FROM order_item oi
+               JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+               JOIN product p          ON p.productId = pv.productId
+              WHERE oi.orderId = o.orderId AND p.supplierId = d.supplierId) AS itemCount
        FROM delivery d
        JOIN `order` o    ON o.orderId = d.orderId
+       JOIN supplier s   ON s.supplierId = d.supplierId
        JOIN customer c   ON c.customerId = o.customerId
        JOIN `user` buyer ON buyer.userId = c.userId
       WHERE d.deliveryPersonnelId = :dp
@@ -138,9 +145,11 @@ function handleListDeliveryHistory(PDO $pdo, array $auth): void {
   $courierId = requireDeliveryPersonnelId($pdo, $auth);
   $stmt = $pdo->prepare(
     "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.deliveryDate,
-            o.orderDeliveryAddress, buyer.fullName AS customerName
+            o.orderDeliveryAddress, buyer.fullName AS customerName,
+            s.companyName AS supplierName
        FROM delivery d
        JOIN `order` o    ON o.orderId = d.orderId
+       JOIN supplier s   ON s.supplierId = d.supplierId
        JOIN customer c   ON c.customerId = o.customerId
        JOIN `user` buyer ON buyer.userId = c.userId
       WHERE d.deliveryPersonnelId = :dp AND d.deliveryStatus IN ('Delivered', 'Failed')
@@ -153,7 +162,7 @@ function handleListDeliveryHistory(PDO $pdo, array $auth): void {
 // Shared: load one of this courier's deliveries (or 404).
 function requireOwnDelivery(PDO $pdo, string $courierId, string $deliveryId): array {
   $stmt = $pdo->prepare(
-    'SELECT deliveryId, orderId, deliveryStatus, otpCode FROM delivery
+    'SELECT deliveryId, orderId, supplierId, deliveryStatus, otpCode FROM delivery
       WHERE deliveryId = :id AND deliveryPersonnelId = :dp'
   );
   $stmt->execute(['id' => $deliveryId, 'dp' => $courierId]);
@@ -169,13 +178,18 @@ function requireOwnDelivery(PDO $pdo, string $courierId, string $deliveryId): ar
 // enters it to confirm.
 function handleGetCourierDelivery(PDO $pdo, array $auth, string $deliveryId): void {
   $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  // Pull this parcel's supplier (the pickup point) alongside the delivery. The
+  // courier collects ONLY this supplier's items, from the supplier's operational
+  // (pickup) address, and drops them at the customer's address.
   $h = $pdo->prepare(
-    "SELECT d.deliveryId, d.orderId, d.deliveryStatus, d.deliveryDate,
+    "SELECT d.deliveryId, d.orderId, d.supplierId, d.deliveryStatus, d.deliveryDate,
             d.estimatedDeliveryTime, d.proofOfDelivery,
             o.orderDeliveryAddress, o.orderTotalAmount,
-            buyer.fullName AS customerName, buyer.phoneNumber AS customerPhone
+            buyer.fullName AS customerName, buyer.phoneNumber AS customerPhone,
+            s.companyName AS supplierName, s.operationalAddress AS pickupAddress
        FROM delivery d
        JOIN `order` o    ON o.orderId = d.orderId
+       JOIN supplier s   ON s.supplierId = d.supplierId
        JOIN customer c   ON c.customerId = o.customerId
        JOIN `user` buyer ON buyer.userId = c.userId
       WHERE d.deliveryId = :id AND d.deliveryPersonnelId = :dp"
@@ -187,15 +201,16 @@ function handleGetCourierDelivery(PDO $pdo, array $auth, string $deliveryId): vo
   }
   $del['orderTotalAmount'] = (float) $del['orderTotalAmount'];
 
+  // only the items from THIS parcel's supplier (an order may have other parcels)
   $it = $pdo->prepare(
     "SELECT p.productName, p.productBrand AS brand, oi.orderSize AS size, oi.orderQuantity AS qty
        FROM order_item oi
        JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
        JOIN product p          ON p.productId = pv.productId
-      WHERE oi.orderId = :oid
+      WHERE oi.orderId = :oid AND p.supplierId = :sid
       ORDER BY oi.orderItemId"
   );
-  $it->execute(['oid' => $del['orderId']]);
+  $it->execute(['oid' => $del['orderId'], 'sid' => $del['supplierId']]);
   $items = $it->fetchAll();
   foreach ($items as &$x) { $x['qty'] = (int) $x['qty']; }
   unset($x);
@@ -223,9 +238,6 @@ function handleUpdateDeliveryStatus(PDO $pdo, array $auth, string $deliveryId): 
     sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => "Cannot move a {$del['deliveryStatus']} delivery to {$status}."]);
   }
 
-  // keep the order status in step with the milestone
-  $orderStatusFor = ['PickedUp' => 'Shipped', 'OutForDelivery' => 'OutForDelivery'];
-
   try {
     $pdo->beginTransaction();
     if ($status === 'OutForDelivery') {
@@ -236,10 +248,9 @@ function handleUpdateDeliveryStatus(PDO $pdo, array $auth, string $deliveryId): 
       $pdo->prepare('UPDATE delivery SET deliveryStatus = :s WHERE deliveryId = :id')
           ->execute(['s' => $status, 'id' => $deliveryId]);
     }
-    if (isset($orderStatusFor[$status])) {
-      $pdo->prepare('UPDATE `order` SET orderStatus = :os WHERE orderId = :oid')
-          ->execute(['os' => $orderStatusFor[$status], 'oid' => $del['orderId']]);
-    }
+    // roll the order status up from all its parcels (an order is only as far
+    // along as its least-progressed parcel)
+    recomputeOrderStatus($pdo, $del['orderId']);
     $pdo->commit();
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
@@ -268,8 +279,8 @@ function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId): void {
     $pdo->beginTransaction();
     $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW() WHERE deliveryId = :id")
         ->execute(['id' => $deliveryId]);
-    $pdo->prepare("UPDATE `order` SET orderStatus = 'Delivered' WHERE orderId = :oid")
-        ->execute(['oid' => $del['orderId']]);
+    // order becomes Delivered only once EVERY parcel is delivered
+    recomputeOrderStatus($pdo, $del['orderId']);
     $pdo->commit();
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }

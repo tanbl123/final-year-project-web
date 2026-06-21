@@ -67,20 +67,49 @@ function scoreCouriers(PDO $pdo): array {
   return $rows;
 }
 
-// Ensure a delivery row exists for a (paid) order and auto-assign the best
-// available courier. If NO courier is available the delivery is left Pending +
-// unassigned, which surfaces it in the admin "needs assignment" queue for a
-// manual pick. Safe to call more than once: an already-assigned delivery is
-// left untouched.
+// Dispatch a whole (paid) order: an order can contain items from several
+// suppliers, and each supplier's items ship as an INDEPENDENT parcel — exactly
+// how Shopee/Lazada/Amazon handle multi-seller orders. So we create one delivery
+// per distinct supplier in the order and auto-assign each one separately.
+// Courier load is re-scored between picks (uncommitted assignments in the same
+// transaction are visible), so two parcels don't both pile onto one courier.
 //
-// Returns: ['deliveryId', 'deliveryPersonnelId'|null, 'deliveryStatus', 'auto'].
-function assignDelivery(PDO $pdo, string $orderId): array {
-  // Already have a delivery for this order?
+// Returns an array of per-supplier dispatch results (see assignDelivery()).
+// Safe to call more than once: existing deliveries are left as-is.
+function dispatchOrder(PDO $pdo, string $orderId): array {
   $stmt = $pdo->prepare(
-    "SELECT deliveryId, deliveryPersonnelId, deliveryStatus
-       FROM delivery WHERE orderId = :o"
+    "SELECT DISTINCT p.supplierId
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+      WHERE oi.orderId = :o
+      ORDER BY p.supplierId"
   );
   $stmt->execute(['o' => $orderId]);
+  $supplierIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+  $results = [];
+  foreach ($supplierIds as $supplierId) {
+    $results[] = assignDelivery($pdo, $orderId, $supplierId);
+  }
+  return $results;
+}
+
+// Ensure a delivery row exists for one (order, supplier) parcel and auto-assign
+// the best available courier. If NO courier is available the delivery is left
+// Pending + unassigned, which surfaces it in the admin "needs assignment" queue
+// for a manual pick. Safe to call more than once: an already-assigned delivery
+// is left untouched.
+//
+// Returns: ['deliveryId', 'orderId', 'supplierId', 'deliveryPersonnelId'|null,
+//           'deliveryStatus', 'auto'].
+function assignDelivery(PDO $pdo, string $orderId, string $supplierId): array {
+  // Already have a delivery for this (order, supplier) parcel?
+  $stmt = $pdo->prepare(
+    "SELECT deliveryId, deliveryPersonnelId, deliveryStatus
+       FROM delivery WHERE orderId = :o AND supplierId = :s"
+  );
+  $stmt->execute(['o' => $orderId, 's' => $supplierId]);
   $existing = $stmt->fetch();
 
   $candidates = scoreCouriers($pdo);
@@ -98,6 +127,8 @@ function assignDelivery(PDO $pdo, string $orderId): array {
 
       return [
         'deliveryId'          => $existing['deliveryId'],
+        'orderId'             => $orderId,
+        'supplierId'          => $supplierId,
         'deliveryPersonnelId' => $best['deliveryPersonnelId'],
         'deliveryStatus'      => 'Assigned',
         'auto'                => true,
@@ -105,6 +136,8 @@ function assignDelivery(PDO $pdo, string $orderId): array {
     }
     return [
       'deliveryId'          => $existing['deliveryId'],
+      'orderId'             => $orderId,
+      'supplierId'          => $supplierId,
       'deliveryPersonnelId' => $existing['deliveryPersonnelId'],
       'deliveryStatus'      => $existing['deliveryStatus'],
       'auto'                => false,
@@ -115,12 +148,14 @@ function assignDelivery(PDO $pdo, string $orderId): array {
 
   if ($best) {
     $pdo->prepare(
-      "INSERT INTO delivery (deliveryId, orderId, deliveryPersonnelId, deliveryStatus)
-       VALUES (:id, :o, :dp, 'Assigned')"
-    )->execute(['id' => $deliveryId, 'o' => $orderId, 'dp' => $best['deliveryPersonnelId']]);
+      "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryStatus)
+       VALUES (:id, :o, :s, :dp, 'Assigned')"
+    )->execute(['id' => $deliveryId, 'o' => $orderId, 's' => $supplierId, 'dp' => $best['deliveryPersonnelId']]);
 
     return [
       'deliveryId'          => $deliveryId,
+      'orderId'             => $orderId,
+      'supplierId'          => $supplierId,
       'deliveryPersonnelId' => $best['deliveryPersonnelId'],
       'deliveryStatus'      => 'Assigned',
       'auto'                => true,
@@ -129,14 +164,50 @@ function assignDelivery(PDO $pdo, string $orderId): array {
 
   // No courier available → queue it for the admin to assign by hand.
   $pdo->prepare(
-    "INSERT INTO delivery (deliveryId, orderId, deliveryPersonnelId, deliveryStatus)
-     VALUES (:id, :o, NULL, 'Pending')"
-  )->execute(['id' => $deliveryId, 'o' => $orderId]);
+    "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryStatus)
+     VALUES (:id, :o, :s, NULL, 'Pending')"
+  )->execute(['id' => $deliveryId, 'o' => $orderId, 's' => $supplierId]);
 
   return [
     'deliveryId'          => $deliveryId,
+    'orderId'             => $orderId,
+    'supplierId'          => $supplierId,
     'deliveryPersonnelId' => null,
     'deliveryStatus'      => 'Pending',
     'auto'                => false,
   ];
+}
+
+// Recompute an order's status from ALL its parcel deliveries and persist it.
+// With split fulfilment an order has several deliveries, so the order-level
+// status is a rollup of the LEAST-progressed parcel:
+//   * every parcel Delivered      → order Delivered
+//   * any parcel OutForDelivery    → order OutForDelivery
+//   * any parcel PickedUp          → order Shipped
+//   * otherwise                    → left unchanged (still Paid/Processing)
+// Mirrors the single-delivery milestones the courier flow used before the split.
+function recomputeOrderStatus(PDO $pdo, string $orderId): void {
+  $stmt = $pdo->prepare('SELECT deliveryStatus FROM delivery WHERE orderId = :o');
+  $stmt->execute(['o' => $orderId]);
+  $statuses = $stmt->fetchAll(PDO::FETCH_COLUMN);
+  if (!$statuses) { return; }
+
+  $allDelivered = true;
+  $anyOut = false;
+  $anyPicked = false;
+  foreach ($statuses as $s) {
+    if ($s !== 'Delivered')        { $allDelivered = false; }
+    if ($s === 'OutForDelivery')   { $anyOut = true; }
+    if ($s === 'PickedUp')         { $anyPicked = true; }
+  }
+
+  $orderStatus = null;
+  if ($allDelivered)   { $orderStatus = 'Delivered'; }
+  elseif ($anyOut)     { $orderStatus = 'OutForDelivery'; }
+  elseif ($anyPicked)  { $orderStatus = 'Shipped'; }
+
+  if ($orderStatus !== null) {
+    $pdo->prepare('UPDATE `order` SET orderStatus = :os WHERE orderId = :oid')
+        ->execute(['os' => $orderStatus, 'oid' => $orderId]);
+  }
 }

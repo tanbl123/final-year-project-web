@@ -85,14 +85,26 @@ function AdminOrderDetailPage() {
           </div>
 
           <div className="card">
-            <div className="card-header bg-white fw-semibold">Delivery</div>
+            <div className="card-header bg-white fw-semibold">
+              Delivery
+              {order.deliveries?.length > 1 && (
+                <span className="text-muted small fw-normal"> · {order.deliveries.length} parcels (one per supplier)</span>
+              )}
+            </div>
             <div className="card-body">
-              {order.delivery ? (
-                <dl className="row mb-0">
-                  <dt className="col-4">Status</dt>
-                  <dd className="col-8"><span className={`badge text-bg-${DELIV_COLORS[order.delivery.deliveryStatus] || 'secondary'}`}>{label(order.delivery.deliveryStatus)}</span></dd>
-                  <dt className="col-4">Courier</dt><dd className="col-8">{order.delivery.courierName || <span className="text-muted">Unassigned</span>}</dd>
-                </dl>
+              {order.deliveries?.length > 0 ? (
+                order.deliveries.map((d, i) => (
+                  <div key={d.deliveryId} className={i > 0 ? 'border-top pt-3 mt-3' : undefined}>
+                    <dl className="row mb-0">
+                      <dt className="col-4">Supplier</dt><dd className="col-8">{d.supplierName}</dd>
+                      <dt className="col-4">Pickup</dt>
+                      <dd className="col-8" style={{ overflowWrap: 'anywhere' }}>{d.pickupAddress}</dd>
+                      <dt className="col-4">Status</dt>
+                      <dd className="col-8"><span className={`badge text-bg-${DELIV_COLORS[d.deliveryStatus] || 'secondary'}`}>{label(d.deliveryStatus)}</span></dd>
+                      <dt className="col-4">Courier</dt><dd className="col-8">{d.courierName || <span className="text-muted">Unassigned</span>}</dd>
+                    </dl>
+                  </div>
+                ))
               ) : <p className="text-muted mb-0">No delivery record.</p>}
             </div>
           </div>

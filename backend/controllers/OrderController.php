@@ -131,7 +131,9 @@ function handleListAdminOrders(PDO $pdo): void {
             buyer.fullName AS customerName,
             (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount,
             pay.paymentStatus,
-            (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId LIMIT 1) AS deliveryStatus
+            (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId
+               ORDER BY FIELD(d.deliveryStatus,'Pending','Assigned','PickedUp','OutForDelivery','Delivered','Failed')
+               LIMIT 1) AS deliveryStatus
        FROM `order` o
        JOIN customer c   ON c.customerId = o.customerId
        JOIN `user` buyer ON buyer.userId = c.userId
@@ -192,15 +194,21 @@ function handleGetAdminOrder(PDO $pdo, string $orderId): void {
   unset($x);
   $order['items'] = $items;
 
+  // one parcel per supplier — return them all so the admin sees each leg
   $dl = $pdo->prepare(
-    "SELECT d.deliveryStatus, cu.fullName AS courierName
+    "SELECT d.deliveryId, d.deliveryStatus, d.supplierId,
+            s.companyName AS supplierName, s.operationalAddress AS pickupAddress,
+            d.estimatedDeliveryTime, d.proofOfDelivery,
+            cu.fullName AS courierName
        FROM delivery d
+       JOIN supplier s ON s.supplierId = d.supplierId
        LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = d.deliveryPersonnelId
        LEFT JOIN `user` cu ON cu.userId = dp.userId
-      WHERE d.orderId = :oid LIMIT 1"
+      WHERE d.orderId = :oid
+      ORDER BY d.deliveryId"
   );
   $dl->execute(['oid' => $orderId]);
-  $order['delivery'] = $dl->fetch() ?: null;
+  $order['deliveries'] = $dl->fetchAll();
 
   $rf = $pdo->prepare(
     "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate
@@ -306,7 +314,9 @@ function handleListCustomerOrders(PDO $pdo, array $auth): void {
     "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount,
             (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount,
             pay.paymentStatus,
-            (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId LIMIT 1) AS deliveryStatus
+            (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId
+               ORDER BY FIELD(d.deliveryStatus,'Pending','Assigned','PickedUp','OutForDelivery','Delivered','Failed')
+               LIMIT 1) AS deliveryStatus
        FROM `order` o
        LEFT JOIN payment pay ON pay.orderId = o.orderId
       WHERE o.customerId = :cid
@@ -362,13 +372,18 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
   unset($x);
   $order['items'] = $items;
 
-  // the customer sees their own OTP (they read it out to the courier on arrival)
+  // one parcel per supplier — each has its OWN status and OTP (the customer
+  // confirms each parcel separately, mirroring Shopee/Lazada multi-seller orders)
   $dl = $pdo->prepare(
-    'SELECT deliveryStatus, estimatedDeliveryTime, otpCode, proofOfDelivery
-       FROM delivery WHERE orderId = :oid LIMIT 1'
+    "SELECT d.deliveryId, d.deliveryStatus, d.estimatedDeliveryTime, d.otpCode, d.proofOfDelivery,
+            s.companyName AS supplierName
+       FROM delivery d
+       JOIN supplier s ON s.supplierId = d.supplierId
+      WHERE d.orderId = :oid
+      ORDER BY d.deliveryId"
   );
   $dl->execute(['oid' => $orderId]);
-  $order['delivery'] = $dl->fetch() ?: null;
+  $order['deliveries'] = $dl->fetchAll();
 
   $rf = $pdo->prepare(
     "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate

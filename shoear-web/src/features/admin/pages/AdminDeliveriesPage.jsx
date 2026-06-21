@@ -73,7 +73,7 @@ function AdminDeliveriesPage() {
     setError('');
     try {
       await assignDelivery(assignTarget.deliveryId, chosenCourier);
-      setToast(`${assignTarget.orderId} → ${chosenCourier}.`);
+      setToast(`${assignTarget.orderId} (${assignTarget.supplierName}) → ${chosenCourier}.`);
       closeAssign();
       load();
     } catch (err) {
@@ -140,7 +140,7 @@ function AdminDeliveriesPage() {
               <tr>
                 <th>Order</th>
                 <th>Customer</th>
-                <th>Deliver to</th>
+                <th>Pickup → Deliver to</th>
                 <th className="text-end" style={{ width: 110 }}>Amount</th>
                 <th className="text-center" style={{ width: 140 }}>Status</th>
                 <th style={{ width: 180 }}>Courier</th>
@@ -155,8 +155,15 @@ function AdminDeliveriesPage() {
                     <div className="text-muted small">{new Date(d.orderDate).toLocaleDateString()}</div>
                   </td>
                   <td>{d.customerName}</td>
-                  <td className="text-muted small" style={{ overflowWrap: 'anywhere' }}>
-                    {d.orderDeliveryAddress}
+                  <td className="small" style={{ overflowWrap: 'anywhere' }}>
+                    <div>
+                      <span className="text-success">📦 {d.supplierName}</span>
+                      <div className="text-muted">{d.pickupAddress}</div>
+                    </div>
+                    <div className="mt-1">
+                      <span className="text-primary">📍 Deliver to</span>
+                      <div className="text-muted">{d.orderDeliveryAddress}</div>
+                    </div>
                   </td>
                   <td className="text-end">RM {d.orderTotalAmount.toFixed(2)}</td>
                   <td className="text-center">
@@ -203,7 +210,7 @@ function AdminDeliveriesPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {assignTarget.deliveryPersonnelId ? 'Reassign' : 'Assign'} courier · {assignTarget.orderId}
+                  {assignTarget.deliveryPersonnelId ? 'Reassign' : 'Assign'} courier · {assignTarget.orderId} · {assignTarget.supplierName}
                 </h5>
                 <button type="button" className="btn-close" onClick={closeAssign}></button>
               </div>

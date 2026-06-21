@@ -3,8 +3,9 @@
 //
 // For now `POST /orders/{id}/payment` confirms payment directly (a simulated
 // gateway success) and runs the REAL post-payment pipeline:
-//   atomic stock decrement → payment recorded → order Paid → receipt → courier
-//   auto-assigned (the same assignDelivery() the payout demo uses).
+//   atomic stock decrement → payment recorded → order Paid → receipt → order
+//   dispatched as one parcel per supplier (the same dispatchOrder() the payout
+//   demo uses), each auto-assigned to a courier.
 //
 // In production this step would create a Stripe PaymentIntent and be confirmed
 // by a signed webhook (the payout demo already proves the live Stripe flow);
@@ -69,8 +70,9 @@ function handlePayOrder(PDO $pdo, array $auth, string $orderId): void {
     $pdo->prepare('INSERT INTO receipt (receiptId, orderId) VALUES (:rid, :oid)')
         ->execute(['rid' => $rcptId, 'oid' => $orderId]);
 
-    // auto-assign a courier (same helper as the demo / a real webhook)
-    $dispatch = assignDelivery($pdo, $orderId);
+    // auto-dispatch the order: one parcel per supplier, each auto-assigned to
+    // the least-loaded courier (same helper as the demo / a real webhook)
+    $dispatch = dispatchOrder($pdo, $orderId);
 
     $pdo->commit();
   } catch (Throwable $e) {
@@ -87,7 +89,7 @@ function handlePayOrder(PDO $pdo, array $auth, string $orderId): void {
     'paymentId'     => $payId,
     'paymentMethod' => $method,
     'amount'        => $amount,
-    'delivery'      => $dispatch,
+    'deliveries'    => $dispatch,
   ]);
 }
 

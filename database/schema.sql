@@ -328,20 +328,24 @@ CREATE TABLE receipt (
 CREATE TABLE delivery (
     deliveryId          VARCHAR(10)  NOT NULL,            -- DLV0001
     orderId             VARCHAR(10)  NOT NULL,
+    supplierId          VARCHAR(10)  NOT NULL,            -- one delivery per supplier in the order (split fulfilment)
     deliveryPersonnelId VARCHAR(10)  NULL,                -- assigned later by admin
     deliveryStatus      ENUM('Pending','Assigned','PickedUp',
                             'OutForDelivery','Delivered','Failed')
                             NOT NULL DEFAULT 'Pending',
     deliveryDate        DATETIME     NULL,
     estimatedDeliveryTime DATETIME   NULL,
-    otpCode             VARCHAR(10)  NULL,                -- customer confirmation OTP
+    otpCode             VARCHAR(10)  NULL,                -- customer confirmation OTP (per parcel)
     proofOfDelivery     VARCHAR(255) NULL,                -- photo path / URL
     PRIMARY KEY (deliveryId),
-    UNIQUE KEY uq_delivery_order (orderId),
+    UNIQUE KEY uq_delivery_order_supplier (orderId, supplierId),
     KEY idx_delivery_personnel (deliveryPersonnelId),
+    KEY idx_delivery_supplier (supplierId),
     KEY idx_delivery_status (deliveryStatus),
     CONSTRAINT fk_delivery_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
         ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_delivery_supplier FOREIGN KEY (supplierId) REFERENCES supplier(supplierId)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_delivery_personnel FOREIGN KEY (deliveryPersonnelId) REFERENCES delivery_personnel(deliveryPersonnelId)
         ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB;

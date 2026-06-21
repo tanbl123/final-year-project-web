@@ -61,8 +61,9 @@ VALUES
 -- UNASSIGNED so it shows up in the admin "needs assignment" queue. With this
 -- state, the next auto-assign would pick DEL0002 or DEL0003 (load 0) over
 -- DEL0001 (load 1) — demonstrating the load-based scoring.
+-- Both seed orders are single-supplier (SUP0001), so each is one parcel.
 INSERT IGNORE INTO delivery
-  (deliveryId, orderId, deliveryPersonnelId, deliveryStatus, estimatedDeliveryTime)
+  (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryStatus, estimatedDeliveryTime)
 VALUES
-  ('DLV0001', 'ORD0007', 'DEL0001', 'OutForDelivery', '2026-06-16 18:00:00'),
-  ('DLV0002', 'ORD0006', NULL,      'Pending',        NULL);
+  ('DLV0001', 'ORD0007', 'SUP0001', 'DEL0001', 'OutForDelivery', '2026-06-16 18:00:00'),
+  ('DLV0002', 'ORD0006', 'SUP0001', NULL,      'Pending',        NULL);

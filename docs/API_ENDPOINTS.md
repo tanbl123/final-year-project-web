@@ -346,14 +346,22 @@ updates (Section 11) drive the later stages.
 | POST  | `/admin/deliveries/{deliveryId}/assign` | Admin | Manually (re)assign a courier. Body: `{ "deliveryPersonnelId": "DEL0001" }`. `Pending` → `Assigned`; allowed until the delivery is `Delivered`/`Failed`. |
 | GET   | `/delivery/assignments` | Delivery | **(Implemented)** The courier's active deliveries (Assigned/PickedUp/OutForDelivery) with customer address + phone. |
 | GET   | `/delivery/history` | Delivery | **(Implemented)** The courier's finished deliveries (Delivered/Failed). |
-| GET   | `/deliveries/{deliveryId}` | Delivery(Owner) | **(Implemented)** Detail: customer contact, address, items (OTP **not** returned to the courier). |
-| PATCH | `/deliveries/{deliveryId}/status` | Delivery(Owner) | **(Implemented)** `Assigned→PickedUp→OutForDelivery` (or `→Failed`); order status kept in step; going `OutForDelivery` generates the customer's OTP. |
-| POST  | `/deliveries/{deliveryId}/verify-otp` | Delivery(Owner) | **(Implemented)** Body: `{ "otpCode": "1234" }`. On match (must be OutForDelivery) → `Delivered`, order → `Delivered`. |
+| GET   | `/deliveries/{deliveryId}` | Delivery(Owner) | **(Implemented)** Detail: **pickup** (the parcel's supplier + `pickupAddress`), customer contact + address, and only THIS supplier's items (OTP **not** returned to the courier). |
+| PATCH | `/deliveries/{deliveryId}/status` | Delivery(Owner) | **(Implemented)** `Assigned→PickedUp→OutForDelivery` (or `→Failed`); the order status is rolled up from all its parcels; going `OutForDelivery` generates this parcel's OTP. |
+| POST  | `/deliveries/{deliveryId}/verify-otp` | Delivery(Owner) | **(Implemented)** Body: `{ "otpCode": "1234" }`. On match (must be OutForDelivery) → this parcel `Delivered`; order → `Delivered` only once **every** parcel is delivered. |
 | POST  | `/deliveries/{deliveryId}/proof` | Delivery(Owner) | **(Implemented)** Attach a proof-of-delivery photo URL (uploaded via `/uploads`). |
 
-> The customer reads their OTP from order tracking (`GET /orders/{id}` →
-> `delivery.otpCode`, set when the delivery goes OutForDelivery) and reads it to
-> the courier, who enters it to confirm receipt.
+> **Split fulfilment (one parcel per supplier).** An order can contain items
+> from several suppliers, so on payment the order is split into **one delivery
+> per supplier** — each with its own pickup address (the supplier's
+> `operationalAddress`), its own courier, and its own OTP. This mirrors how
+> Shopee/Lazada/Amazon ship multi-seller orders as independent parcels. Order
+> detail therefore returns a `deliveries[]` array (per supplier), and the order's
+> own status is a rollup of the least-progressed parcel.
+
+> The customer reads each parcel's OTP from order tracking (`GET /orders/{id}` →
+> `deliveries[].otpCode`, set when that parcel goes OutForDelivery) and reads it
+> to the courier delivering that parcel, who enters it to confirm receipt.
 
 > OTP + proof-of-delivery satisfy the delivery app's confirmation requirement.
 
