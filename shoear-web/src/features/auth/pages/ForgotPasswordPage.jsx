@@ -219,6 +219,12 @@ function ForgotPasswordPage() {
   if (step === 'verify') {
     return (
       <div className="container py-5" style={{ maxWidth: '420px' }}>
+        <div className="mb-2">
+          <button type="button" className="btn btn-link p-0"
+            onClick={() => { setStep('request'); setCodeError(''); setInfo(''); }}>
+            ← Change email
+          </button>
+        </div>
         <h1 className="mb-3 text-center">📧 Enter code</h1>
         <form onSubmit={handleVerify} className="card card-body shadow-sm text-start" noValidate>
           <p className="text-muted">
@@ -247,16 +253,10 @@ function ForgotPasswordPage() {
             {verifying ? 'Verifying…' : 'Verify code'}
           </button>
 
-          <div className="d-flex justify-content-between align-items-center mt-3">
-            <button type="button" className="btn btn-link p-0"
-              onClick={() => { setStep('request'); setCodeError(''); setInfo(''); }}>
-              ← Change email
-            </button>
-            <button type="button" className="btn btn-link p-0"
-              onClick={handleResend} disabled={resendIn > 0 || resending}>
-              {resending ? 'Sending…' : resendIn > 0 ? `Resend code (${resendIn}s)` : 'Resend code'}
-            </button>
-          </div>
+          <button type="button" className="btn btn-outline-secondary w-100 mt-2 text-center"
+            onClick={handleResend} disabled={resendIn > 0 || resending}>
+            {resending ? 'Sending…' : resendIn > 0 ? `Resend code (${resendIn}s)` : 'Resend code'}
+          </button>
         </form>
       </div>
     );
