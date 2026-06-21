@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:customer/features/auth/services/account_service.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
+import 'package:customer/features/auth/screens/change_password_screen.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 
 /// The customer's profile: view/edit details, change password, delete account.
@@ -128,10 +129,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openChangePassword() async {
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const _ChangePasswordSheet(),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
     );
     if (ok == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed.')));
@@ -248,69 +247,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               child: _saving
                   ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Save'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Change-password sheet — owns its controllers; pops `true` on success.
-class _ChangePasswordSheet extends StatefulWidget {
-  const _ChangePasswordSheet();
-
-  @override
-  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
-}
-
-class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
-  final TextEditingController _current = TextEditingController();
-  final TextEditingController _next = TextEditingController();
-  bool _saving = false;
-  String? _err;
-
-  @override
-  void dispose() {
-    _current.dispose();
-    _next.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() { _saving = true; _err = null; });
-    try {
-      await context.read<AccountService>().changePassword(_current.text, _next.text);
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      if (mounted) setState(() { _saving = false; _err = e.toString(); });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 16 + MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Change password', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          if (_err != null) ...[
-            Text(_err!, style: TextStyle(color: Colors.red.shade700)),
-            const SizedBox(height: 8),
-          ],
-          _profileField(_current, 'Current password', obscure: true),
-          _profileField(_next, 'New password', obscure: true),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: _saving
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Update password'),
             ),
           ),
         ],
