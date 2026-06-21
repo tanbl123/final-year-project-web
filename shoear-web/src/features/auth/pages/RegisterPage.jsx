@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { register, sendRegisterCode, uploadRegistrationDoc, checkUsername } from '../authService';
 import EyeIcon from '../../../components/EyeIcon';
 import ClearableInput from '../../../components/ClearableInput';
+import BackButton from '../../../components/BackButton';
 
 // Reduce free text (e.g. a company name) to a valid username body:
 // lowercase, only letters/numbers/underscore, max 20 chars.
@@ -519,6 +520,7 @@ function RegisterPage() {
 
   return (
     <div className="container py-5" style={{ maxWidth: '540px' }}>
+      <BackButton to="/login" />
       <h1 className="mb-4 text-center">👟 Supplier Registration</h1>
       <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
         {formError && <div className="alert alert-danger py-2">{formError}</div>}
