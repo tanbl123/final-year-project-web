@@ -4,7 +4,7 @@ Two Flutter apps live here. Both consume the **same PHP REST API** in
 `../backend/` (contract in `../docs/API_ENDPOINTS.md`).
 
 ```
-mobile/
+shoear-mobile/
 ├── customer/    Customer app — browse, AR try-on, cart, checkout, track, review, refund
 └── delivery/    Delivery personnel app — assignments, status, OTP confirm, proof
 ```
@@ -19,7 +19,7 @@ folders (`android/`, `ios/`, …) and `build/` / `.dart_tool/` are gitignored, s
 each app needs `flutter create .` run once locally to add them:
 
 ```bash
-cd mobile/customer
+cd shoear-mobile/customer
 flutter create .   # generates android/ios/etc around the existing lib/
 flutter pub get
 flutter run

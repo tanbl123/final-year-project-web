@@ -94,10 +94,10 @@ The schema is complete in **`database/schema.sql`** (22 tables) with rationale i
   (assignments → status → OTP → proof). Stripe payout demo proves the live
   money flow.
 
-Remaining work (mostly **separate codebases** — see `mobile/README.md`):
-1. **Flutter customer app** (`mobile/customer/`) — the primary user app +
+Remaining work (mostly **separate codebases** — see `shoear-mobile/README.md`):
+1. **Flutter customer app** (`shoear-mobile/customer/`) — the primary user app +
    **AR virtual try-on** (flagship #1). Consumes the customer API.
-2. **Flutter delivery app** (`mobile/delivery/`) — consumes the delivery API.
+2. **Flutter delivery app** (`shoear-mobile/delivery/`) — consumes the delivery API.
 3. **ML recommender** (`ml/`, Python/Flask) — flagship #2.
 4. Loose ends (in `backend/`): real Stripe **PaymentIntent + webhook** (payment
    is simulated for now), **push notifications**, and final testing.

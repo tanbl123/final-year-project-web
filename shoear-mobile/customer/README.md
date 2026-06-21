@@ -34,7 +34,7 @@ From inside this folder, let Flutter create the `android/` `ios/` etc. wrappers
 around the existing `lib/` + `pubspec.yaml`:
 
 ```bash
-cd mobile/customer
+cd shoear-mobile/customer
 flutter create .
 flutter pub get
 ```
