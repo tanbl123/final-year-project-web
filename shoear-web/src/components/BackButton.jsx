@@ -2,9 +2,9 @@ import { useNavigate, Link } from 'react-router-dom';
 
 // A standard, left-aligned back control for detail/sub pages — a small outline
 // button showing just a ← arrow (real e-commerce sites keep it minimal). Pass
-// `label` to also show text; pass `to` for a fixed destination, or omit it to
-// go back in history.
-function BackButton({ to, label, className = '' }) {
+// `label` to also show text; pass `onClick` for a custom action, `to` for a
+// fixed destination, or omit both to go back in history.
+function BackButton({ to, onClick, label, className = '' }) {
   const navigate = useNavigate();
   const cls = `btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 ${className}`;
   const title = label || 'Go back';
@@ -18,9 +18,11 @@ function BackButton({ to, label, className = '' }) {
   );
   return (
     <div className="text-start mb-3">
-      {to
-        ? <Link to={to} className={cls} aria-label={title} title={title}>{inner}</Link>
-        : <button type="button" className={cls} aria-label={title} title={title} onClick={() => navigate(-1)}>{inner}</button>}
+      {onClick
+        ? <button type="button" className={cls} aria-label={title} title={title} onClick={onClick}>{inner}</button>
+        : to
+          ? <Link to={to} className={cls} aria-label={title} title={title}>{inner}</Link>
+          : <button type="button" className={cls} aria-label={title} title={title} onClick={() => navigate(-1)}>{inner}</button>}
     </div>
   );
 }

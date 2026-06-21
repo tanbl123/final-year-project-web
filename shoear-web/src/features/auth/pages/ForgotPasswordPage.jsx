@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { forgotPassword, verifyResetCode, resetPassword } from '../authService';
 import EyeIcon from '../../../components/EyeIcon';
+import BackButton from '../../../components/BackButton';
 
 // Same password policy as registration: 8+ chars with a lowercase, uppercase,
 // digit and special character. Returns an error string, or '' when valid.
@@ -219,12 +220,7 @@ function ForgotPasswordPage() {
   if (step === 'verify') {
     return (
       <div className="container py-5" style={{ maxWidth: '420px' }}>
-        <div className="mb-2">
-          <button type="button" className="btn btn-link p-0"
-            onClick={() => { setStep('request'); setCodeError(''); setInfo(''); }}>
-            ← Change email
-          </button>
-        </div>
+        <BackButton onClick={() => { setStep('request'); setCodeError(''); setInfo(''); }} />
         <h1 className="mb-3 text-center">📧 Enter code</h1>
         <form onSubmit={handleVerify} className="card card-body shadow-sm text-start" noValidate>
           <p className="text-muted">
