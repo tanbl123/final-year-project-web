@@ -12,7 +12,7 @@ import 'services/wishlist_service.dart';
 import 'state/auth_provider.dart';
 import 'state/cart_provider.dart';
 import 'state/wishlist_provider.dart';
-import 'screens/catalog_screen.dart';
+import 'screens/main_shell.dart';
 
 void main() {
   final api = ApiClient();
@@ -53,7 +53,7 @@ class ShoeArApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4F46E5)),
           useMaterial3: true,
         ),
-        home: const CatalogScreen(),
+        home: const MainShell(),
       ),
     );
   }

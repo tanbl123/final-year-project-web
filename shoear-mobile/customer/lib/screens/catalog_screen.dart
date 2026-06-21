@@ -7,13 +7,8 @@ import '../models/category.dart';
 import '../models/product.dart';
 import '../services/catalog_service.dart';
 import '../state/auth_provider.dart';
-import '../state/cart_provider.dart';
-import 'cart_screen.dart';
 import 'login_screen.dart';
-import 'orders_screen.dart';
 import 'product_detail_screen.dart';
-import 'profile_screen.dart';
-import 'wishlist_screen.dart';
 
 /// Home screen: a searchable grid of approved products. Browsable as a guest;
 /// an account menu in the app bar handles sign in / sign out.
@@ -93,7 +88,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('👟 ShoeAR'),
-        actions: [_filterAction(context), _cartAction(context), _accountAction(context)],
+        actions: [_filterAction(context), _accountAction(context)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -276,57 +271,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
     maxCtrl.dispose();
   }
 
-  Widget _cartAction(BuildContext context) {
-    final count = context.watch<CartProvider>().count;
-    return Badge(
-      isLabelVisible: count > 0,
-      label: Text('$count'),
-      offset: const Offset(-4, 4),
-      child: IconButton(
-        icon: const Icon(Icons.shopping_cart_outlined),
-        tooltip: 'Cart',
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CartScreen()),
-        ),
-      ),
-    );
-  }
 
+  // Home keeps a Login shortcut for guests; signed-in users manage everything
+  // from the Wishlist / Orders / Profile tabs in the bottom bar.
   Widget _accountAction(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    if (!auth.isLoggedIn) {
-      return TextButton.icon(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        ),
-        icon: const Icon(Icons.login),
-        label: const Text('Login'),
-      );
-    }
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.account_circle),
-      onSelected: (v) {
-        if (v == 'logout') {
-          context.read<AuthProvider>().logout();
-        } else if (v == 'orders') {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
-        } else if (v == 'wishlist') {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WishlistScreen()));
-        } else if (v == 'profile') {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
-        }
-      },
-      itemBuilder: (context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text('Hi, ${auth.user?.fullName ?? 'Customer'}'),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(value: 'profile', child: Text('Profile')),
-        const PopupMenuItem<String>(value: 'orders', child: Text('My orders')),
-        const PopupMenuItem<String>(value: 'wishlist', child: Text('My wishlist')),
-        const PopupMenuItem<String>(value: 'logout', child: Text('Sign out')),
-      ],
+    final loggedIn = context.watch<AuthProvider>().isLoggedIn;
+    if (loggedIn) return const SizedBox.shrink();
+    return TextButton.icon(
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      ),
+      icon: const Icon(Icons.login),
+      label: const Text('Login'),
     );
   }
 }

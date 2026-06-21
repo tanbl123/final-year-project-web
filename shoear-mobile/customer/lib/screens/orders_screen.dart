@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../models/order.dart';
 import '../services/order_service.dart';
+import '../state/auth_provider.dart';
+import 'login_screen.dart';
 import 'order_detail_screen.dart';
 
 const Map<String, Color> kOrderStatusColors = {
@@ -27,13 +29,8 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  late Future<List<CustomerOrderSummary>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = context.read<OrderService>().listOrders();
-  }
+  Future<List<CustomerOrderSummary>>? _future;
+  bool _wasLoggedIn = false;
 
   Future<void> _refresh() async {
     final next = context.read<OrderService>().listOrders();
@@ -43,9 +40,39 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loggedIn = context.watch<AuthProvider>().isLoggedIn;
+    if (loggedIn != _wasLoggedIn) {
+      _wasLoggedIn = loggedIn;
+      _future = null; // reload on login / drop on logout
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('My Orders')),
-      body: FutureBuilder<List<CustomerOrderSummary>>(
+      body: !loggedIn ? _signInPrompt(context) : _ordersBody(context),
+    );
+  }
+
+  Widget _signInPrompt(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.receipt_long, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              const Text('Sign in to see your orders.', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
+                child: const Text('Login'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _ordersBody(BuildContext context) {
+    _future ??= context.read<OrderService>().listOrders();
+    return FutureBuilder<List<CustomerOrderSummary>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -83,8 +110,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           );
         },
-      ),
-    );
+      );
   }
 }
 

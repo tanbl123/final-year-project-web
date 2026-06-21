@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../services/account_service.dart';
 import '../state/auth_provider.dart';
+import 'login_screen.dart';
 
 /// The customer's profile: view/edit details, change password, delete account.
 class ProfileScreen extends StatefulWidget {
@@ -13,21 +14,46 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late Future<Map<String, dynamic>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = context.read<AccountService>().me();
-  }
+  Future<Map<String, dynamic>>? _future;
+  bool _wasLoggedIn = false;
 
   void _reload() => setState(() => _future = context.read<AccountService>().me());
 
   @override
   Widget build(BuildContext context) {
+    final loggedIn = context.watch<AuthProvider>().isLoggedIn;
+    if (loggedIn != _wasLoggedIn) {
+      _wasLoggedIn = loggedIn;
+      _future = null; // reload on login / drop on logout
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('My Profile')),
-      body: FutureBuilder<Map<String, dynamic>>(
+      body: !loggedIn ? _signInPrompt(context) : _profileBody(context),
+    );
+  }
+
+  Widget _signInPrompt(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.person_outline, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              const Text('Sign in to manage your account.', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
+                child: const Text('Login'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _profileBody(BuildContext context) {
+    _future ??= context.read<AccountService>().me();
+    return FutureBuilder<Map<String, dynamic>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -58,6 +84,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.lock_outline),
                 label: const Text('Change password'),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => context.read<AuthProvider>().logout(),
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign out'),
+              ),
               const SizedBox(height: 24),
               TextButton.icon(
                 onPressed: _confirmDelete,
@@ -67,8 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _row(String k, String v) => Padding(
