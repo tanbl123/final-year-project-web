@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -22,6 +24,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   final _searchCtrl = TextEditingController();
   late Future<CatalogPage> _future;
   String _search = '';
+  Timer? _debounce;   // debounces the live search so we don't hit the API on every keystroke
 
   @override
   void initState() {
@@ -31,6 +34,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -43,9 +47,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
     await next;
   }
 
-  void _runSearch() {
+  // type-to-search: rebuild now (for the clear button), then reload after a pause
+  void _onSearchChanged(String value) {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _applySearch(value));
+  }
+
+  // run the search immediately (on submit / clear), skipping the debounce
+  void _applySearch(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q == _search) return;
     setState(() {
-      _search = _searchCtrl.text.trim();
+      _search = q;
       _future = _load();
     });
   }
@@ -63,19 +78,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
             child: TextField(
               controller: _searchCtrl,
               textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _runSearch(),
+              onChanged: _onSearchChanged,
+              onSubmitted: _applySearch,
               decoration: InputDecoration(
                 hintText: 'Search shoes or brands…',
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surface,
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _search.isEmpty
+                suffixIcon: _searchCtrl.text.isEmpty
                     ? null
                     : IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchCtrl.clear();
-                          _runSearch();
+                          _applySearch('');
                         },
                       ),
                 isDense: true,
