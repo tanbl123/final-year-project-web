@@ -82,11 +82,6 @@ export function getBusinessDetails() {
   return apiGet('/supplier/business-details', getToken());
 }
 
-// Company address is operational — editable freely (no admin review).
-export function updateCompanyAddress(companyAddress) {
-  return apiPut('/supplier/company-address', { companyAddress }, getToken());
-}
-
 // Operational (pickup) address — where couriers collect orders. Logistics, not
 // verified identity, so it's editable freely (no admin review).
 export function updateOperationalAddress(operationalAddress) {

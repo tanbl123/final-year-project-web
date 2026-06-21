@@ -451,6 +451,7 @@ CREATE TABLE supplier_change_request (
     requestId          VARCHAR(10)  NOT NULL,                 -- SCR0001
     supplierId         VARCHAR(10)  NOT NULL,
     companyName        VARCHAR(150) NOT NULL,                 -- proposed values
+    companyAddress     VARCHAR(255) NOT NULL,                 -- registered business address (verified)
     businessRegNo      VARCHAR(50)  NOT NULL,
     taxNumber          VARCHAR(50)  NULL,
     businessLicenseUrl VARCHAR(255) NOT NULL,

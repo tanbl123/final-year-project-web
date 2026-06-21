@@ -121,6 +121,7 @@ function AdminBusinessChangesPage() {
                   <div className="col-4">Proposed</div>
                 </div>
                 <DiffRow label="Company name" from={r.curCompanyName} to={r.newCompanyName} />
+                <DiffRow label="Business address" from={r.curCompanyAddress} to={r.newCompanyAddress} />
                 <DiffRow label="SSM no." from={r.curBusinessRegNo} to={r.newBusinessRegNo} />
                 <DiffRow label="SST no." from={r.curTaxNumber} to={r.newTaxNumber} />
                 <DiffRow label="Document" from={r.curBusinessLicenseUrl} to={r.newBusinessLicenseUrl} isDoc />

@@ -204,10 +204,12 @@ function handleSetUserStatus(PDO $pdo, array $auth, string $userId): void {
 function handleListChangeRequests(PDO $pdo): void {
   $stmt = $pdo->query(
     "SELECT r.requestId, r.created_at,
-            r.companyName AS newCompanyName, r.businessRegNo AS newBusinessRegNo,
+            r.companyName AS newCompanyName, r.companyAddress AS newCompanyAddress,
+            r.businessRegNo AS newBusinessRegNo,
             r.taxNumber AS newTaxNumber, r.businessLicenseUrl AS newBusinessLicenseUrl,
             s.supplierId, u.email, u.username,
-            s.companyName AS curCompanyName, s.businessRegNo AS curBusinessRegNo,
+            s.companyName AS curCompanyName, s.companyAddress AS curCompanyAddress,
+            s.businessRegNo AS curBusinessRegNo,
             s.taxNumber AS curTaxNumber, s.businessLicenseUrl AS curBusinessLicenseUrl
        FROM supplier_change_request r
        JOIN supplier s ON s.supplierId = r.supplierId
@@ -241,10 +243,11 @@ function handleApproveChangeRequest(PDO $pdo, array $auth, string $requestId): v
   try {
     $pdo->prepare(
       'UPDATE supplier
-          SET companyName = :cn, businessRegNo = :brn, taxNumber = :tax, businessLicenseUrl = :blu
+          SET companyName = :cn, companyAddress = :ca, businessRegNo = :brn,
+              taxNumber = :tax, businessLicenseUrl = :blu
         WHERE supplierId = :sid'
     )->execute([
-      'cn' => $req['companyName'], 'brn' => $req['businessRegNo'],
+      'cn' => $req['companyName'], 'ca' => $req['companyAddress'], 'brn' => $req['businessRegNo'],
       'tax' => $req['taxNumber'], 'blu' => $req['businessLicenseUrl'],
       'sid' => $req['supplierId'],
     ]);

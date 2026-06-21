@@ -1,27 +1,22 @@
 import { useEffect, useState } from 'react';
 import {
-  getBusinessDetails, updateCompanyAddress, updateOperationalAddress,
+  getBusinessDetails, updateOperationalAddress,
   submitBusinessChangeRequest, uploadRegistrationDoc,
 } from '../auth/authService';
 import ClearableInput from '../../components/ClearableInput';
 
 const SSM_RE = /^(\d{12}|\d{6,8}-?[A-Za-z])$/;
 const SST_RE = /^[A-Za-z0-9][A-Za-z0-9-]{6,18}[A-Za-z0-9]$/;
-const EMPTY_REQ = { companyName: '', businessRegNo: '', taxNumber: '', businessLicenseUrl: '' };
+const EMPTY_REQ = { companyName: '', companyAddress: '', businessRegNo: '', taxNumber: '', businessLicenseUrl: '' };
 
-// Supplier-only card on the profile page. Company address is editable freely;
-// the verified fields (company name, SSM, SST, document) can only be CHANGED by
-// submitting a request that an admin re-approves — the account stays Active.
+// Supplier-only card on the profile page. The operational (pickup) address is
+// editable freely; the verified identity fields (company name, business address,
+// SSM, SST, document) can only be CHANGED by submitting a request that an admin
+// re-approves — the account stays Active.
 function BusinessDetailsCard({ onToast }) {
   const [data, setData] = useState(null);        // { current, latestRequest }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // free address edit (company / registered address)
-  const [addrEditing, setAddrEditing] = useState(false);
-  const [addr, setAddr] = useState('');
-  const [addrError, setAddrError] = useState('');
-  const [addrSaving, setAddrSaving] = useState(false);
 
   // free address edit (operational / pickup address)
   const [opEditing, setOpEditing] = useState(false);
@@ -57,25 +52,6 @@ function BusinessDetailsCard({ onToast }) {
   const last = data.latestRequest;
   const pending = last && last.requestStatus === 'Pending';
 
-  // ── company address (free edit) ───────────────────────────────────
-  function startAddr() { setAddr(cur.companyAddress || ''); setAddrError(''); setAddrEditing(true); }
-  async function saveAddr(e) {
-    e.preventDefault();
-    if (!addr.trim()) { setAddrError('Company address is required.'); return; }
-    if (addr.trim() === (cur.companyAddress || '')) { setAddrEditing(false); return; }
-    setAddrSaving(true);
-    try {
-      const saved = await updateCompanyAddress(addr.trim());
-      setData((d) => ({ ...d, current: { ...d.current, ...saved } }));
-      setAddrEditing(false);
-      onToast?.('Company address updated.');
-    } catch (err) {
-      setAddrError(err.message);
-    } finally {
-      setAddrSaving(false);
-    }
-  }
-
   // ── operational (pickup) address (free edit) ──────────────────────
   function startOp() { setOpAddr(cur.operationalAddress || cur.companyAddress || ''); setOpError(''); setOpEditing(true); }
   async function saveOp(e) {
@@ -99,6 +75,7 @@ function BusinessDetailsCard({ onToast }) {
   function openRequest() {
     setReq({
       companyName: cur.companyName || '',
+      companyAddress: cur.companyAddress || '',
       businessRegNo: cur.businessRegNo || '',
       taxNumber: cur.taxNumber || '',
       businessLicenseUrl: cur.businessLicenseUrl || '',
@@ -130,6 +107,7 @@ function BusinessDetailsCard({ onToast }) {
   function validateReq() {
     const e = {};
     if (!req.companyName.trim()) e.companyName = 'Company name is required.';
+    if (!req.companyAddress.trim()) e.companyAddress = 'Business address is required.';
     if (!req.businessRegNo.trim()) e.businessRegNo = 'SSM number is required.';
     else if (!SSM_RE.test(req.businessRegNo.trim())) e.businessRegNo = 'Enter a valid SSM number, e.g. 202301012345 or 1234567-A.';
     if (req.taxNumber.trim() && !SST_RE.test(req.taxNumber.trim())) e.taxNumber = 'Enter a valid SST number, e.g. W10-1808-32000001.';
@@ -139,6 +117,7 @@ function BusinessDetailsCard({ onToast }) {
   // has anything actually changed vs the current verified values?
   const reqDirty = reqOpen && (
     req.companyName.trim() !== (cur.companyName || '') ||
+    req.companyAddress.trim() !== (cur.companyAddress || '') ||
     req.businessRegNo.trim() !== (cur.businessRegNo || '') ||
     req.taxNumber.trim() !== (cur.taxNumber || '') ||
     req.businessLicenseUrl !== (cur.businessLicenseUrl || '')
@@ -153,6 +132,7 @@ function BusinessDetailsCard({ onToast }) {
     try {
       await submitBusinessChangeRequest({
         companyName: req.companyName.trim(),
+        companyAddress: req.companyAddress.trim(),
         businessRegNo: req.businessRegNo.trim(),
         taxNumber: req.taxNumber.trim(),
         businessLicenseUrl: req.businessLicenseUrl,
@@ -187,6 +167,7 @@ function BusinessDetailsCard({ onToast }) {
             <div className="small mt-1">Your account stays active while we review these proposed changes:</div>
             <ul className="small mb-0 mt-1">
               {last.companyName !== cur.companyName && <li>Company name → <strong>{last.companyName}</strong></li>}
+              {last.companyAddress !== cur.companyAddress && <li>Business address → <strong>{last.companyAddress}</strong></li>}
               {last.businessRegNo !== cur.businessRegNo && <li>SSM no. → <strong>{last.businessRegNo}</strong></li>}
               {(last.taxNumber || '') !== (cur.taxNumber || '') && <li>SST no. → <strong>{last.taxNumber || '—'}</strong></li>}
               {last.businessLicenseUrl !== cur.businessLicenseUrl && <li>New registration document uploaded</li>}
@@ -216,32 +197,9 @@ function BusinessDetailsCard({ onToast }) {
               : <span className="text-muted">—</span>}
           </dd>
 
-          {/* business / registered address — free edit */}
+          {/* business / registered address — verified; changed via Request changes */}
           <dt className="col-sm-4">Business address</dt>
-          <dd className="col-sm-8">
-            {addrEditing ? (
-              <form onSubmit={saveAddr} className="d-flex flex-column gap-2">
-                <ClearableInput type="text" maxLength="255"
-                  className={addrError ? 'is-invalid' : ''}
-                  value={addr}
-                  onChange={(e) => { setAddr(e.target.value); if (addrError) setAddrError(''); }}
-                  onClear={() => setAddr('')} />
-                {addrError && <div className="invalid-feedback d-block">{addrError}</div>}
-                <div className="d-flex gap-2">
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={addrSaving}>
-                    {addrSaving ? 'Saving…' : 'Save'}
-                  </button>
-                  <button type="button" className="btn btn-outline-secondary btn-sm"
-                    onClick={() => setAddrEditing(false)} disabled={addrSaving}>Cancel</button>
-                </div>
-              </form>
-            ) : (
-              <div className="d-flex justify-content-between align-items-start gap-2">
-                <span>{cur.companyAddress || <span className="text-muted">—</span>}</span>
-                <button className="btn btn-link btn-sm p-0" onClick={startAddr}>Edit</button>
-              </div>
-            )}
-          </dd>
+          <dd className="col-sm-8">{cur.companyAddress || <span className="text-muted">—</span>}</dd>
 
           {/* operational / pickup address — free edit */}
           <dt className="col-sm-4">Operational (pickup) address</dt>
@@ -289,6 +247,15 @@ function BusinessDetailsCard({ onToast }) {
                 onChange={(e) => setReqField('companyName', e.target.value)}
                 onClear={() => setReqField('companyName', '')} />
               {reqErrors.companyName && <div className="invalid-feedback d-block">{reqErrors.companyName}</div>}
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Business address</label>
+              <ClearableInput type="text" maxLength="255"
+                className={reqErrors.companyAddress ? 'is-invalid' : ''}
+                value={req.companyAddress}
+                onChange={(e) => setReqField('companyAddress', e.target.value)}
+                onClear={() => setReqField('companyAddress', '')} />
+              {reqErrors.companyAddress && <div className="invalid-feedback d-block">{reqErrors.companyAddress}</div>}
             </div>
             <div className="mb-3">
               <label className="form-label">Business registration no. (SSM)</label>
