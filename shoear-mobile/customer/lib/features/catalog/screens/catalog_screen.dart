@@ -1,0 +1,422 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import 'package:customer/core/widgets/product_image.dart';
+import 'package:provider/provider.dart';
+
+import 'package:customer/features/catalog/models/category.dart';
+import 'package:customer/features/catalog/models/product.dart';
+import 'package:customer/features/catalog/services/catalog_service.dart';
+import 'package:customer/features/auth/state/auth_provider.dart';
+import 'package:customer/features/auth/screens/login_screen.dart';
+import 'package:customer/features/catalog/screens/product_detail_screen.dart';
+
+/// Home screen: a searchable grid of approved products. Browsable as a guest;
+/// an account menu in the app bar handles sign in / sign out.
+class CatalogScreen extends StatefulWidget {
+  const CatalogScreen({super.key});
+
+  @override
+  State<CatalogScreen> createState() => _CatalogScreenState();
+}
+
+class _CatalogScreenState extends State<CatalogScreen> {
+  final _searchCtrl = TextEditingController();
+  late Future<CatalogPage> _future;
+  String _search = '';
+  Timer? _debounce;   // debounces the live search so we don't hit the API on every keystroke
+
+  // filters
+  List<Category> _categories = [];
+  String? _categoryId;
+  double? _minPrice;
+  double? _maxPrice;
+  String? _sort;   // price_asc | price_desc | newest
+
+  bool get _filtersActive => _categoryId != null || _minPrice != null || _maxPrice != null || _sort != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+    // categories for the filter dropdown (best-effort)
+    context.read<CatalogService>().listCategories().then((cats) {
+      if (mounted) setState(() => _categories = cats);
+    }).catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<CatalogPage> _load() => context.read<CatalogService>().listProducts(
+        search: _search,
+        categoryId: _categoryId,
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
+        sort: _sort,
+      );
+
+  Future<void> _refresh() async {
+    final next = _load();
+    setState(() => _future = next);
+    await next;
+  }
+
+  // type-to-search: rebuild now (for the clear button), then reload after a pause
+  void _onSearchChanged(String value) {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _applySearch(value));
+  }
+
+  // run the search immediately (on submit / clear), skipping the debounce
+  void _applySearch(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q == _search) return;
+    setState(() {
+      _search = q;
+      _future = _load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('👟 ShoeAR'),
+        actions: [_filterAction(context), _accountAction(context)],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: TextField(
+              controller: _searchCtrl,
+              textInputAction: TextInputAction.search,
+              onChanged: _onSearchChanged,
+              onSubmitted: _applySearch,
+              decoration: InputDecoration(
+                hintText: 'Search shoes or brands…',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchCtrl.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          _applySearch('');
+                        },
+                      ),
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<CatalogPage>(
+          future: _future,
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snap.hasError) {
+              return _ErrorView(message: snap.error.toString(), onRetry: _refresh);
+            }
+            final items = snap.data?.items ?? [];
+            if (items.isEmpty) {
+              return ListView(
+                children: const [
+                  SizedBox(height: 120),
+                  Center(child: Text('No products found.')),
+                ],
+              );
+            }
+            return GridView.builder(
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 220,
+                childAspectRatio: 0.62,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: items.length,
+              itemBuilder: (context, i) => _ProductCard(product: items[i]),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _filterAction(BuildContext context) {
+    return Badge(
+      isLabelVisible: _filtersActive,
+      smallSize: 8,
+      child: IconButton(
+        icon: const Icon(Icons.tune),
+        tooltip: 'Filters',
+        onPressed: _openFilters,
+      ),
+    );
+  }
+
+  Future<void> _openFilters() async {
+    final result = await showModalBottomSheet<_FilterResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _FilterSheet(
+        categories: _categories,
+        categoryId: _categoryId,
+        sort: _sort,
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _categoryId = result.categoryId;
+        _sort = result.sort;
+        _minPrice = result.minPrice;
+        _maxPrice = result.maxPrice;
+        _future = _load();
+      });
+    }
+  }
+
+
+  // Home keeps a Login shortcut for guests; signed-in users manage everything
+  // from the Wishlist / Orders / Profile tabs in the bottom bar.
+  Widget _accountAction(BuildContext context) {
+    final loggedIn = context.watch<AuthProvider>().isLoggedIn;
+    if (loggedIn) return const SizedBox.shrink();
+    return TextButton.icon(
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      ),
+      icon: const Icon(Icons.login),
+      label: const Text('Login'),
+    );
+  }
+}
+
+class _ProductCard extends StatelessWidget {
+  final ProductSummary product;
+  const _ProductCard({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: product.id)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ProductImage(url: product.imageUrl),
+                  if (product.virtualTryOnEnable)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text('AR', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(product.brand.toUpperCase(),
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                  Text(product.name,
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text('RM ${product.price.toStringAsFixed(2)}',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  if (product.ratingCount > 0)
+                    Text('★ ${product.ratingAverage} (${product.ratingCount})',
+                        style: TextStyle(fontSize: 12, color: Colors.amber.shade800)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        const SizedBox(height: 100),
+        const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+        ),
+        const SizedBox(height: 16),
+        Center(child: OutlinedButton(onPressed: onRetry, child: const Text('Retry'))),
+      ],
+    );
+  }
+}
+
+/// Result of the filter sheet.
+class _FilterResult {
+  final String? categoryId;
+  final String? sort;
+  final double? minPrice;
+  final double? maxPrice;
+  _FilterResult({this.categoryId, this.sort, this.minPrice, this.maxPrice});
+}
+
+/// Filter sheet — owns its own controllers (disposed in dispose) so they're
+/// never freed while their text fields are still attached.
+class _FilterSheet extends StatefulWidget {
+  final List<Category> categories;
+  final String? categoryId;
+  final String? sort;
+  final double? minPrice;
+  final double? maxPrice;
+  const _FilterSheet({
+    required this.categories,
+    this.categoryId,
+    this.sort,
+    this.minPrice,
+    this.maxPrice,
+  });
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late String? _cat = widget.categoryId;
+  late String? _sort = widget.sort;
+  late final TextEditingController _min = TextEditingController(text: widget.minPrice?.toStringAsFixed(0) ?? '');
+  late final TextEditingController _max = TextEditingController(text: widget.maxPrice?.toStringAsFixed(0) ?? '');
+
+  @override
+  void dispose() {
+    _min.dispose();
+    _max.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 16 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Filters', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String?>(
+            value: _cat,
+            decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All categories')),
+              for (final c in widget.categories) DropdownMenuItem<String?>(value: c.id, child: Text(c.name)),
+            ],
+            onChanged: (v) => setState(() => _cat = v),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            value: _sort,
+            decoration: const InputDecoration(labelText: 'Sort by', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem<String?>(value: null, child: Text('Newest')),
+              DropdownMenuItem<String?>(value: 'price_asc', child: Text('Price: low to high')),
+              DropdownMenuItem<String?>(value: 'price_desc', child: Text('Price: high to low')),
+            ],
+            onChanged: (v) => setState(() => _sort = v),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _min,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Min price', prefixText: 'RM ', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _max,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Max price', prefixText: 'RM ', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => setState(() {
+                    _cat = null;
+                    _sort = null;
+                    _min.clear();
+                    _max.clear();
+                  }),
+                  child: const Text('Clear'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(_FilterResult(
+                    categoryId: _cat,
+                    sort: _sort,
+                    minPrice: double.tryParse(_min.text.trim()),
+                    maxPrice: double.tryParse(_max.text.trim()),
+                  )),
+                  child: const Text('Apply'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

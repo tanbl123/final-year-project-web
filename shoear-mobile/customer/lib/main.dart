@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'api/api_client.dart';
-import 'services/account_service.dart';
-import 'services/auth_service.dart';
-import 'services/catalog_service.dart';
-import 'services/cart_service.dart';
-import 'services/order_service.dart';
-import 'services/review_service.dart';
-import 'services/wishlist_service.dart';
-import 'state/auth_provider.dart';
-import 'state/cart_provider.dart';
-import 'state/wishlist_provider.dart';
-import 'screens/main_shell.dart';
+import 'package:customer/core/api/api_client.dart';
+import 'package:customer/features/auth/services/account_service.dart';
+import 'package:customer/features/auth/services/auth_service.dart';
+import 'package:customer/features/catalog/services/catalog_service.dart';
+import 'package:customer/features/cart/services/cart_service.dart';
+import 'package:customer/features/order/services/order_service.dart';
+import 'package:customer/features/review/services/review_service.dart';
+import 'package:customer/features/wishlist/services/wishlist_service.dart';
+import 'package:customer/features/auth/state/auth_provider.dart';
+import 'package:customer/features/cart/state/cart_provider.dart';
+import 'package:customer/features/wishlist/state/wishlist_provider.dart';
+import 'package:customer/features/shell/main_shell.dart';
 
 void main() {
   final api = ApiClient();
