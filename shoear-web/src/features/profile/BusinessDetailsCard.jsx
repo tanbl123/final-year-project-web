@@ -4,6 +4,7 @@ import {
   submitBusinessChangeRequest, uploadRegistrationDoc,
 } from '../auth/authService';
 import ClearableInput from '../../components/ClearableInput';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const SSM_RE = /^(\d{12}|\d{6,8}-?[A-Za-z])$/;
 const SST_RE = /^[A-Za-z0-9][A-Za-z0-9-]{6,18}[A-Za-z0-9]$/;
@@ -31,6 +32,9 @@ function BusinessDetailsCard({ onToast }) {
   const [reqSubmitting, setReqSubmitting] = useState(false);
   const [licenseName, setLicenseName] = useState('');
   const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // discard-changes prompt: 'op' (operational address) | 'request' (change form)
+  const [discard, setDiscard] = useState(null);
 
   function load() {
     setLoading(true);
@@ -69,6 +73,13 @@ function BusinessDetailsCard({ onToast }) {
     } finally {
       setOpSaving(false);
     }
+  }
+
+  // cancel the operational edit — confirm first if there are unsaved changes
+  function cancelOp() {
+    const baseline = cur.operationalAddress || cur.companyAddress || '';
+    if (opAddr.trim() !== baseline) setDiscard('op');
+    else setOpEditing(false);
   }
 
   // ── change request (verified fields) ──────────────────────────────
@@ -147,6 +158,17 @@ function BusinessDetailsCard({ onToast }) {
     }
   }
 
+  // cancel the change-request form — confirm first if there are unsaved changes
+  function cancelRequest() {
+    if (reqDirty) setDiscard('request');
+    else setReqOpen(false);
+  }
+  function confirmDiscard() {
+    if (discard === 'op') setOpEditing(false);
+    if (discard === 'request') setReqOpen(false);
+    setDiscard(null);
+  }
+
   return (
     <div className="card mt-4">
       <div className="card-body">
@@ -222,7 +244,7 @@ function BusinessDetailsCard({ onToast }) {
                     {opSaving ? 'Saving…' : 'Save'}
                   </button>
                   <button type="button" className="btn btn-outline-secondary btn-sm"
-                    onClick={() => setOpEditing(false)} disabled={opSaving}>Cancel</button>
+                    onClick={cancelOp} disabled={opSaving}>Cancel</button>
                 </div>
               </form>
             ) : (
@@ -305,11 +327,21 @@ function BusinessDetailsCard({ onToast }) {
                 {reqSubmitting ? 'Submitting…' : 'Submit for review'}
               </button>
               <button type="button" className="btn btn-outline-secondary"
-                onClick={() => setReqOpen(false)} disabled={reqSubmitting}>Cancel</button>
+                onClick={cancelRequest} disabled={reqSubmitting}>Cancel</button>
             </div>
           </form>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!discard}
+        title="Discard changes?"
+        message="You have unsaved changes. Are you sure you want to discard them?"
+        confirmText="Discard"
+        confirmColor="danger"
+        onCancel={() => setDiscard(null)}
+        onConfirm={confirmDiscard}
+      />
     </div>
   );
 }
