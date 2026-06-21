@@ -36,7 +36,8 @@ function ForgotPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [shown, setShown] = useState({ password: false, confirm: false });
-  const [resetError, setResetError] = useState('');
+  const [pwErrors, setPwErrors] = useState({});   // per-field inline errors
+  const [resetError, setResetError] = useState(''); // server-side errors only
   const [resetting, setResetting] = useState(false);
 
   const [done, setDone] = useState(false);
@@ -50,6 +51,48 @@ function ForgotPasswordPage() {
 
   function toggleShown(name) {
     setShown((prev) => ({ ...prev, [name]: !prev[name] }));
+  }
+
+  // Validate one password field against the latest values (same rules as the
+  // register form). Returns an error string, or '' when valid.
+  function pwFieldError(name, pw, cf) {
+    if (name === 'password') return validatePassword(pw);
+    if (name === 'confirm') {
+      if (cf === '') return 'Please confirm your password.';
+      if (pw !== cf) return 'Passwords do not match.';
+    }
+    return '';
+  }
+
+  // live re-check (only once a field already shows an error), like register/login
+  function handlePwChange(name, val) {
+    const nextPw = name === 'password' ? val : password;
+    const nextCf = name === 'confirm' ? val : confirm;
+    if (name === 'password') setPassword(val); else setConfirm(val);
+    setResetError('');
+    setPwErrors((prev) => {
+      const next = { ...prev };
+      if (name in prev) {
+        const msg = pwFieldError(name, nextPw, nextCf);
+        if (msg) next[name] = msg; else delete next[name];
+      }
+      // password & confirm are linked — keep the confirm error in sync
+      if (name === 'password' && 'confirm' in prev) {
+        const msg = pwFieldError('confirm', nextPw, nextCf);
+        if (msg) next.confirm = msg; else delete next.confirm;
+      }
+      return next;
+    });
+  }
+
+  // validate a field when the user leaves it (on blur)
+  function handlePwBlur(name) {
+    setPwErrors((prev) => {
+      const next = { ...prev };
+      const msg = pwFieldError(name, password, confirm);
+      if (msg) next[name] = msg; else delete next[name];
+      return next;
+    });
   }
 
   // Step 1 → email a code, then move to the verify step.
@@ -105,9 +148,13 @@ function ForgotPasswordPage() {
   async function handleReset(event) {
     event.preventDefault();
     setResetError('');
-    const pwError = validatePassword(password);
-    if (pwError) { setResetError(pwError); return; }
-    if (password !== confirm) { setResetError('Passwords do not match.'); return; }
+    const errs = {};
+    const pwMsg = pwFieldError('password', password, confirm);
+    if (pwMsg) errs.password = pwMsg;
+    const cfMsg = pwFieldError('confirm', password, confirm);
+    if (cfMsg) errs.confirm = cfMsg;
+    if (Object.keys(errs).length > 0) { setPwErrors(errs); return; }
+    setPwErrors({});
 
     setResetting(true);
     try {
@@ -157,17 +204,18 @@ function ForgotPasswordPage() {
   }
 
   // a password field with a Show/Hide toggle (same pattern as the other forms)
-  function passwordField(name, label, value, setter) {
+  function passwordField(name, label, value) {
     const isShown = shown[name];
     return (
       <div className="mb-3">
         <label className="form-label">{label}</label>
-        <div className="input-group">
+        <div className="input-group has-validation">
           <input
             type={isShown ? 'text' : 'password'}
-            className="form-control"
+            className={`form-control ${pwErrors[name] ? 'is-invalid' : ''}`}
             value={value}
-            onChange={(e) => { setter(e.target.value); setResetError(''); }}
+            onChange={(e) => handlePwChange(name, e.target.value)}
+            onBlur={() => handlePwBlur(name)}
             style={{ backgroundImage: 'none' }}
           />
           <button
@@ -179,6 +227,7 @@ function ForgotPasswordPage() {
           >
             <EyeIcon off={isShown} />
           </button>
+          {pwErrors[name] && <div className="invalid-feedback">{pwErrors[name]}</div>}
         </div>
       </div>
     );
@@ -267,8 +316,8 @@ function ForgotPasswordPage() {
         </p>
         {resetError && <div className="alert alert-danger py-2">{resetError}</div>}
 
-        {passwordField('password', 'New password', password, setPassword)}
-        {passwordField('confirm', 'Confirm new password', confirm, setConfirm)}
+        {passwordField('password', 'New password', password)}
+        {passwordField('confirm', 'Confirm new password', confirm)}
 
         <button type="submit" className="btn btn-primary w-100 text-center" disabled={resetting}>
           {resetting ? 'Resetting...' : 'Reset password'}
