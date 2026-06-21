@@ -139,6 +139,11 @@ function handleRegister(PDO $pdo): void {
   $phoneNumber    = trim($body['phoneNumber'] ?? '');
   $companyName    = trim($body['companyName'] ?? '');
   $companyAddress = trim($body['companyAddress'] ?? '');
+  // operational (pickup) address — where couriers collect orders. Optional in
+  // the payload: when blank it defaults to the registered companyAddress (the
+  // SME case where they ship from their registered address).
+  $operationalAddress = trim($body['operationalAddress'] ?? '');
+  if ($operationalAddress === '') $operationalAddress = $companyAddress;
   $password       = $body['password'] ?? '';
 
   // business identity (supplier KYB). Bank/payout details are NOT collected
@@ -170,6 +175,9 @@ function handleRegister(PDO $pdo): void {
   // SST number is optional, but if given it must look like a real one
   if ($taxNumber !== '' && !preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{6,18}[A-Za-z0-9]$/', $taxNumber)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid SST number, e.g. W10-1808-32000001.']);
+  }
+  if (mb_strlen($operationalAddress) > 255) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Operational address is too long.']);
   }
   // password policy: 8+ chars with lower, upper, digit and special char
   $pwErr = passwordPolicyError($password);
@@ -245,11 +253,12 @@ function handleRegister(PDO $pdo): void {
     $supplierId = nextId($pdo, 'supplier', 'supplierId', 'SUP');
     $pdo->prepare(
       'INSERT INTO supplier
-         (supplierId, userId, companyName, companyAddress,
+         (supplierId, userId, companyName, companyAddress, operationalAddress,
           businessRegNo, businessLicenseUrl, taxNumber)
-       VALUES (:sid, :uid, :cn, :ca, :brn, :blu, :tax)'
+       VALUES (:sid, :uid, :cn, :ca, :oa, :brn, :blu, :tax)'
     )->execute([
       'sid' => $supplierId, 'uid' => $userId, 'cn' => $companyName, 'ca' => $companyAddress,
+      'oa' => $operationalAddress,
       'brn' => $businessRegNo, 'blu' => $businessLicenseUrl,
       'tax' => ($taxNumber === '' ? null : $taxNumber),
     ]);
@@ -341,7 +350,7 @@ function handleMe(PDO $pdo, array $auth): void {
 
   $profile = null;
   if ($u['role'] === 'Supplier') {
-    $p = $pdo->prepare('SELECT supplierId, companyName, companyAddress,
+    $p = $pdo->prepare('SELECT supplierId, companyName, companyAddress, operationalAddress,
                                bankName, bankAccountName, bankAccountNumber
                           FROM supplier WHERE userId = :id');
   } elseif ($u['role'] === 'Customer') {
