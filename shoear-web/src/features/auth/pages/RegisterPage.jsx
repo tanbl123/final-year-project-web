@@ -479,7 +479,7 @@ function RegisterPage() {
         {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
         {!errors.username && (
           <div className="form-text">
-            {s === 'idle' && 'Suggested from your company name — you can change it.'}
+            {s === 'idle' && 'Suggested from your company name'}
             {s === 'checking' && <span className="text-muted">Checking availability…</span>}
             {s === 'invalid' && <span className="text-danger">3–20 letters, numbers or underscores.</span>}
             {s === 'available' && <span className="text-success">✓ {form.username.trim()} is available</span>}
