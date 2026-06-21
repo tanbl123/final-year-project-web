@@ -5,6 +5,7 @@ import '../models/cart.dart';
 import '../state/auth_provider.dart';
 import '../state/cart_provider.dart';
 import 'catalog_screen.dart' show ProductImage;
+import 'checkout_screen.dart';
 import 'login_screen.dart';
 
 /// The shopping cart: review items, change quantities, remove lines, see the
@@ -137,9 +138,11 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             FilledButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Checkout is coming in the next update.')),
-              ),
+              onPressed: cart.items.isEmpty
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+                      ),
               icon: const Icon(Icons.lock),
               label: const Text('Checkout'),
             ),
