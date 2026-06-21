@@ -162,11 +162,15 @@ function ForgotPasswordPage() {
       navigate('/login', { state: { toast: 'Your password has been reset — please log in.' } });
     } catch (err) {
       const msg = err.message || 'Something went wrong. Please try again.';
-      setResetError(msg);
-      // if the code expired/was exhausted between steps, send them back to re-enter
-      if (/code/i.test(msg) && /(expired|request|incorrect|attempts)/i.test(msg)) {
+      if (/different from your current/i.test(msg)) {
+        // password-reuse rejection → show it inline under the field
+        setPwErrors({ password: msg });
+      } else if (/code/i.test(msg) && /(expired|request|incorrect|attempts)/i.test(msg)) {
+        // code expired/exhausted between steps → send them back to re-enter
         setCodeError(msg);
         setStep('verify');
+      } else {
+        setResetError(msg);
       }
     } finally {
       setResetting(false);

@@ -572,6 +572,15 @@ function handleResetPassword(PDO $pdo): void {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $pwErr]);
   }
 
+  // and it must differ from the current password (same rule as change-password)
+  $cur = $pdo->prepare('SELECT password FROM `user` WHERE email = :e');
+  $cur->execute(['e' => $email]);
+  $curRow = $cur->fetch();
+  if ($curRow && password_verify($new, $curRow['password'])) {
+    sendJson(400, false, null, ['code' => 'VALIDATION',
+      'message' => 'Your new password must be different from your current password.']);
+  }
+
   $hash = password_hash($new, PASSWORD_BCRYPT);
   $upd  = $pdo->prepare('UPDATE `user` SET password = :p WHERE email = :e');
   $upd->execute(['p' => $hash, 'e' => $email]);
