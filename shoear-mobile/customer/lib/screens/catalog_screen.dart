@@ -169,106 +169,26 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   Future<void> _openFilters() async {
-    // local copies so Cancel discards
-    String? cat = _categoryId;
-    String? sort = _sort;
-    final minCtrl = TextEditingController(text: _minPrice?.toStringAsFixed(0) ?? '');
-    final maxCtrl = TextEditingController(text: _maxPrice?.toStringAsFixed(0) ?? '');
-
-    final applied = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<_FilterResult>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 16 + MediaQuery.of(ctx).viewInsets.bottom),
-        child: StatefulBuilder(
-          builder: (ctx, setSheet) => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Filters', style: Theme.of(ctx).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String?>(
-                value: cat,
-                decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                items: [
-                  const DropdownMenuItem<String?>(value: null, child: Text('All categories')),
-                  for (final c in _categories) DropdownMenuItem<String?>(value: c.id, child: Text(c.name)),
-                ],
-                onChanged: (v) => setSheet(() => cat = v),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: sort,
-                decoration: const InputDecoration(labelText: 'Sort by', border: OutlineInputBorder()),
-                items: const [
-                  DropdownMenuItem<String?>(value: null, child: Text('Newest')),
-                  DropdownMenuItem<String?>(value: 'price_asc', child: Text('Price: low to high')),
-                  DropdownMenuItem<String?>(value: 'price_desc', child: Text('Price: high to low')),
-                ],
-                onChanged: (v) => setSheet(() => sort = v),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: minCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Min price', prefixText: 'RM ', border: OutlineInputBorder()),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: maxCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Max price', prefixText: 'RM ', border: OutlineInputBorder()),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setSheet(() {
-                          cat = null;
-                          sort = null;
-                          minCtrl.clear();
-                          maxCtrl.clear();
-                        });
-                      },
-                      child: const Text('Clear'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      child: const Text('Apply'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      builder: (_) => _FilterSheet(
+        categories: _categories,
+        categoryId: _categoryId,
+        sort: _sort,
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
       ),
     );
-
-    if (applied == true) {
+    if (result != null) {
       setState(() {
-        _categoryId = cat;
-        _sort = sort;
-        _minPrice = double.tryParse(minCtrl.text.trim());
-        _maxPrice = double.tryParse(maxCtrl.text.trim());
+        _categoryId = result.categoryId;
+        _sort = result.sort;
+        _minPrice = result.minPrice;
+        _maxPrice = result.maxPrice;
         _future = _load();
       });
     }
-    minCtrl.dispose();
-    maxCtrl.dispose();
   }
 
 
@@ -391,6 +311,132 @@ class _ErrorView extends StatelessWidget {
         const SizedBox(height: 16),
         Center(child: OutlinedButton(onPressed: onRetry, child: const Text('Retry'))),
       ],
+    );
+  }
+}
+
+/// Result of the filter sheet.
+class _FilterResult {
+  final String? categoryId;
+  final String? sort;
+  final double? minPrice;
+  final double? maxPrice;
+  _FilterResult({this.categoryId, this.sort, this.minPrice, this.maxPrice});
+}
+
+/// Filter sheet — owns its own controllers (disposed in dispose) so they're
+/// never freed while their text fields are still attached.
+class _FilterSheet extends StatefulWidget {
+  final List<Category> categories;
+  final String? categoryId;
+  final String? sort;
+  final double? minPrice;
+  final double? maxPrice;
+  const _FilterSheet({
+    required this.categories,
+    this.categoryId,
+    this.sort,
+    this.minPrice,
+    this.maxPrice,
+  });
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late String? _cat = widget.categoryId;
+  late String? _sort = widget.sort;
+  late final TextEditingController _min = TextEditingController(text: widget.minPrice?.toStringAsFixed(0) ?? '');
+  late final TextEditingController _max = TextEditingController(text: widget.maxPrice?.toStringAsFixed(0) ?? '');
+
+  @override
+  void dispose() {
+    _min.dispose();
+    _max.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 16 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Filters', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String?>(
+            value: _cat,
+            decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All categories')),
+              for (final c in widget.categories) DropdownMenuItem<String?>(value: c.id, child: Text(c.name)),
+            ],
+            onChanged: (v) => setState(() => _cat = v),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            value: _sort,
+            decoration: const InputDecoration(labelText: 'Sort by', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem<String?>(value: null, child: Text('Newest')),
+              DropdownMenuItem<String?>(value: 'price_asc', child: Text('Price: low to high')),
+              DropdownMenuItem<String?>(value: 'price_desc', child: Text('Price: high to low')),
+            ],
+            onChanged: (v) => setState(() => _sort = v),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _min,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Min price', prefixText: 'RM ', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _max,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Max price', prefixText: 'RM ', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => setState(() {
+                    _cat = null;
+                    _sort = null;
+                    _min.clear();
+                    _max.clear();
+                  }),
+                  child: const Text('Clear'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(_FilterResult(
+                    categoryId: _cat,
+                    sort: _sort,
+                    minPrice: double.tryParse(_min.text.trim()),
+                    maxPrice: double.tryParse(_max.text.trim()),
+                  )),
+                  child: const Text('Apply'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
