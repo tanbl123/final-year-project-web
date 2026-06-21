@@ -162,13 +162,23 @@ function LoginPage({ variant = 'supplier' }) {
           Forgot password?
         </Link>
 
-        {variant === 'supplier' && (
+        {/* footer block — kept the same height on both variants so the portal
+            toggle below the card doesn't jump when switching */}
+        {variant === 'supplier' ? (
           <>
             <hr className="my-3" />
             <p className="text-center text-muted small mb-2">New to ShoeAR?</p>
             <Link to="/register" className="btn btn-outline-primary w-100 text-center">
               Create a supplier account
             </Link>
+          </>
+        ) : (
+          <>
+            <hr className="my-3" />
+            <p className="text-center text-muted small mb-2">Don't have an admin account?</p>
+            <div className="btn btn-outline-secondary w-100 text-center disabled" aria-disabled="true">
+              Created internally — ask an administrator
+            </div>
           </>
         )}
       </form>
