@@ -11,6 +11,7 @@ import 'cart_screen.dart';
 import 'login_screen.dart';
 import 'orders_screen.dart';
 import 'product_detail_screen.dart';
+import 'wishlist_screen.dart';
 
 /// Home screen: a searchable grid of approved products. Browsable as a guest;
 /// an account menu in the app bar handles sign in / sign out.
@@ -173,6 +174,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
           context.read<AuthProvider>().logout();
         } else if (v == 'orders') {
           Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
+        } else if (v == 'wishlist') {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WishlistScreen()));
         }
       },
       itemBuilder: (context) => <PopupMenuEntry<String>>[
@@ -182,6 +185,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
         const PopupMenuDivider(),
         const PopupMenuItem<String>(value: 'orders', child: Text('My orders')),
+        const PopupMenuItem<String>(value: 'wishlist', child: Text('My wishlist')),
         const PopupMenuItem<String>(value: 'logout', child: Text('Sign out')),
       ],
     );

@@ -6,8 +6,10 @@ import 'services/auth_service.dart';
 import 'services/catalog_service.dart';
 import 'services/cart_service.dart';
 import 'services/order_service.dart';
+import 'services/wishlist_service.dart';
 import 'state/auth_provider.dart';
 import 'state/cart_provider.dart';
+import 'state/wishlist_provider.dart';
 import 'screens/catalog_screen.dart';
 
 void main() {
@@ -34,6 +36,10 @@ class ShoeArApp extends StatelessWidget {
         ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
           create: (_) => CartProvider(CartService(api)),
           update: (_, auth, cart) => cart!..syncWithAuth(auth.isLoggedIn),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, WishlistProvider>(
+          create: (_) => WishlistProvider(WishlistService(api)),
+          update: (_, auth, wl) => wl!..syncWithAuth(auth.isLoggedIn),
         ),
       ],
       child: MaterialApp(

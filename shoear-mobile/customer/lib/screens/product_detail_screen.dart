@@ -5,6 +5,7 @@ import '../models/product.dart';
 import '../services/catalog_service.dart';
 import '../state/auth_provider.dart';
 import '../state/cart_provider.dart';
+import '../state/wishlist_provider.dart';
 import 'catalog_screen.dart' show ProductImage;
 import 'login_screen.dart';
 
@@ -54,10 +55,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Future<void> _toggleWishlist() async {
+    if (!context.read<AuthProvider>().isLoggedIn) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
+      return;
+    }
+    try {
+      await context.read<WishlistProvider>().toggle(widget.productId);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final saved = context.watch<WishlistProvider>().isSaved(widget.productId);
     return Scaffold(
-      appBar: AppBar(title: const Text('Product')),
+      appBar: AppBar(
+        title: const Text('Product'),
+        actions: [
+          IconButton(
+            icon: Icon(saved ? Icons.favorite : Icons.favorite_border, color: saved ? Colors.red : null),
+            tooltip: saved ? 'Remove from wishlist' : 'Save to wishlist',
+            onPressed: _toggleWishlist,
+          ),
+        ],
+      ),
       body: FutureBuilder<ProductDetail>(
         future: _future,
         builder: (context, snap) {
