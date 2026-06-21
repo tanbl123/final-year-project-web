@@ -188,6 +188,7 @@ function ForgotPasswordPage() {
   if (step === 'request') {
     return (
       <div className="container py-5" style={{ maxWidth: '420px' }}>
+        <BackButton to="/login" />
         <h1 className="mb-4 text-center">🔑 Forgot password</h1>
         <form onSubmit={handleRequest} className="card card-body shadow-sm text-start" noValidate>
           <p className="text-muted">
@@ -209,9 +210,6 @@ function ForgotPasswordPage() {
             {sending ? 'Sending code...' : 'Send reset code'}
           </button>
         </form>
-        <div className="mt-3">
-          <Link to="/login" className="btn btn-link p-0">← Back to Login</Link>
-        </div>
       </div>
     );
   }
