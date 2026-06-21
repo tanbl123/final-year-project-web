@@ -208,8 +208,8 @@ function ForgotPasswordPage() {
             {sending ? 'Sending code...' : 'Send reset code'}
           </button>
         </form>
-        <div className="text-center mt-3">
-          <Link to="/login" className="btn btn-outline-secondary btn-sm">Back to Login</Link>
+        <div className="mt-3">
+          <Link to="/login" className="btn btn-link p-0">← Back to Login</Link>
         </div>
       </div>
     );
