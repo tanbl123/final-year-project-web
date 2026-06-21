@@ -75,3 +75,148 @@ class Receipt {
             .toList(),
       );
 }
+
+/// A row in the customer's order history (GET /orders).
+class CustomerOrderSummary {
+  final String orderId;
+  final String? orderDate;
+  final String orderStatus;
+  final double total;
+  final int itemCount;
+  final String? paymentStatus;
+  final String? deliveryStatus; // rolled up across parcels
+
+  CustomerOrderSummary({
+    required this.orderId,
+    this.orderDate,
+    required this.orderStatus,
+    required this.total,
+    required this.itemCount,
+    this.paymentStatus,
+    this.deliveryStatus,
+  });
+
+  factory CustomerOrderSummary.fromJson(Map<String, dynamic> j) => CustomerOrderSummary(
+        orderId: j['orderId'] as String,
+        orderDate: j['orderDate'] as String?,
+        orderStatus: j['orderStatus'] as String? ?? '',
+        total: (j['orderTotalAmount'] as num?)?.toDouble() ?? 0,
+        itemCount: (j['itemCount'] as num?)?.toInt() ?? 0,
+        paymentStatus: j['paymentStatus'] as String?,
+        deliveryStatus: j['deliveryStatus'] as String?,
+      );
+}
+
+/// A line item on an order (detail view).
+class OrderItem {
+  final String productName;
+  final String brand;
+  final String size;
+  final int qty;
+  final double unitPrice;
+  final double subtotal;
+  final String? imageUrl;
+
+  OrderItem({required this.productName, required this.brand, required this.size, required this.qty, required this.unitPrice, required this.subtotal, this.imageUrl});
+
+  factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
+        productName: j['productName'] as String? ?? '',
+        brand: j['brand'] as String? ?? '',
+        size: j['size']?.toString() ?? '',
+        qty: (j['qty'] as num?)?.toInt() ?? 0,
+        unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,
+        subtotal: (j['subtotal'] as num?)?.toDouble() ?? 0,
+        imageUrl: (j['imageUrl'] as String?)?.isNotEmpty == true ? j['imageUrl'] as String : null,
+      );
+}
+
+/// One parcel of a (possibly multi-supplier) order. Each ships independently and
+/// has its own delivery status and confirmation OTP.
+class ParcelDelivery {
+  final String deliveryId;
+  final String deliveryStatus;
+  final String? estimatedDeliveryTime;
+  final String? otpCode;
+  final String? proofOfDelivery;
+  final String supplierName;
+
+  ParcelDelivery({required this.deliveryId, required this.deliveryStatus, this.estimatedDeliveryTime, this.otpCode, this.proofOfDelivery, required this.supplierName});
+
+  factory ParcelDelivery.fromJson(Map<String, dynamic> j) => ParcelDelivery(
+        deliveryId: j['deliveryId'] as String? ?? '',
+        deliveryStatus: j['deliveryStatus'] as String? ?? '',
+        estimatedDeliveryTime: j['estimatedDeliveryTime'] as String?,
+        otpCode: j['otpCode']?.toString(),
+        proofOfDelivery: j['proofOfDelivery'] as String?,
+        supplierName: j['supplierName'] as String? ?? '',
+      );
+}
+
+/// A refund request on an order.
+class OrderRefund {
+  final String refundId;
+  final String refundReason;
+  final String refundStatus;
+  final double refundAmount;
+  final String? requestDate;
+
+  OrderRefund({required this.refundId, required this.refundReason, required this.refundStatus, required this.refundAmount, this.requestDate});
+
+  factory OrderRefund.fromJson(Map<String, dynamic> j) => OrderRefund(
+        refundId: j['refundId'] as String? ?? '',
+        refundReason: j['refundReason'] as String? ?? '',
+        refundStatus: j['refundStatus'] as String? ?? '',
+        refundAmount: (j['refundAmount'] as num?)?.toDouble() ?? 0,
+        requestDate: j['requestDate'] as String?,
+      );
+}
+
+/// Full order detail (GET /orders/{id}).
+class CustomerOrder {
+  final String orderId;
+  final String? orderDate;
+  final String orderStatus;
+  final double total;
+  final String deliveryAddress;
+  final String? paymentMethod;
+  final String? paymentStatus;
+  final String? paymentDate;
+  final List<OrderItem> items;
+  final List<ParcelDelivery> deliveries;
+  final List<OrderRefund> refunds;
+
+  CustomerOrder({
+    required this.orderId,
+    this.orderDate,
+    required this.orderStatus,
+    required this.total,
+    required this.deliveryAddress,
+    this.paymentMethod,
+    this.paymentStatus,
+    this.paymentDate,
+    required this.items,
+    required this.deliveries,
+    required this.refunds,
+  });
+
+  factory CustomerOrder.fromJson(Map<String, dynamic> j) => CustomerOrder(
+        orderId: j['orderId'] as String,
+        orderDate: j['orderDate'] as String?,
+        orderStatus: j['orderStatus'] as String? ?? '',
+        total: (j['orderTotalAmount'] as num?)?.toDouble() ?? 0,
+        deliveryAddress: j['orderDeliveryAddress'] as String? ?? '',
+        paymentMethod: j['paymentMethod'] as String?,
+        paymentStatus: j['paymentStatus'] as String?,
+        paymentDate: j['paymentDate'] as String?,
+        items: ((j['items'] as List?) ?? [])
+            .map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        deliveries: ((j['deliveries'] as List?) ?? [])
+            .map((e) => ParcelDelivery.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        refunds: ((j['refunds'] as List?) ?? [])
+            .map((e) => OrderRefund.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+

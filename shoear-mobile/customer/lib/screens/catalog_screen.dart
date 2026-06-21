@@ -9,6 +9,7 @@ import '../state/auth_provider.dart';
 import '../state/cart_provider.dart';
 import 'cart_screen.dart';
 import 'login_screen.dart';
+import 'orders_screen.dart';
 import 'product_detail_screen.dart';
 
 /// Home screen: a searchable grid of approved products. Browsable as a guest;
@@ -168,7 +169,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.account_circle),
       onSelected: (v) {
-        if (v == 'logout') context.read<AuthProvider>().logout();
+        if (v == 'logout') {
+          context.read<AuthProvider>().logout();
+        } else if (v == 'orders') {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
+        }
       },
       itemBuilder: (context) => <PopupMenuEntry<String>>[
         PopupMenuItem<String>(
@@ -176,6 +181,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
           child: Text('Hi, ${auth.user?.fullName ?? 'Customer'}'),
         ),
         const PopupMenuDivider(),
+        const PopupMenuItem<String>(value: 'orders', child: Text('My orders')),
         const PopupMenuItem<String>(value: 'logout', child: Text('Sign out')),
       ],
     );
