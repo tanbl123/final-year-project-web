@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../services/catalog_service.dart';
 import '../state/auth_provider.dart';
+import '../state/cart_provider.dart';
+import 'cart_screen.dart';
 import 'login_screen.dart';
 import 'product_detail_screen.dart';
 
@@ -53,7 +55,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('👟 ShoeAR'),
-        actions: [_accountAction(context)],
+        actions: [_cartAction(context), _accountAction(context)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -115,6 +117,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
               itemBuilder: (context, i) => _ProductCard(product: items[i]),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _cartAction(BuildContext context) {
+    final count = context.watch<CartProvider>().count;
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text('$count'),
+      offset: const Offset(-4, 4),
+      child: IconButton(
+        icon: const Icon(Icons.shopping_cart_outlined),
+        tooltip: 'Cart',
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CartScreen()),
         ),
       ),
     );

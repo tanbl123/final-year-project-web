@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../models/product.dart';
 import '../services/catalog_service.dart';
+import '../state/auth_provider.dart';
+import '../state/cart_provider.dart';
 import 'catalog_screen.dart' show ProductImage;
+import 'login_screen.dart';
 
 /// Full detail for one product: images, price, sizes, description, reviews,
-/// and (when enabled) an AR try-on entry point. Cart/checkout arrive in a
-/// later increment.
+/// add-to-cart, and (when enabled) an AR try-on entry point.
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
   const ProductDetailScreen({super.key, required this.productId});
@@ -18,11 +20,38 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late Future<ProductDetail> _future;
+  String? _selectedVariantId;   // the chosen size
+  bool _adding = false;
 
   @override
   void initState() {
     super.initState();
     _future = context.read<CatalogService>().getProduct(widget.productId);
+  }
+
+  Future<void> _addToCart(ProductDetail p) async {
+    // cart needs a signed-in customer — send guests to login first
+    if (!context.read<AuthProvider>().isLoggedIn) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
+      return;
+    }
+    if (_selectedVariantId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a size.')));
+      return;
+    }
+    setState(() => _adding = true);
+    try {
+      await context.read<CartProvider>().add(_selectedVariantId!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Added "${p.name}" to your cart.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
   }
 
   @override
@@ -52,85 +81,117 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _body(BuildContext context, ProductDetail p) {
     final theme = Theme.of(context);
-    return ListView(
+    final hasStock = p.variants.any((v) => v.inStock);
+    return Column(
       children: [
-        SizedBox(
-          height: 300,
-          child: p.images.isEmpty
-              ? const ProductImage(url: null)
-              : PageView(children: [for (final url in p.images) ProductImage(url: url)]),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Expanded(
+          child: ListView(
             children: [
-              Text(p.brand.toUpperCase(), style: TextStyle(color: Colors.grey.shade600, letterSpacing: 0.5)),
-              const SizedBox(height: 2),
-              Text(p.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('RM ${p.price.toStringAsFixed(2)}',
-                  style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-              if (p.ratingCount > 0) ...[
-                const SizedBox(height: 4),
-                Text('★ ${p.ratingAverage}  ·  ${p.ratingCount} review(s)', style: TextStyle(color: Colors.amber.shade800)),
-              ],
-
-              if (p.virtualTryOnEnable) ...[
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('AR try-on is coming in the next update.')),
-                  ),
-                  icon: const Icon(Icons.view_in_ar),
-                  label: const Text('AR Try-On'),
-                ),
-              ],
-
-              const SizedBox(height: 20),
-              if (p.variants.isNotEmpty) ...[
-                Text('Sizes', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+              SizedBox(
+                height: 300,
+                child: p.images.isEmpty
+                    ? const ProductImage(url: null)
+                    : PageView(children: [for (final url in p.images) ProductImage(url: url)]),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final v in p.variants)
-                      Chip(
-                        label: Text(v.size),
-                        backgroundColor: v.inStock ? null : Colors.grey.shade200,
-                        labelStyle: TextStyle(
-                          color: v.inStock ? null : Colors.grey,
-                          decoration: v.inStock ? null : TextDecoration.lineThrough,
+                    Text(p.brand.toUpperCase(), style: TextStyle(color: Colors.grey.shade600, letterSpacing: 0.5)),
+                    const SizedBox(height: 2),
+                    Text(p.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('RM ${p.price.toStringAsFixed(2)}',
+                        style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                    if (p.ratingCount > 0) ...[
+                      const SizedBox(height: 4),
+                      Text('★ ${p.ratingAverage}  ·  ${p.ratingCount} review(s)', style: TextStyle(color: Colors.amber.shade800)),
+                    ],
+
+                    if (p.virtualTryOnEnable) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('AR try-on is coming in the next update.')),
                         ),
+                        icon: const Icon(Icons.view_in_ar),
+                        label: const Text('AR Try-On'),
                       ),
+                    ],
+
+                    const SizedBox(height: 20),
+                    if (p.variants.isNotEmpty) ...[
+                      Text('Select size', style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final v in p.variants)
+                            ChoiceChip(
+                              label: Text(v.size),
+                              selected: _selectedVariantId == v.variantId,
+                              onSelected: v.inStock ? (_) => setState(() => _selectedVariantId = v.variantId) : null,
+                              labelStyle: TextStyle(
+                                color: v.inStock ? null : Colors.grey,
+                                decoration: v.inStock ? null : TextDecoration.lineThrough,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    if ((p.description ?? '').isNotEmpty) ...[
+                      Text('Description', style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(p.description!),
+                      const SizedBox(height: 20),
+                    ],
+
+                    if (p.supplierName != null) ...[
+                      Text('Sold by ${p.supplierName}', style: TextStyle(color: Colors.grey.shade700)),
+                      const SizedBox(height: 20),
+                    ],
+
+                    Text('Reviews', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    if (p.reviews.isEmpty)
+                      Text('No reviews yet.', style: TextStyle(color: Colors.grey.shade600))
+                    else
+                      for (final r in p.reviews) _ReviewTile(review: r),
                   ],
                 ),
-                const SizedBox(height: 20),
-              ],
-
-              if ((p.description ?? '').isNotEmpty) ...[
-                Text('Description', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 6),
-                Text(p.description!),
-                const SizedBox(height: 20),
-              ],
-
-              if (p.supplierName != null) ...[
-                Text('Sold by ${p.supplierName}', style: TextStyle(color: Colors.grey.shade700)),
-                const SizedBox(height: 20),
-              ],
-
-              Text('Reviews', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              if (p.reviews.isEmpty)
-                Text('No reviews yet.', style: TextStyle(color: Colors.grey.shade600))
-              else
-                for (final r in p.reviews) _ReviewTile(review: r),
+              ),
             ],
           ),
         ),
+        _addToCartBar(context, p, hasStock),
       ],
+    );
+  }
+
+  Widget _addToCartBar(BuildContext context, ProductDetail p, bool hasStock) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, -2))],
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: (!hasStock || _adding) ? null : () => _addToCart(p),
+            icon: _adding
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.add_shopping_cart),
+            label: Text(hasStock ? 'Add to cart' : 'Out of stock'),
+          ),
+        ),
+      ),
     );
   }
 }
