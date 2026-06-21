@@ -193,7 +193,12 @@ function BusinessDetailsCard({ onToast }) {
           <dt className="col-sm-4">Registration doc</dt>
           <dd className="col-sm-8">
             {cur.businessLicenseUrl
-              ? <a href={cur.businessLicenseUrl} target="_blank" rel="noreferrer">📄 View document</a>
+              ? (
+                <a href={cur.businessLicenseUrl} target="_blank" rel="noreferrer"
+                  className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
+                  📄 View document
+                </a>
+              )
               : <span className="text-muted">—</span>}
           </dd>
 
@@ -226,7 +231,7 @@ function BusinessDetailsCard({ onToast }) {
                   {cur.operationalAddress || cur.companyAddress || <span className="text-muted">—</span>}
                   <div className="text-muted small">Where couriers collect your orders.</div>
                 </span>
-                <button className="btn btn-link btn-sm p-0" onClick={startOp}>Edit</button>
+                <button className="btn btn-outline-secondary btn-sm flex-shrink-0" onClick={startOp}>Edit</button>
               </div>
             )}
           </dd>
@@ -278,8 +283,10 @@ function BusinessDetailsCard({ onToast }) {
             <div className="mb-3">
               <label className="form-label">Business registration document</label>
               {req.businessLicenseUrl ? (
-                <div className="d-flex align-items-center gap-2">
+                <div className="d-flex align-items-center gap-2 flex-wrap">
                   <span className="badge text-bg-success text-truncate" style={{ minWidth: 0 }} title={licenseName || 'Document uploaded'}>📄 {licenseName || 'Document uploaded'}</span>
+                  <a href={req.businessLicenseUrl} target="_blank" rel="noreferrer"
+                    className="btn btn-outline-secondary btn-sm flex-shrink-0">Preview</a>
                   <button type="button" className="btn btn-outline-danger btn-sm flex-shrink-0"
                     onClick={() => { setReq((r) => ({ ...r, businessLicenseUrl: '' })); setLicenseName(''); }}>
                     Replace
