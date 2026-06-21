@@ -355,8 +355,9 @@ function RegisterPage() {
         <h1 className="mb-3 text-center">📧 Verify your email</h1>
         <form onSubmit={handleVerify} className="card card-body shadow-sm" noValidate>
           <p className="text-muted">
-            We've sent a 6-digit code to <strong>{form.email.trim()}</strong>. Enter it
-            below to finish creating your account.
+            We've sent a 6-digit code to <strong>{form.email.trim()}</strong> (if it can be
+            registered). Enter it below to finish creating your account. Already have an
+            account? <Link to="/login">Log in</Link>.
           </p>
           {codeError && <div className="alert alert-danger py-2">{codeError}</div>}
           {resendInfo && <div className="alert alert-success py-2">{resendInfo}</div>}

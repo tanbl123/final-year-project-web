@@ -170,3 +170,26 @@ function sendPasswordResetCodeEmail(array $config, string $toEmail, string $code
     '</div>';
   sendMail($config, $toEmail, '', $subject, $text, $html);
 }
+
+// Sent when someone tries to REGISTER with an email that already has an
+// account. We never tell the browser the email exists (anti-enumeration); the
+// heads-up goes only to the real inbox owner.
+function sendAccountExistsEmail(array $config, string $toEmail): void {
+  $subject = 'You already have a ShoeAR account';
+  $text =
+    "Someone tried to register a ShoeAR supplier account using this email, but " .
+    "you already have an account.\n\n" .
+    "If this was you, just log in. If you forgot your password, use " .
+    "\"Forgot password\" on the login page to reset it.\n\n" .
+    "If this wasn't you, you can safely ignore this email.";
+  $html =
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:auto">' .
+    '<h2 style="margin:0 0 12px">👟 ShoeAR</h2>' .
+    '<p>Someone tried to register a supplier account using this email, but you ' .
+    'already have a ShoeAR account.</p>' .
+    '<p>If this was you, just <strong>log in</strong> — or use ' .
+    '<strong>"Forgot password"</strong> if you need to reset it.</p>' .
+    '<p style="color:#666">If this wasn\'t you, you can safely ignore this email.</p>' .
+    '</div>';
+  sendMail($config, $toEmail, '', $subject, $text, $html);
+}

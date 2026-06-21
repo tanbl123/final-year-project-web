@@ -84,28 +84,34 @@ function handleSendRegisterCode(PDO $pdo, array $config): void {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
   }
 
-  // don't send a code for an address that already has an account
-  $chk = $pdo->prepare('SELECT 1 FROM `user` WHERE email = :e');
-  $chk->execute(['e' => $email]);
-  if ($chk->fetch()) {
-    sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That email is already registered.']);
-  }
-
-  // SMTP must be configured — there's no other way to deliver the code
+  // SMTP must be configured — there's no other way to deliver the code (this is
+  // a server-level fact, not account-specific, so it's safe to surface)
   if (!mailConfigured($config)) {
     sendJson(503, false, null, ['code' => 'MAIL_NOT_CONFIGURED',
       'message' => 'Email sending is not configured on the server. Please contact the administrator.']);
   }
 
-  // resend cooldown: don't let someone hammer the send button (or our SMTP)
+  // identical generic response whether or not the email already has an account,
+  // so the form can't be used to discover which emails are registered
+  $generic = ['message' => 'If this email can be registered, a 6-digit code has been sent to it.'];
+
+  // already registered? email the real owner a heads-up (never a code) and stop,
+  // but tell the browser the same generic thing as for a brand-new email.
+  $chk = $pdo->prepare('SELECT 1 FROM `user` WHERE email = :e');
+  $chk->execute(['e' => $email]);
+  if ($chk->fetch()) {
+    try { sendAccountExistsEmail($config, $email); } catch (Throwable $ex) { /* best effort */ }
+    sendJson(200, true, $generic);
+  }
+
+  // resend cooldown: don't let someone hammer the send button (or our SMTP).
+  // Within the cooldown, return the same generic success without resending.
   $cool = $pdo->prepare('SELECT TIMESTAMPDIFF(SECOND, last_sent_at, NOW()) AS secs
                            FROM email_verification WHERE email = :e');
   $cool->execute(['e' => $email]);
   $existing = $cool->fetch();
   if ($existing && $existing['secs'] !== null && (int) $existing['secs'] < VERIFY_RESEND_SECS) {
-    $wait = VERIFY_RESEND_SECS - (int) $existing['secs'];
-    sendJson(429, false, null, ['code' => 'COOLDOWN',
-      'message' => "Please wait {$wait}s before requesting another code."]);
+    sendJson(200, true, $generic);
   }
 
   // generate the code, store only its hash, reset the attempt counter + expiry
@@ -126,7 +132,7 @@ function handleSendRegisterCode(PDO $pdo, array $config): void {
       'message' => 'Could not send the verification email. Please check the address and try again.']);
   }
 
-  sendJson(200, true, ['message' => 'A 6-digit verification code has been sent to your email.']);
+  sendJson(200, true, $generic);
 }
 
 // POST /auth/register — create a new SUPPLIER account (status Pending,

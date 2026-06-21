@@ -61,8 +61,11 @@ function ForgotPasswordPage() {
     }
     setSending(true);
     try {
-      const res = await forgotPassword(email.trim());
-      setInfo(res?.message || 'If an account exists for that email, a reset code has been sent.');
+      await forgotPassword(email.trim());
+      // the verify-step paragraph already carries the "(if an account exists)"
+      // caveat, so we don't repeat it in a banner here — the banner is only for
+      // the resend confirmation.
+      setInfo('');
       setCode('');
       setCodeError('');
       setStep('verify');

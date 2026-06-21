@@ -76,7 +76,7 @@ List responses include paging info:
 
 | Method | Path | Access | Purpose |
 |--------|------|--------|---------|
-| POST | `/auth/register/send-code` | Public | **(Implemented)** Email a 6-digit verification code to a supplier's address before the account is created. Requires SMTP configured. |
+| POST | `/auth/register/send-code` | Public | **(Implemented)** Email a 6-digit verification code before the account is created. Always returns a generic success (no account enumeration); if the email already exists it gets an "account exists" notice instead of a code. Requires SMTP. |
 | POST | `/auth/register` | Public | **(Implemented, supplier)** Register. Supplier → `Pending` (await admin); requires a valid `verificationCode`. Customer/Delivery register on their mobile apps. |
 | POST | `/auth/login` | Public | Returns JWT + role + basic profile. |
 | POST | `/auth/logout` | Any | Client-side token discard (and optional server token blacklist). |
