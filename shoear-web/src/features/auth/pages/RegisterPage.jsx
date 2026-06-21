@@ -218,10 +218,11 @@ function RegisterPage() {
     setOperationalEdited(true);
     setForm((f) => ({ ...f, operationalAddress: event.target.value }));
   }
-  // clearing it re-attaches to the business address (mirrors it again)
+  // the ✕ empties the field (and detaches it, so it stops mirroring); left
+  // blank, it falls back to the business address on submit
   function clearOperational() {
-    setOperationalEdited(false);
-    setForm((f) => ({ ...f, operationalAddress: f.companyAddress }));
+    setOperationalEdited(true);
+    setForm((f) => ({ ...f, operationalAddress: '' }));
   }
 
   // clear a field via its ✕ button (mirrors handleChange's live re-validation)
@@ -448,7 +449,7 @@ function RegisterPage() {
         />
         <div className="form-text">
           {operationalEdited
-            ? 'Where couriers collect your orders. Clear it to use your business address again.'
+            ? 'Where couriers collect your orders. Leave blank to use your business address.'
             : 'Auto-filled from your business address — change it if you ship from elsewhere.'}
         </div>
       </div>
