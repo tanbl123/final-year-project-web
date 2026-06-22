@@ -139,12 +139,12 @@ function ProductForm({ onAdd, onCancel, initialValues = null, mode = 'create' })
     return errs;
   }
 
-  // onChange that also re-validates the field once it has been touched.
+  // onChange that validates live: typing marks the field touched and re-checks
+  // it on every keystroke (errors still never show on a pristine field).
   function changeField(field, setter, value) {
     setter(value);
-    if (touched[field]) {
-      setFieldErrors((e) => ({ ...e, [field]: validateField(field, { [field]: value }) }));
-    }
+    setTouched((t) => (t[field] ? t : { ...t, [field]: true }));
+    setFieldErrors((e) => ({ ...e, [field]: validateField(field, { [field]: value }) }));
   }
   function blurField(field) {
     setTouched((t) => ({ ...t, [field]: true }));
@@ -155,6 +155,8 @@ function ProductForm({ onAdd, onCancel, initialValues = null, mode = 'create' })
   // ── sizes ────────────────────────────────────────────────────────
   function updateVariant(index, field, value) {
     setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
+    // validate this size row live (mark touched so the inline error shows)
+    setVariantTouched((t) => ({ ...t, [`${index}-${field}`]: true }));
   }
   function addVariantRow() {
     setVariants((prev) => [...prev, emptyVariant()]);
