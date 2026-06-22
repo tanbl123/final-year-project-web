@@ -260,7 +260,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.done,
           autofocus: true,
-          onChanged: _emailError == null ? null : (_) => setState(() => _emailError = null),
+          onChanged: (v) => setState(() => _emailError = v.trim().isEmpty ? null : (_validEmail(v.trim()) ? null : 'Please enter a valid email.')),
           onSubmitted: (_) => _request(),
           decoration: InputDecoration(
             labelText: 'Email',
@@ -345,7 +345,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextField(
           controller: _password,
           obscureText: !_showPw,
-          onChanged: _passwordError == null ? null : (_) => setState(() => _passwordError = null),
+          onChanged: (v) => setState(() {
+            _passwordError = v.isEmpty ? null : _passwordPolicyError(v);
+            if (_confirm.text.isNotEmpty) _confirmError = _confirm.text == v ? null : 'Passwords do not match.';
+          }),
           decoration: InputDecoration(
             labelText: 'New password',
             border: const OutlineInputBorder(),
@@ -360,7 +363,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextField(
           controller: _confirm,
           obscureText: !_showConfirm,
-          onChanged: _confirmError == null ? null : (_) => setState(() => _confirmError = null),
+          onChanged: (v) => setState(() => _confirmError = v.isEmpty ? null : (v == _password.text ? null : 'Passwords do not match.')),
           decoration: InputDecoration(
             labelText: 'Confirm new password',
             border: const OutlineInputBorder(),

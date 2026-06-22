@@ -117,12 +117,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  // live re-check: only once a field already shows an error, so the message
-  // updates as the user fixes it (matches the web's handleChange behaviour)
-  void _liveRecheck(String? current, void Function() apply) {
-    if (current != null) setState(apply);
-  }
-
   Future<void> _submit() async {
     setState(() {
       _fullNameError = _validateFullName(_fullName.text);
@@ -183,14 +177,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             focusNode: _fullNameFocus,
             label: 'Full name',
             error: _fullNameError,
-            onChanged: (v) => _liveRecheck(_fullNameError, () => _fullNameError = _validateFullName(v)),
+            onChanged: (v) => setState(() => _fullNameError = _validateFullName(v)),
           ),
           _field(
             controller: _username,
             focusNode: _usernameFocus,
             label: 'Username',
             error: _usernameError,
-            onChanged: (v) => _liveRecheck(_usernameError, () => _usernameError = _validateUsername(v)),
+            onChanged: (v) => setState(() => _usernameError = _validateUsername(v)),
           ),
           _field(
             controller: _email,
@@ -198,7 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             label: 'Email',
             keyboard: TextInputType.emailAddress,
             error: _emailError,
-            onChanged: (v) => _liveRecheck(_emailError, () => _emailError = _validateEmail(v)),
+            onChanged: (v) => setState(() => _emailError = _validateEmail(v)),
           ),
           _field(
             controller: _phone,
@@ -206,7 +200,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             label: 'Phone number',
             keyboard: TextInputType.phone,
             error: _phoneError,
-            onChanged: (v) => _liveRecheck(_phoneError, () => _phoneError = _validatePhone(v)),
+            onChanged: (v) => setState(() => _phoneError = _validatePhone(v)),
           ),
           _field(
             controller: _address,
@@ -221,9 +215,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             focusNode: _passwordFocus,
             obscureText: _obscure,
             onChanged: (v) => setState(() {
-              if (_passwordError != null) _passwordError = _validatePassword(v);
+              _passwordError = _validatePassword(v);
               // password & confirm are linked — keep the confirm error in sync
-              if (_confirmError != null) _confirmError = _validateConfirm();
+              if (_confirm.text.isNotEmpty) _confirmError = _validateConfirm();
             }),
             decoration: InputDecoration(
               labelText: 'Password',
@@ -241,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _confirm,
             focusNode: _confirmFocus,
             obscureText: _obscure,
-            onChanged: (_) => _liveRecheck(_confirmError, () => _confirmError = _validateConfirm()),
+            onChanged: (_) => setState(() => _confirmError = _validateConfirm()),
             decoration: InputDecoration(
               labelText: 'Confirm password',
               border: const OutlineInputBorder(),
