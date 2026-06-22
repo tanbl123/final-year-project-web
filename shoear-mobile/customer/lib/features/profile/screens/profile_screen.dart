@@ -87,12 +87,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: () => context.read<AuthProvider>().logout(),
-                icon: const Icon(Icons.logout),
-                label: const Text('Sign out'),
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
                 onPressed: _confirmDelete,
                 icon: const Icon(Icons.delete_forever),
                 label: const Text('Delete my account'),
@@ -100,6 +94,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   foregroundColor: Colors.red,
                   side: const BorderSide(color: Colors.red),
                 ),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: () => context.read<AuthProvider>().logout(),
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign out'),
               ),
             ],
           );
