@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -57,8 +58,8 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
   Future<void> _confirmOtp() async {
     final code = _otp.text.trim();
-    if (code.isEmpty) {
-      _toast('Enter the customer OTP.');
+    if (code.length != 4) {
+      _toast('Enter the 4-digit customer OTP.');
       return;
     }
     setState(() => _busy = true);
@@ -230,6 +231,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             controller: _otp,
             keyboardType: TextInputType.number,
             maxLength: 4,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
             decoration: const InputDecoration(
               labelText: 'Customer OTP',
               border: OutlineInputBorder(),

@@ -82,6 +82,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('A reason is required.')));
       return;
     }
+    if (reason.length < 5) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please give a bit more detail (at least 5 characters).')));
+      return;
+    }
     try {
       await context.read<OrderService>().requestRefund(widget.orderId, reason);
       if (!mounted) return;

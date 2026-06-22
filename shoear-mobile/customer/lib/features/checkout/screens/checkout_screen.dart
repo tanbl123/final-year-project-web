@@ -51,6 +51,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() => _addrError = 'A delivery address is required.');
       return;
     }
+    if (address.length < 10) {
+      setState(() => _addrError = 'Please enter a complete delivery address.');
+      return;
+    }
+    if (address.length > 255) {
+      setState(() => _addrError = 'Address is too long (max 255 characters).');
+      return;
+    }
     setState(() {
       _addrError = null;
       _placing = true;

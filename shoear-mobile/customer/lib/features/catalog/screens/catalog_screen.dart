@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:customer/core/widgets/product_image.dart';
 import 'package:provider/provider.dart';
@@ -349,6 +350,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   late String? _sort = widget.sort;
   late final TextEditingController _min = TextEditingController(text: widget.minPrice?.toStringAsFixed(0) ?? '');
   late final TextEditingController _max = TextEditingController(text: widget.maxPrice?.toStringAsFixed(0) ?? '');
+  String? _priceError;
 
   @override
   void dispose() {
@@ -356,6 +358,30 @@ class _FilterSheetState extends State<_FilterSheet> {
     _max.dispose();
     super.dispose();
   }
+
+  // numeric, non-negative, and min <= max
+  void _apply() {
+    final minTxt = _min.text.trim();
+    final maxTxt = _max.text.trim();
+    final min = minTxt.isEmpty ? null : double.tryParse(minTxt);
+    final max = maxTxt.isEmpty ? null : double.tryParse(maxTxt);
+
+    if (minTxt.isNotEmpty && (min == null || min < 0)) {
+      setState(() => _priceError = 'Enter a valid minimum price.');
+      return;
+    }
+    if (maxTxt.isNotEmpty && (max == null || max < 0)) {
+      setState(() => _priceError = 'Enter a valid maximum price.');
+      return;
+    }
+    if (min != null && max != null && min > max) {
+      setState(() => _priceError = 'Min price cannot be greater than max price.');
+      return;
+    }
+    Navigator.of(context).pop(_FilterResult(categoryId: _cat, sort: _sort, minPrice: min, maxPrice: max));
+  }
+
+  static final _priceFormatters = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))];
 
   @override
   Widget build(BuildContext context) {
@@ -393,7 +419,9 @@ class _FilterSheetState extends State<_FilterSheet> {
               Expanded(
                 child: TextField(
                   controller: _min,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: _priceFormatters,
+                  onChanged: _priceError == null ? null : (_) => setState(() => _priceError = null),
                   decoration: const InputDecoration(labelText: 'Min price', prefixText: 'RM ', border: OutlineInputBorder()),
                 ),
               ),
@@ -401,12 +429,18 @@ class _FilterSheetState extends State<_FilterSheet> {
               Expanded(
                 child: TextField(
                   controller: _max,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: _priceFormatters,
+                  onChanged: _priceError == null ? null : (_) => setState(() => _priceError = null),
                   decoration: const InputDecoration(labelText: 'Max price', prefixText: 'RM ', border: OutlineInputBorder()),
                 ),
               ),
             ],
           ),
+          if (_priceError != null) ...[
+            const SizedBox(height: 6),
+            Text(_priceError!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [
@@ -417,6 +451,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     _sort = null;
                     _min.clear();
                     _max.clear();
+                    _priceError = null;
                   }),
                   child: const Text('Clear'),
                 ),
@@ -424,12 +459,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(_FilterResult(
-                    categoryId: _cat,
-                    sort: _sort,
-                    minPrice: double.tryParse(_min.text.trim()),
-                    maxPrice: double.tryParse(_max.text.trim()),
-                  )),
+                  onPressed: _apply,
                   child: const Text('Apply'),
                 ),
               ),
