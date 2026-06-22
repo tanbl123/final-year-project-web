@@ -115,28 +115,45 @@ rejected / completed) and the app lists them with an unread badge. This works
 out of the box — **no Firebase needed** — over the same REST API
 (`GET /notifications`, `PATCH /notifications/{id}/read`, `POST /notifications/read-all`).
 
-### Optional: real background push (FCM)
+### Real background push (FCM) — client is wired, just add the Firebase files
 
-To also deliver a system push when the app is closed (Android needs Firebase
-Cloud Messaging; iOS needs APNs), turn on the swap seam:
+The client is implemented (`PushService` + token registration on login + the
+backend FCM sender). It's **graceful**: with no Firebase config the app runs
+normally and push is simply off. To turn it on:
 
-**1. Backend** — create a Firebase project, generate a service-account key
-(Project settings → Service accounts → Generate new private key), and in
-`backend/config.local.php` add:
+**1. Backend** — one Firebase service-account key powers both Storage and push
+(see "Cloud storage" below). In `backend/config.local.php`:
 ```php
-'fcm_service_account' => '/absolute/path/to/serviceAccount.json',
+'firebase_service_account' => '/absolute/path/to/serviceAccount.json',
 ```
 The backend then pushes to every registered device whenever it creates a
-notification. With this unset, push is a silent no-op and the in-app bell still
-works.
+notification.
 
-**2. App** — add `firebase_messaging` + `firebase_core` to `pubspec.yaml`, drop
-the Android `google-services.json` (and the iOS plist) into the generated
-platform folders, then on login request permission, read the FCM token and send
-it once via `NotificationService.registerDevice(token)` (already implemented →
-`POST /notifications/device`). Handle taps with the push's `data.orderId` to
-deep-link to the order. (Not wired by default so the app still runs without
-Firebase.)
+**2. App native config** (the generated `android/` `ios/` folders aren't in git):
+- `flutter pub get` (pulls `firebase_core` + `firebase_messaging`).
+- Add the Android app in the Firebase console, download **`google-services.json`**
+  into `android/app/`.
+- In `android/build.gradle(.kts)` add the classpath
+  `com.google.gms:google-services` and in `android/app/build.gradle(.kts)` apply
+  the `com.google.gms.google-services` plugin (and `minSdk >= 21`).
+- iOS: add the app, drop `GoogleService-Info.plist` into `ios/Runner/`, and
+  enable Push Notifications + an APNs key in Firebase.
+
+That's it — `PushService.init()` runs at startup, and the device token is
+registered (`POST /notifications/device`) on login. Backgrounded pushes show in
+the tray automatically; foregrounded ones refresh the 🔔 bell.
+
+## Cloud storage (images + 3D models)
+
+Uploads (product images, `.glb` models, avatars, proof/issue photos) go through
+one swap seam (`backend/lib/storage.php`). With Firebase configured they upload
+to **Firebase Storage** and return a public download URL; otherwise they save to
+`backend/uploads/` locally. In `backend/config.local.php`:
+```php
+'firebase_service_account' => '/absolute/path/to/serviceAccount.json',
+'firebase_storage_bucket'  => 'your-project-id.appspot.com',
+```
+(Same service-account key as push.)
 
 ## Test login
 

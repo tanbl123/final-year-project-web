@@ -10,24 +10,31 @@ import 'package:customer/features/order/services/order_service.dart';
 import 'package:customer/features/review/services/review_service.dart';
 import 'package:customer/features/wishlist/services/wishlist_service.dart';
 import 'package:customer/features/notification/services/notification_service.dart';
+import 'package:customer/features/notification/services/push_service.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/features/wishlist/state/wishlist_provider.dart';
 import 'package:customer/features/notification/state/notification_provider.dart';
 import 'package:customer/features/shell/main_shell.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   final api = ApiClient();
   final authProvider = AuthProvider(api: api, authService: AuthService(api))
     ..loadFromStorage();
 
-  runApp(ShoeArApp(api: api, authProvider: authProvider));
+  // best-effort FCM init (no-op if Firebase isn't configured on this build)
+  final pushService = PushService(NotificationService(api));
+  await pushService.init();
+
+  runApp(ShoeArApp(api: api, authProvider: authProvider, pushService: pushService));
 }
 
 class ShoeArApp extends StatelessWidget {
   final ApiClient api;
   final AuthProvider authProvider;
-  const ShoeArApp({super.key, required this.api, required this.authProvider});
+  final PushService pushService;
+  const ShoeArApp({super.key, required this.api, required this.authProvider, required this.pushService});
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +54,10 @@ class ShoeArApp extends StatelessWidget {
           create: (_) => WishlistProvider(WishlistService(api)),
           update: (_, auth, wl) => wl!..syncWithAuth(auth.isLoggedIn),
         ),
-        // notifications load on login and clear on logout, like cart/wishlist
+        // notifications load on login and clear on logout, like cart/wishlist;
+        // also registers this device for FCM push on login (via PushService)
         ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
-          create: (_) => NotificationProvider(NotificationService(api)),
+          create: (_) => NotificationProvider(NotificationService(api), pushService),
           update: (_, auth, notif) => notif!..syncWithAuth(auth.isLoggedIn),
         ),
       ],

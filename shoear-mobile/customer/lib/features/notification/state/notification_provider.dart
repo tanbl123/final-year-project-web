@@ -2,13 +2,18 @@ import 'package:flutter/foundation.dart';
 
 import 'package:customer/features/notification/models/app_notification.dart';
 import 'package:customer/features/notification/services/notification_service.dart';
+import 'package:customer/features/notification/services/push_service.dart';
 
 /// Holds the customer's notifications + unread count for the bell badge.
 /// Loads on login and clears on logout (driven by [syncWithAuth]), same as the
-/// cart/wishlist providers.
+/// cart/wishlist providers. Also owns FCM device registration via [PushService].
 class NotificationProvider extends ChangeNotifier {
   final NotificationService _service;
-  NotificationProvider(this._service);
+  final PushService? _push;
+  NotificationProvider(this._service, [this._push]) {
+    // a foreground push refreshes the bell badge
+    _push?.onMessageCallback = refresh;
+  }
 
   List<AppNotification> _items = [];
   List<AppNotification> get items => _items;
@@ -27,6 +32,7 @@ class NotificationProvider extends ChangeNotifier {
     _wasLoggedIn = loggedIn;
     if (loggedIn) {
       Future.microtask(refresh);
+      _push?.registerDevice(); // register this device for push on login
     } else {
       _items = [];
       _unread = 0;
