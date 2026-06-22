@@ -108,15 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: _loading ? null : _openForgotPassword,
-                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
-                            child: const Text('Forgot password?'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 20),
                         FilledButton(
                           onPressed: _loading ? null : _submit,
                           child: Padding(
@@ -125,6 +117,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Text('Login'),
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextButton(
+                          onPressed: _loading ? null : _openForgotPassword,
+                          child: const Text('Forgot password?'),
                         ),
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
