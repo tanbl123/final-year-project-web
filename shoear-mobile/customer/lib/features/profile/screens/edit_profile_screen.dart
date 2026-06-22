@@ -36,11 +36,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _phone = TextEditingController(text: widget.phone);
   late final TextEditingController _address = TextEditingController(text: widget.address);
 
+  // focus nodes so we can validate a field when it loses focus (like register)
+  final _nameFocus = FocusNode();
+  final _usernameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+
   late String? _avatarUrl = widget.avatarUrl;
   bool _avatarBusy = false;
   bool _saving = false;
-  // whether the photo changed, so the caller refreshes even if fields didn't
-  bool _avatarChanged = false;
 
   String? _nameError;
   String? _usernameError;
@@ -54,14 +57,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     for (final c in [_name, _username, _phone, _address]) {
       c.addListener(_onFieldChanged);
     }
+    // validate on blur
+    _nameFocus.addListener(() => _onBlur(_nameFocus, () => _nameError = _validateName(_name.text)));
+    _usernameFocus.addListener(() => _onBlur(_usernameFocus, () => _usernameError = _validateUsername(_username.text)));
+    _phoneFocus.addListener(() => _onBlur(_phoneFocus, () => _phoneError = _validatePhone(_phone.text)));
   }
 
   void _onFieldChanged() => setState(() {});
+
+  void _onBlur(FocusNode node, VoidCallback validate) {
+    if (!node.hasFocus) setState(validate);
+  }
+
+  // same rules as the register form
+  String? _validateName(String v) => v.trim().isEmpty ? 'Full name is required.' : null;
+
+  String? _validateUsername(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'Username is required.';
+    if (!RegExp(r'^[A-Za-z0-9_]{3,20}$').hasMatch(t)) return 'Username must be 3–20 letters, numbers or underscores.';
+    return null;
+  }
+
+  String? _validatePhone(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'Phone number is required.';
+    if (!RegExp(r'^\+?[1-9]\d{7,14}$').hasMatch(t)) return 'Enter a valid phone number, e.g. +60123456789.';
+    return null;
+  }
 
   @override
   void dispose() {
     for (final c in [_name, _username, _phone, _address]) {
       c.dispose();
+    }
+    for (final f in [_nameFocus, _usernameFocus, _phoneFocus]) {
+      f.dispose();
     }
     super.dispose();
   }
@@ -101,7 +132,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (action == 'remove') {
         await account.removeAvatar();
         setState(() => _avatarUrl = null);
-        _avatarChanged = true;
       } else {
         final picked = await ImagePicker().pickImage(
           source: action == 'camera' ? ImageSource.camera : ImageSource.gallery,
@@ -111,7 +141,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (picked == null) return;
         final url = await account.uploadAvatar(File(picked.path));
         setState(() => _avatarUrl = url);
-        _avatarChanged = true;
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
@@ -123,10 +152,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _save() async {
     setState(() {
       _saving = true;
-      _nameError = _name.text.trim().isEmpty ? 'Full name is required.' : null;
-      _usernameError = _username.text.trim().isEmpty ? 'Username is required.' : null;
+      _nameError = _validateName(_name.text);
+      _usernameError = _validateUsername(_username.text);
+      _phoneError = _validatePhone(_phone.text);
     });
-    if (_nameError != null || _usernameError != null) {
+    if (_nameError != null || _usernameError != null || _phoneError != null) {
       setState(() => _saving = false);
       return;
     }
@@ -203,12 +233,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             Center(child: _avatarEditor()),
             const SizedBox(height: 24),
             _field(_name, 'Full name',
-                error: _nameError, onChanged: () => setState(() => _nameError = null)),
+                focusNode: _nameFocus,
+                error: _nameError,
+                onChanged: (v) { if (_nameError != null) setState(() => _nameError = _validateName(v)); }),
             _field(_username, 'Username',
-                error: _usernameError, onChanged: () => setState(() => _usernameError = null)),
+                focusNode: _usernameFocus,
+                error: _usernameError,
+                onChanged: (v) { if (_usernameError != null) setState(() => _usernameError = _validateUsername(v)); }),
             _field(_phone, 'Phone number',
+                focusNode: _phoneFocus,
                 keyboard: TextInputType.phone,
-                error: _phoneError, onChanged: () => setState(() => _phoneError = null)),
+                error: _phoneError,
+                onChanged: (v) { if (_phoneError != null) setState(() => _phoneError = _validatePhone(v)); }),
             _field(_address, 'Shipping address', maxLines: 2),
             const SizedBox(height: 8),
             FilledButton(
@@ -259,14 +295,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _field(TextEditingController c, String label,
-          {int maxLines = 1, TextInputType? keyboard, String? error, VoidCallback? onChanged}) =>
+          {FocusNode? focusNode, int maxLines = 1, TextInputType? keyboard, String? error, void Function(String)? onChanged}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: TextField(
           controller: c,
+          focusNode: focusNode,
           keyboardType: keyboard,
           maxLines: maxLines,
-          onChanged: (error == null || onChanged == null) ? null : (_) => onChanged(),
+          onChanged: onChanged,
           decoration: InputDecoration(
             labelText: label,
             border: const OutlineInputBorder(),
