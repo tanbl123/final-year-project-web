@@ -194,6 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             focusNode: _fullNameFocus,
             label: 'Full name',
             error: _fullNameError,
+            maxLength: 120,
             onChanged: (v) => setState(() => _fullNameError = _validateFullName(v)),
           ),
           _field(
@@ -280,6 +281,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required void Function(String) onChanged,
     TextInputType? keyboard,
     int maxLines = 1,
+    int? maxLength,
   }) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -288,6 +290,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           focusNode: focusNode,
           keyboardType: keyboard,
           maxLines: maxLines,
+          maxLength: maxLength,
           onChanged: onChanged,
           decoration: InputDecoration(
             labelText: label,

@@ -365,6 +365,9 @@ function handleRegisterCourier(PDO $pdo): void {
   if (!preg_match('/^\+?[1-9]\d{7,14}$/', $phoneNumber)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid phone number in international format, e.g. +60123456789.']);
   }
+  if (mb_strlen($fullName) > 120) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Full name is too long (max 120 characters).']);
+  }
   if (mb_strlen($vehicleInfo) > 100) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Vehicle info is too long (max 100 characters).']);
   }
