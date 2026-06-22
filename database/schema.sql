@@ -60,6 +60,7 @@ CREATE TABLE `user` (
     email         VARCHAR(120) NOT NULL,
     fullName      VARCHAR(120) NOT NULL,
     phoneNumber   VARCHAR(20)  NOT NULL,
+    avatarUrl     VARCHAR(255) NULL,                     -- profile picture URL (NULL = initials fallback)
     role          ENUM('Admin','Supplier','Customer','DeliveryPersonnel') NOT NULL,
     -- Pending  : supplier/delivery awaiting admin approval
     -- Active    : approved & usable (customers are Active immediately)

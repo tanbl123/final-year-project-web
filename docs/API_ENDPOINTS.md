@@ -80,8 +80,10 @@ List responses include paging info:
 | POST | `/auth/register` | Public | **(Implemented, supplier)** Register. Supplier → `Pending` (await admin); requires a valid `verificationCode`. Customer/Delivery register on their mobile apps. |
 | POST | `/auth/login` | Public | Returns JWT + role + basic profile. |
 | POST | `/auth/logout` | Any | Client-side token discard (and optional server token blacklist). |
-| GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). |
+| GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). Includes `avatarUrl` (null = no photo). |
 | PUT  | `/auth/me` | Any | **(Implemented)** Update own profile (`fullName`, `phoneNumber`). |
+| POST | `/auth/me/avatar` | Any | **(Implemented)** Upload/replace the profile picture (multipart `file`). Returns `{ avatarUrl }`. |
+| DELETE | `/auth/me/avatar` | Any | **(Implemented)** Remove the profile picture (back to initials). |
 | POST | `/auth/change-password` | Any | **(Implemented)** Change own password — verifies `currentPassword` before setting `newPassword`. |
 | POST | `/auth/forgot-password` | Public | **(Implemented)** Email a 6-digit reset code to a registered address. Always returns a generic success (no account enumeration). Requires SMTP. |
 | POST | `/auth/reset-password/verify-code` | Public | **(Implemented)** Check a reset code `{ email, code }` WITHOUT consuming it — lets the UI confirm the code as its own step before the new-password step. |

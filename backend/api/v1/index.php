@@ -334,6 +334,19 @@ if ($method === 'DELETE' && $path === '/auth/me') {
   handleDeleteMe($pdo, $auth);
 }
 
+// profile picture (multipart upload / remove) — any signed-in user
+if ($method === 'POST' && $path === '/auth/me/avatar') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUploadAvatar($pdo, $auth);
+}
+
+if ($method === 'DELETE' && $path === '/auth/me/avatar') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRemoveAvatar($pdo, $auth);
+}
+
 if ($method === 'POST' && $path === '/auth/change-password') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();

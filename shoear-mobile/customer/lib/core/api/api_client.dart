@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:customer/config.dart';
 
@@ -59,6 +60,17 @@ class ApiClient {
   Future<dynamic> delete(String path) async {
     final uri = Uri.parse('$baseUrl$path');
     final res = await http.delete(uri, headers: _headers());
+    return _unwrap(res);
+  }
+
+  /// Multipart POST of a single file (field `file`), e.g. the profile photo.
+  Future<dynamic> uploadFile(String path, File file) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_headers())
+      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    final streamed = await req.send();
+    final res = await http.Response.fromStream(streamed);
     return _unwrap(res);
   }
 

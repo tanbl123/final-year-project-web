@@ -1,9 +1,22 @@
+import 'dart:io';
+
 import 'package:customer/core/api/api_client.dart';
 
 /// Account: customer sign-up (public) and profile/password/delete (token).
 class AccountService {
   final ApiClient api;
   AccountService(this.api);
+
+  /// POST /auth/me/avatar — upload a new profile picture, returns its URL.
+  Future<String> uploadAvatar(File photo) async {
+    final data = await api.uploadFile('/auth/me/avatar', photo) as Map<String, dynamic>;
+    return data['avatarUrl']?.toString() ?? '';
+  }
+
+  /// DELETE /auth/me/avatar — remove the profile picture (back to initials).
+  Future<void> removeAvatar() async {
+    await api.delete('/auth/me/avatar');
+  }
 
   /// POST /auth/register/customer — create a customer account (Active at once).
   Future<void> registerCustomer({

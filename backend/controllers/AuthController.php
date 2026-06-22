@@ -406,7 +406,7 @@ function handleLogin(PDO $pdo, string $secret): void {
 // GET /auth/me — the signed-in user's own profile (+ role-specific details).
 function handleMe(PDO $pdo, array $auth): void {
   $stmt = $pdo->prepare(
-    'SELECT userId, username, fullName, email, phoneNumber, role, status, created_at
+    'SELECT userId, username, fullName, email, phoneNumber, avatarUrl, role, status, created_at
        FROM `user` WHERE userId = :id'
   );
   $stmt->execute(['id' => $auth['userId']]);
@@ -467,6 +467,25 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
   }
 
   sendJson(200, true, ['fullName' => $fullName, 'phoneNumber' => $phone, 'username' => $username]);
+}
+
+// POST /auth/me/avatar — upload (or replace) the signed-in user's profile
+// picture. Accepts a multipart `file`; stores it and saves the URL on the user.
+function handleUploadAvatar(PDO $pdo, array $auth): void {
+  if (!isset($_FILES['file'])) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A photo is required.']);
+  }
+  $url = storeUploadedFile($_FILES['file'], 'image');
+  $pdo->prepare('UPDATE `user` SET avatarUrl = :url WHERE userId = :id')
+      ->execute(['url' => $url, 'id' => $auth['userId']]);
+  sendJson(200, true, ['avatarUrl' => $url]);
+}
+
+// DELETE /auth/me/avatar — remove the profile picture (back to initials).
+function handleRemoveAvatar(PDO $pdo, array $auth): void {
+  $pdo->prepare('UPDATE `user` SET avatarUrl = NULL WHERE userId = :id')
+      ->execute(['id' => $auth['userId']]);
+  sendJson(200, true, ['avatarUrl' => null]);
 }
 
 // DELETE /auth/me — the user closes their own account. Soft-delete (status →

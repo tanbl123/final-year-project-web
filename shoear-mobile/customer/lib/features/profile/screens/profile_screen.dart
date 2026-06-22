@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import 'package:customer/core/widgets/profile_avatar.dart';
 import 'package:customer/features/auth/services/account_service.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/auth/screens/change_password_screen.dart';
@@ -68,6 +72,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Center(child: _avatarHeader(me)),
+              const SizedBox(height: 20),
               _row('Username', me['username']?.toString() ?? '—'),
               _row('Name', me['fullName']?.toString() ?? '—'),
               _row('Email', me['email']?.toString() ?? '—'),
@@ -105,6 +111,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       );
+  }
+
+  // big avatar with a camera badge to change the photo
+  Widget _avatarHeader(Map<String, dynamic> me) {
+    final url = (me['avatarUrl'] as String?)?.isNotEmpty == true ? me['avatarUrl'] as String : null;
+    final name = me['fullName']?.toString() ?? '';
+    return Stack(
+      children: [
+        ProfileAvatar(name: name, url: url, size: 96),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: Material(
+            color: Theme.of(context).colorScheme.primary,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => _changeAvatar(hasPhoto: url != null),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(Icons.camera_alt, size: 18, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _changeAvatar({required bool hasPhoto}) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            if (hasPhoto)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Remove photo', style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(context, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+
+    try {
+      if (action == 'remove') {
+        await context.read<AccountService>().removeAvatar();
+      } else {
+        final picked = await ImagePicker().pickImage(
+          source: action == 'camera' ? ImageSource.camera : ImageSource.gallery,
+          maxWidth: 800,
+          imageQuality: 85,
+        );
+        if (picked == null) return;
+        await context.read<AccountService>().uploadAvatar(File(picked.path));
+      }
+      if (mounted) _reload();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   Widget _row(String k, String v) => Padding(

@@ -14,6 +14,7 @@ dependencies:
   provider: ^6.1.2          # simple state management (auth session)
   shared_preferences: ^2.3.2 # persists the JWT + basic user across launches
   flutter_stripe: ^11.1.0   # Stripe PaymentSheet for card checkout
+  image_picker: ^1.1.2      # pick/take the profile photo
 
 dev_dependencies:
   flutter_test:
