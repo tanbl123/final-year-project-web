@@ -104,7 +104,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             show: _showNew,
             onToggle: () => setState(() => _showNew = !_showNew),
             errorText: _newPwError,
-            helperText: '8+ chars with upper, lower, number & symbol',
           ),
           const SizedBox(height: 16),
           _pwField(
