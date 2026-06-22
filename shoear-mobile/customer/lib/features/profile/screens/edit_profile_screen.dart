@@ -47,6 +47,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _phoneError;
 
   @override
+  void initState() {
+    super.initState();
+    // rebuild as the user types so the Save button's enabled state (and the
+    // unsaved-changes guard) stays in sync with the fields
+    for (final c in [_name, _username, _phone, _address]) {
+      c.addListener(_onFieldChanged);
+    }
+  }
+
+  void _onFieldChanged() => setState(() {});
+
+  @override
   void dispose() {
     for (final c in [_name, _username, _phone, _address]) {
       c.dispose();
@@ -200,7 +212,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _field(_address, 'Shipping address', maxLines: 2),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: _saving ? null : _save,
+              // disabled until something actually changes (mirrors the web)
+              onPressed: (_saving || !_dirty) ? null : _save,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: _saving
