@@ -385,10 +385,21 @@ function handleReportIssue(PDO $pdo, array $auth, string $deliveryId): void {
     sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not report the issue.']);
   }
 
-  // tell the buyer there's a problem (best-effort; never blocks)
+  // Notify the buyer too — but with a CUSTOMER-friendly, reason-specific
+  // message (the courier's raw note/photo stay internal to the admin queue).
   if (function_exists('notifyOrderCustomer')) {
-    notifyOrderCustomer($pdo, $del['orderId'], 'delivery', 'Delivery issue',
-      "There was a problem delivering order {$del['orderId']}. Our team is looking into it.");
+    $oid = $del['orderId'];
+    $customerMsg = [
+      'customer_unreachable' => ['We missed you', "We tried to deliver order {$oid} but couldn't reach you — we'll try again soon."],
+      'customer_unavailable' => ['Delivery attempt unsuccessful', "No one was available to receive order {$oid}. We'll arrange another attempt."],
+      'customer_refused'     => ['Delivery cancelled', "Order {$oid} was marked refused at delivery. Contact support if this isn't right."],
+      'wrong_address'        => ['Address problem', "We couldn't deliver order {$oid} — the address looks incomplete. Please check your delivery address."],
+      'package_damaged'      => ['Delivery issue', "There was a problem with your parcel for order {$oid}. Our team will be in touch."],
+      'vehicle_emergency'    => ['Delivery delayed', "Your delivery for order {$oid} is delayed due to a logistics issue — we'll reassign it shortly."],
+      'other'                => ['Delivery issue', "There was a problem with your delivery for order {$oid}. Our team is looking into it."],
+    ];
+    [$ctitle, $cbody] = $customerMsg[$reason] ?? $customerMsg['other'];
+    notifyOrderCustomer($pdo, $oid, 'delivery', $ctitle, $cbody);
   }
 
   sendJson(201, true, ['issueId' => $id, 'deliveryId' => $deliveryId, 'reason' => $reason, 'outcome' => $outcome]);
