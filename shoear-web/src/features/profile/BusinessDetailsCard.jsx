@@ -95,9 +95,23 @@ function BusinessDetailsCard({ onToast }) {
     setReqErrors({});
     setReqOpen(true);
   }
+  // validate one change-request field live (format errors show as you type;
+  // empty "required" fields aren't nagged mid-typing — submit covers those)
+  function reqFieldError(name, value) {
+    const v = value.trim();
+    if (v === '') return '';
+    if (name === 'businessRegNo') return SSM_RE.test(v) ? '' : 'Enter a valid SSM number, e.g. 202301012345 or 1234567-A.';
+    if (name === 'taxNumber') return SST_RE.test(v) ? '' : 'Enter a valid SST number, e.g. W10-1808-32000001.';
+    return '';
+  }
   function setReqField(name, value) {
     setReq((r) => ({ ...r, [name]: value }));
-    setReqErrors((er) => { if (!er[name]) return er; const n = { ...er }; delete n[name]; return n; });
+    setReqErrors((er) => {
+      const n = { ...er };
+      const msg = reqFieldError(name, value);
+      if (msg) n[name] = msg; else delete n[name];
+      return n;
+    });
   }
   async function handleDoc(event) {
     const file = event.target.files[0];
