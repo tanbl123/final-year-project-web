@@ -128,7 +128,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 height: 300,
                 child: p.images.isEmpty
                     ? const ProductImage(url: null)
-                    : PageView(children: [for (final url in p.images) ProductImage(url: url)]),
+                    : _ImageCarousel(images: p.images),
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -459,6 +459,79 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Swipeable product-image gallery with a page counter and dot indicators, so
+/// it's obvious there's more than one image (the bare PageView gave no hint).
+class _ImageCarousel extends StatefulWidget {
+  final List<String> images;
+  const _ImageCarousel({required this.images});
+
+  @override
+  State<_ImageCarousel> createState() => _ImageCarouselState();
+}
+
+class _ImageCarouselState extends State<_ImageCarousel> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.images;
+    if (images.length == 1) return ProductImage(url: images.first);
+
+    return Stack(
+      children: [
+        PageView(
+          controller: _controller,
+          onPageChanged: (i) => setState(() => _page = i),
+          children: [for (final url in images) ProductImage(url: url)],
+        ),
+        // "1 / 3" counter, top-right
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('${_page + 1} / ${images.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 12)),
+          ),
+        ),
+        // dot indicators, bottom-center
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 12,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (int i = 0; i < images.length; i++)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: i == _page ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: i == _page ? Theme.of(context).colorScheme.primary : Colors.white70,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
