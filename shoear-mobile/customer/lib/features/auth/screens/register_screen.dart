@@ -4,6 +4,18 @@ import 'package:provider/provider.dart';
 import 'package:customer/features/auth/services/account_service.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 
+// Password policy mirrors the web/registration backend: 8+ chars with at least
+// one lowercase, uppercase, digit and special character. Returns an error
+// string, or null when valid.
+String? _passwordPolicyError(String pw) {
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!RegExp(r'[a-z]').hasMatch(pw)) return 'Password must include a lowercase letter.';
+  if (!RegExp(r'[A-Z]').hasMatch(pw)) return 'Password must include an uppercase letter.';
+  if (!RegExp(r'[0-9]').hasMatch(pw)) return 'Password must include a number.';
+  if (!RegExp(r'[^a-zA-Z0-9]').hasMatch(pw)) return 'Password must include a special character.';
+  return null;
+}
+
 /// Customer self-service sign-up. On success the account is created and we log
 /// the customer straight in, then pop back.
 class RegisterScreen extends StatefulWidget {
@@ -21,6 +33,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _address = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+
+  // a focus node per validated field so we can validate on blur (like the web)
+  final _fullNameFocus = FocusNode();
+  final _usernameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
   bool _obscure = true;
   bool _loading = false;
   // per-field inline errors
@@ -32,23 +53,84 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _confirmError;
 
   @override
+  void initState() {
+    super.initState();
+    // validate a field when it loses focus (real-time, on blur)
+    _fullNameFocus.addListener(() => _onBlur(_fullNameFocus, () => _fullNameError = _validateFullName(_fullName.text)));
+    _usernameFocus.addListener(() => _onBlur(_usernameFocus, () => _usernameError = _validateUsername(_username.text)));
+    _emailFocus.addListener(() => _onBlur(_emailFocus, () => _emailError = _validateEmail(_email.text)));
+    _phoneFocus.addListener(() => _onBlur(_phoneFocus, () => _phoneError = _validatePhone(_phone.text)));
+    _passwordFocus.addListener(() => _onBlur(_passwordFocus, () => _passwordError = _validatePassword(_password.text)));
+    _confirmFocus.addListener(() => _onBlur(_confirmFocus, () => _confirmError = _validateConfirm()));
+  }
+
+  void _onBlur(FocusNode node, VoidCallback validate) {
+    if (!node.hasFocus) setState(validate);
+  }
+
+  @override
   void dispose() {
     for (final c in [_fullName, _username, _email, _phone, _address, _password, _confirm]) {
       c.dispose();
     }
+    for (final f in [_fullNameFocus, _usernameFocus, _emailFocus, _phoneFocus, _passwordFocus, _confirmFocus]) {
+      f.dispose();
+    }
     super.dispose();
+  }
+
+  // ── field validators (same rules as the web register form) ──
+  String? _validateFullName(String v) => v.trim().isEmpty ? 'Full name is required.' : null;
+
+  String? _validateUsername(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'Username is required.';
+    if (!RegExp(r'^[A-Za-z0-9_]{3,20}$').hasMatch(t)) return 'Username must be 3–20 letters, numbers or underscores.';
+    return null;
+  }
+
+  String? _validateEmail(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'Email is required.';
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(t)) return 'Please enter a valid email.';
+    return null;
+  }
+
+  String? _validatePhone(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'Phone number is required.';
+    // E.164: optional leading +, then 8–15 digits, no leading zero
+    if (!RegExp(r'^\+?[1-9]\d{7,14}$').hasMatch(t)) {
+      return 'Enter a valid phone number, e.g. +60123456789.';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String v) {
+    if (v.isEmpty) return 'Password is required.';
+    return _passwordPolicyError(v);
+  }
+
+  String? _validateConfirm() {
+    if (_confirm.text.isEmpty) return 'Please confirm your password.';
+    if (_password.text != _confirm.text) return 'Passwords do not match.';
+    return null;
+  }
+
+  // live re-check: only once a field already shows an error, so the message
+  // updates as the user fixes it (matches the web's handleChange behaviour)
+  void _liveRecheck(String? current, void Function() apply) {
+    if (current != null) setState(apply);
   }
 
   Future<void> _submit() async {
     setState(() {
-      _fullNameError = _fullName.text.trim().isEmpty ? 'Full name is required.' : null;
-      _usernameError = _username.text.trim().isEmpty ? 'Username is required.' : null;
-      _emailError = _email.text.trim().isEmpty ? 'Email is required.' : null;
-      _phoneError = _phone.text.trim().isEmpty ? 'Phone number is required.' : null;
-      _passwordError = _password.text.isEmpty ? 'Password is required.' : null;
-      _confirmError = (_password.text.isNotEmpty && _password.text != _confirm.text)
-          ? 'Passwords do not match.'
-          : null;
+      _fullNameError = _validateFullName(_fullName.text);
+      _usernameError = _validateUsername(_username.text);
+      _emailError = _validateEmail(_email.text);
+      _phoneError = _validatePhone(_phone.text);
+      _passwordError = _validatePassword(_password.text);
+      _confirmError = _validateConfirm();
     });
     if (_fullNameError != null ||
         _usernameError != null ||
@@ -80,8 +162,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _usernameError = msg;
         } else if (lower.contains('email')) {
           _emailError = msg;
-        } else if (lower.contains('password')) {
-          _passwordError = msg;
         } else {
           _passwordError = msg;
         }
@@ -98,21 +178,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _field(_fullName, 'Full name',
-              errorText: _fullNameError, onChanged: () => setState(() => _fullNameError = null)),
-          _field(_username, 'Username',
-              errorText: _usernameError, onChanged: () => setState(() => _usernameError = null)),
-          _field(_email, 'Email',
-              keyboard: TextInputType.emailAddress,
-              errorText: _emailError, onChanged: () => setState(() => _emailError = null)),
-          _field(_phone, 'Phone number',
-              keyboard: TextInputType.phone,
-              errorText: _phoneError, onChanged: () => setState(() => _phoneError = null)),
-          _field(_address, 'Shipping address (optional)', maxLines: 2),
+          _field(
+            controller: _fullName,
+            focusNode: _fullNameFocus,
+            label: 'Full name',
+            error: _fullNameError,
+            onChanged: (v) => _liveRecheck(_fullNameError, () => _fullNameError = _validateFullName(v)),
+          ),
+          _field(
+            controller: _username,
+            focusNode: _usernameFocus,
+            label: 'Username',
+            error: _usernameError,
+            onChanged: (v) => _liveRecheck(_usernameError, () => _usernameError = _validateUsername(v)),
+          ),
+          _field(
+            controller: _email,
+            focusNode: _emailFocus,
+            label: 'Email',
+            keyboard: TextInputType.emailAddress,
+            error: _emailError,
+            onChanged: (v) => _liveRecheck(_emailError, () => _emailError = _validateEmail(v)),
+          ),
+          _field(
+            controller: _phone,
+            focusNode: _phoneFocus,
+            label: 'Phone number',
+            keyboard: TextInputType.phone,
+            error: _phoneError,
+            onChanged: (v) => _liveRecheck(_phoneError, () => _phoneError = _validatePhone(v)),
+          ),
+          _field(
+            controller: _address,
+            focusNode: null,
+            label: 'Shipping address (optional)',
+            error: null,
+            maxLines: 2,
+            onChanged: (_) {},
+          ),
           TextField(
             controller: _password,
+            focusNode: _passwordFocus,
             obscureText: _obscure,
-            onChanged: _passwordError == null ? null : (_) => setState(() => _passwordError = null),
+            onChanged: (v) => setState(() {
+              if (_passwordError != null) _passwordError = _validatePassword(v);
+              // password & confirm are linked — keep the confirm error in sync
+              if (_confirmError != null) _confirmError = _validateConfirm();
+            }),
             decoration: InputDecoration(
               labelText: 'Password',
               border: const OutlineInputBorder(),
@@ -127,8 +239,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _confirm,
+            focusNode: _confirmFocus,
             obscureText: _obscure,
-            onChanged: _confirmError == null ? null : (_) => setState(() => _confirmError = null),
+            onChanged: (_) => _liveRecheck(_confirmError, () => _confirmError = _validateConfirm()),
             decoration: InputDecoration(
               labelText: 'Confirm password',
               border: const OutlineInputBorder(),
@@ -150,19 +263,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _field(TextEditingController c, String label,
-          {TextInputType? keyboard, int maxLines = 1, String? errorText, VoidCallback? onChanged}) =>
+  Widget _field({
+    required TextEditingController controller,
+    required FocusNode? focusNode,
+    required String label,
+    required String? error,
+    required void Function(String) onChanged,
+    TextInputType? keyboard,
+    int maxLines = 1,
+  }) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: TextField(
-          controller: c,
+          controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboard,
           maxLines: maxLines,
-          onChanged: (errorText == null || onChanged == null) ? null : (_) => onChanged(),
+          onChanged: onChanged,
           decoration: InputDecoration(
             labelText: label,
             border: const OutlineInputBorder(),
-            errorText: errorText,
+            errorText: error,
           ),
         ),
       );
