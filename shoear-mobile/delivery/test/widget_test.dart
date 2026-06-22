@@ -16,6 +16,6 @@ void main() {
 
     expect(find.text('ShoeAR Express'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
-    expect(find.text('New here? Apply to be a courier'), findsOneWidget);
+    expect(find.text('Apply to be a courier'), findsOneWidget);
   });
 }

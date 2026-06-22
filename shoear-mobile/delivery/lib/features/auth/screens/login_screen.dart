@@ -116,13 +116,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextButton(
+                OutlinedButton(
                   onPressed: _loading
                       ? null
                       : () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const RegisterScreen()),
                           ),
-                  child: const Text('New here? Apply to be a courier'),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('Apply to be a courier'),
+                  ),
                 ),
               ],
             ),
