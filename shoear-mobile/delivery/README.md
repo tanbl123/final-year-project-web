@@ -16,6 +16,39 @@ flutter create .
 flutter pub get
 ```
 
+## 1b. Fix the app display name
+
+`flutter create .` sets the Android app label to the project folder name
+(`delivery`). Change it to **ShoeAR Express** in
+`android/app/src/main/AndroidManifest.xml`:
+```xml
+android:label="ShoeAR Express"
+```
+Re-apply after any future `flutter create .` (the `android/` folder is gitignored).
+
+## 1c. Firebase push notifications (optional)
+
+The courier app supports real background push (FCM) using the same Firebase
+project as the customer app. The client is already wired — to turn it on:
+
+1. From this folder, run:
+   ```bash
+   dart pub global run flutterfire_cli:flutterfire configure
+   ```
+   Select the `shoear` Firebase project and the **android** platform.
+   This generates `lib/firebase_options.dart` and `android/app/google-services.json`.
+
+2. In `android/app/build.gradle.kts` verify `minSdk = 21` and the
+   `com.google.gms.google-services` plugin is applied (flutterfire usually adds
+   this automatically).
+
+3. Restart Apache (XAMPP) and make sure `backend/config.local.php` has:
+   ```php
+   'firebase_service_account' => '/path/to/serviceAccount.json',
+   ```
+
+Without Firebase configured the app works normally — push is simply off.
+
 ## 2. Point the app at your API
 
 Edit **`lib/config.dart`** and set `apiBaseUrl`:
