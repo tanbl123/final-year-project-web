@@ -23,7 +23,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirm = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
-  String? _error;
+  // per-field inline errors
+  String? _fullNameError;
+  String? _usernameError;
+  String? _emailError;
+  String? _phoneError;
+  String? _passwordError;
+  String? _confirmError;
 
   @override
   void dispose() {
@@ -34,17 +40,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
-    setState(() => _error = null);
-    if (_fullName.text.trim().isEmpty ||
-        _username.text.trim().isEmpty ||
-        _email.text.trim().isEmpty ||
-        _phone.text.trim().isEmpty ||
-        _password.text.isEmpty) {
-      setState(() => _error = 'Please fill in all required fields.');
-      return;
-    }
-    if (_password.text != _confirm.text) {
-      setState(() => _error = 'Passwords do not match.');
+    setState(() {
+      _fullNameError = _fullName.text.trim().isEmpty ? 'Full name is required.' : null;
+      _usernameError = _username.text.trim().isEmpty ? 'Username is required.' : null;
+      _emailError = _email.text.trim().isEmpty ? 'Email is required.' : null;
+      _phoneError = _phone.text.trim().isEmpty ? 'Phone number is required.' : null;
+      _passwordError = _password.text.isEmpty ? 'Password is required.' : null;
+      _confirmError = (_password.text.isNotEmpty && _password.text != _confirm.text)
+          ? 'Passwords do not match.'
+          : null;
+    });
+    if (_fullNameError != null ||
+        _usernameError != null ||
+        _emailError != null ||
+        _phoneError != null ||
+        _passwordError != null ||
+        _confirmError != null) {
       return;
     }
     setState(() => _loading = true);
@@ -61,7 +72,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await context.read<AuthProvider>().login(_username.text.trim(), _password.text);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = e.toString());
+      // route the server error to the most likely field, else under the password
+      final msg = e.toString();
+      final lower = msg.toLowerCase();
+      setState(() {
+        if (lower.contains('username')) {
+          _usernameError = msg;
+        } else if (lower.contains('email')) {
+          _emailError = msg;
+        } else if (lower.contains('password')) {
+          _passwordError = msg;
+        } else {
+          _passwordError = msg;
+        }
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -74,26 +98,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          if (_error != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-              child: Text(_error!, style: TextStyle(color: Colors.red.shade700)),
-            ),
-            const SizedBox(height: 16),
-          ],
-          _field(_fullName, 'Full name'),
-          _field(_username, 'Username'),
-          _field(_email, 'Email', keyboard: TextInputType.emailAddress),
-          _field(_phone, 'Phone number', keyboard: TextInputType.phone),
+          _field(_fullName, 'Full name',
+              errorText: _fullNameError, onChanged: () => setState(() => _fullNameError = null)),
+          _field(_username, 'Username',
+              errorText: _usernameError, onChanged: () => setState(() => _usernameError = null)),
+          _field(_email, 'Email',
+              keyboard: TextInputType.emailAddress,
+              errorText: _emailError, onChanged: () => setState(() => _emailError = null)),
+          _field(_phone, 'Phone number',
+              keyboard: TextInputType.phone,
+              errorText: _phoneError, onChanged: () => setState(() => _phoneError = null)),
           _field(_address, 'Shipping address (optional)', maxLines: 2),
           TextField(
             controller: _password,
             obscureText: _obscure,
+            onChanged: _passwordError == null ? null : (_) => setState(() => _passwordError = null),
             decoration: InputDecoration(
               labelText: 'Password',
               border: const OutlineInputBorder(),
               helperText: '8+ chars with upper, lower, number & symbol',
+              errorText: _passwordError,
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscure = !_obscure),
@@ -104,7 +128,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextField(
             controller: _confirm,
             obscureText: _obscure,
-            decoration: const InputDecoration(labelText: 'Confirm password', border: OutlineInputBorder()),
+            onChanged: _confirmError == null ? null : (_) => setState(() => _confirmError = null),
+            decoration: InputDecoration(
+              labelText: 'Confirm password',
+              border: const OutlineInputBorder(),
+              errorText: _confirmError,
+            ),
           ),
           const SizedBox(height: 24),
           FilledButton(
@@ -121,13 +150,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _field(TextEditingController c, String label, {TextInputType? keyboard, int maxLines = 1}) => Padding(
+  Widget _field(TextEditingController c, String label,
+          {TextInputType? keyboard, int maxLines = 1, String? errorText, VoidCallback? onChanged}) =>
+      Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: TextField(
           controller: c,
           keyboardType: keyboard,
           maxLines: maxLines,
-          decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+          onChanged: (errorText == null || onChanged == null) ? null : (_) => onChanged(),
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+            errorText: errorText,
+          ),
         ),
       );
 }

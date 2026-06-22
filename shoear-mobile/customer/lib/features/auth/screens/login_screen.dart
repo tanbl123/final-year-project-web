@@ -16,7 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _password = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
-  String? _error;
+  String? _identifierError;
+  String? _passwordError;
 
   @override
   void dispose() {
@@ -26,17 +27,19 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    setState(() => _error = null);
-    if (_identifier.text.trim().isEmpty || _password.text.isEmpty) {
-      setState(() => _error = 'Email/username and password are required.');
-      return;
-    }
+    setState(() {
+      _identifierError = _identifier.text.trim().isEmpty ? 'Email or username is required.' : null;
+      _passwordError = _password.text.isEmpty ? 'Password is required.' : null;
+    });
+    if (_identifierError != null || _passwordError != null) return;
+
     setState(() => _loading = true);
     try {
       await context.read<AuthProvider>().login(_identifier.text.trim(), _password.text);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = e.toString());
+      // auth failures aren't tied to one field — surface under the password
+      if (mounted) setState(() => _passwordError = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -67,33 +70,26 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (_error != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(_error!, style: TextStyle(color: Colors.red.shade700)),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
                         TextField(
                           controller: _identifier,
                           textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
+                          onChanged: _identifierError == null ? null : (_) => setState(() => _identifierError = null),
+                          decoration: InputDecoration(
                             labelText: 'Email or username',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
+                            errorText: _identifierError,
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: _password,
                           obscureText: _obscure,
+                          onChanged: _passwordError == null ? null : (_) => setState(() => _passwordError = null),
                           onSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
                             labelText: 'Password',
                             border: const OutlineInputBorder(),
+                            errorText: _passwordError,
                             suffixIcon: IconButton(
                               icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                               onPressed: () => setState(() => _obscure = !_obscure),

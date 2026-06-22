@@ -30,7 +30,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _showNew = false;
   bool _showConfirm = false;
   bool _saving = false;
-  String? _formError; // server-side (e.g. wrong current password)
+  String? _currentError; // server-side, shown under the Current password field
 
   @override
   void dispose() {
@@ -60,7 +60,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Future<void> _save() async {
     setState(() {
       _saving = true;
-      _formError = null;
+      _currentError = null;
     });
     try {
       await context.read<AccountService>().changePassword(_current.text, _next.text);
@@ -69,7 +69,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _formError = e.toString();
+          _currentError = e.toString();
         });
       }
     }
@@ -82,19 +82,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_formError != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-              child: Text(_formError!, style: TextStyle(color: Colors.red.shade700)),
-            ),
-            const SizedBox(height: 16),
-          ],
           _pwField(
             controller: _current,
             label: 'Current password',
             show: _showCurrent,
             onToggle: () => setState(() => _showCurrent = !_showCurrent),
+            errorText: _currentError,
             autofocus: true,
           ),
           const SizedBox(height: 16),
@@ -141,7 +134,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       controller: controller,
       obscureText: !show,
       autofocus: autofocus,
-      onChanged: (_) => setState(() {}), // refresh live validation + button
+      onChanged: (_) => setState(() => _currentError = null), // refresh validation, clear server error
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

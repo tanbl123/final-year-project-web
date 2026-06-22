@@ -166,13 +166,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 /// Shared field used by the profile sheets.
-Widget _profileField(TextEditingController c, String label, {bool obscure = false, int maxLines = 1}) => Padding(
+Widget _profileField(TextEditingController c, String label,
+        {bool obscure = false, int maxLines = 1, String? errorText, VoidCallback? onChanged}) =>
+    Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
         obscureText: obscure,
         maxLines: obscure ? 1 : maxLines,
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+        onChanged: (errorText == null || onChanged == null) ? null : (_) => onChanged(),
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          errorText: errorText,
+        ),
       ),
     );
 
@@ -195,7 +202,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _phone = TextEditingController(text: widget.phone);
   late final TextEditingController _address = TextEditingController(text: widget.address);
   bool _saving = false;
-  String? _err;
+  // per-field inline errors
+  String? _nameError;
+  String? _usernameError;
+  String? _phoneError;
 
   @override
   void dispose() {
@@ -206,7 +216,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Future<void> _save() async {
-    setState(() { _saving = true; _err = null; });
+    setState(() {
+      _saving = true;
+      _nameError = _name.text.trim().isEmpty ? 'Full name is required.' : null;
+      _usernameError = _username.text.trim().isEmpty ? 'Username is required.' : null;
+    });
+    if (_nameError != null || _usernameError != null) {
+      setState(() => _saving = false);
+      return;
+    }
     try {
       await context.read<AccountService>().updateProfile(
             fullName: _name.text.trim(),
@@ -217,7 +235,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       await context.read<AuthProvider>().applyProfile(fullName: _name.text.trim());
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      if (mounted) setState(() { _saving = false; _err = e.toString(); });
+      // route the server error to the most likely field, else under the username
+      final msg = e.toString();
+      final lower = msg.toLowerCase();
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          if (lower.contains('phone')) {
+            _phoneError = msg;
+          } else if (lower.contains('name')) {
+            _nameError = msg;
+          } else {
+            _usernameError = msg;
+          }
+        });
+      }
     }
   }
 
@@ -231,13 +263,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         children: [
           Text('Edit profile', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
-          if (_err != null) ...[
-            Text(_err!, style: TextStyle(color: Colors.red.shade700)),
-            const SizedBox(height: 8),
-          ],
-          _profileField(_name, 'Full name'),
-          _profileField(_username, 'Username'),
-          _profileField(_phone, 'Phone number'),
+          _profileField(_name, 'Full name',
+              errorText: _nameError, onChanged: () => setState(() => _nameError = null)),
+          _profileField(_username, 'Username',
+              errorText: _usernameError, onChanged: () => setState(() => _usernameError = null)),
+          _profileField(_phone, 'Phone number',
+              errorText: _phoneError, onChanged: () => setState(() => _phoneError = null)),
           _profileField(_address, 'Shipping address', maxLines: 2),
           const SizedBox(height: 8),
           FilledButton(
