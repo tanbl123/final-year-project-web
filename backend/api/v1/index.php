@@ -5,6 +5,7 @@ require __DIR__ . '/../../lib/jwt.php';
 require __DIR__ . '/../../lib/request.php';
 require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
+require __DIR__ . '/../../lib/google_auth.php';
 require __DIR__ . '/../../lib/storage.php';
 require __DIR__ . '/../../lib/stripe.php';
 require __DIR__ . '/../../lib/mail.php';
