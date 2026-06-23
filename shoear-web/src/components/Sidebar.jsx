@@ -5,6 +5,7 @@ import { NavLink } from 'react-router-dom';
 const ADMIN_NAV = [
   { group: 'Main', items: [
     { to: '/admin', label: 'Suppliers', icon: '🏪', end: true },
+    { to: '/admin/couriers', label: 'Couriers', icon: '🛵' },
     { to: '/admin/changes', label: 'Changes', icon: '📝' },
     { to: '/admin/users', label: 'Users', icon: '👥' },
   ] },
@@ -16,6 +17,7 @@ const ADMIN_NAV = [
   { group: 'Operations', items: [
     { to: '/admin/orders', label: 'Orders', icon: '🧾' },
     { to: '/admin/deliveries', label: 'Deliveries', icon: '🚚' },
+    { to: '/admin/delivery-issues', label: 'Issues', icon: '⚠️' },
   ] },
   { group: 'Moderation', items: [
     { to: '/admin/reviews', label: 'Reviews', icon: '⭐' },

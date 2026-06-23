@@ -11,8 +11,24 @@ return [
   // config.local.php, not here.
   'stripe_secret' => 'sk_test_REPLACE_ME',
 
+  // Your Stripe TEST publishable key (starts with pk_test_). Sent to the mobile
+  // app so its Stripe SDK can present the payment sheet. Safe to expose.
+  'stripe_publishable' => 'pk_test_REPLACE_ME',
+
   // Only if your React app runs somewhere other than the default:
   // 'app_url' => 'http://localhost:5173',
+
+  // OPTIONAL — Firebase (Storage for uploads + Cloud Messaging for push).
+  // ONE service-account key powers both. Firebase console → Project settings →
+  // Service accounts → Generate new private key; save the JSON and point this
+  // at its absolute path. Leave unset to keep LOCAL file storage + in-app-only
+  // notifications (no cloud, no push). See backend/lib/storage.php + push.php.
+  // 'firebase_service_account' => 'C:/xampp/htdocs/shoear/backend/firebase-service-account.json',
+
+  // Your Storage bucket (Firebase console → Storage). Required for cloud file
+  // uploads (product images, 3D .glb models, avatars, proof photos). Looks like
+  // 'your-project-id.appspot.com' (or '...firebasestorage.app').
+  // 'firebase_storage_bucket' => 'your-project-id.appspot.com',
 
   // Optional: override the FAKE test bank account the payout demo attaches to
   // each supplier (only needed if Stripe rejects the built-in default for your

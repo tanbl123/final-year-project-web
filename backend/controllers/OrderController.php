@@ -12,7 +12,9 @@ function handleListSupplierOrders(PDO $pdo, array $auth): void {
   $allowed    = ['Placed', 'Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed', 'Cancelled'];
 
   $where  = ['p.supplierId = :sid'];
-  $params = ['sid' => $supplierId];
+  // separate placeholder for the correlated subquery (emulation is off, so a
+  // named param can't be reused across the statement)
+  $params = ['sid' => $supplierId, 'dsid' => $supplierId];
   if ($status !== '' && in_array($status, $allowed, true)) {
     $where[] = 'o.orderStatus = :st';
     $params['st'] = $status;
@@ -23,6 +25,8 @@ function handleListSupplierOrders(PDO $pdo, array $auth): void {
             buyer.fullName AS customerName,
             COUNT(oi.orderItemId)  AS itemCount,
             SUM(oi.orderSubtotal)  AS supplierSubtotal,
+            (SELECT d.deliveryStatus FROM delivery d
+              WHERE d.orderId = o.orderId AND d.supplierId = :dsid LIMIT 1) AS myDeliveryStatus,
             (SELECT rf.refundStatus FROM refund rf
               WHERE rf.orderId = o.orderId ORDER BY rf.requestDate DESC LIMIT 1) AS refundStatus
        FROM `order` o
@@ -105,6 +109,19 @@ function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId): void {
   foreach ($refunds as &$x) { $x['refundAmount'] = (float) $x['refundAmount']; }
   unset($x);
   $order['refunds'] = $refunds;
+
+  // the supplier's OWN parcel for this order (split fulfilment): its delivery
+  // status, the courier collecting from them, and the ETA. Null until the order
+  // is paid and dispatched. The customer's address/contact is still withheld.
+  $dl = $pdo->prepare(
+    "SELECT d.deliveryStatus, d.estimatedDeliveryTime, cu.fullName AS courierName
+       FROM delivery d
+       LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = d.deliveryPersonnelId
+       LEFT JOIN `user` cu ON cu.userId = dp.userId
+      WHERE d.orderId = :oid AND d.supplierId = :sid LIMIT 1"
+  );
+  $dl->execute(['oid' => $orderId, 'sid' => $supplierId]);
+  $order['myDelivery'] = $dl->fetch() ?: null;
 
   sendJson(200, true, $order);
 }

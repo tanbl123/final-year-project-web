@@ -159,8 +159,9 @@ function RegisterPage() {
     setShown((prev) => ({ ...prev, [name]: !prev[name] }));
   }
 
-  // update the changed field; if it (or the linked confirm field) is already
-  // showing an error, re-check it live so the message updates as you fix it
+  // update the changed field and validate it live (on every keystroke), so the
+  // error appears/updates as you type. Empty fields aren't nagged here — the
+  // full required check runs on submit.
   function handleChange(event) {
     const { name, value } = event.target;
     const nextForm = { ...form, [name]: value };
@@ -177,13 +178,16 @@ function RegisterPage() {
 
     setErrors((prev) => {
       const next = { ...prev };
-      if (name in prev) applyFieldError(next, name, nextForm);
-      // password & confirm are linked — keep the confirm error in sync
-      if (name === 'password' && 'confirm' in prev) applyFieldError(next, 'confirm', nextForm);
-      // auto-filling the username from the company name must also refresh its
-      // error, so a stale "Username is required" clears once a value flows in
-      if (name === 'companyName' && !usernameEdited && 'username' in next) {
-        applyFieldError(next, 'username', nextForm);
+      // validate the changed field live, but don't show "required" while the
+      // field is still empty (mid-typing) — submit handles the empty case
+      if (value.trim() !== '') applyFieldError(next, name, nextForm);
+      else delete next[name];
+      // password & confirm are linked — re-check confirm once it has content
+      if (name === 'password' && nextForm.confirm !== '') applyFieldError(next, 'confirm', nextForm);
+      // auto-filling the username from the company name must also refresh its error
+      if (name === 'companyName' && !usernameEdited) {
+        if (nextForm.username.trim() !== '') applyFieldError(next, 'username', nextForm);
+        else delete next.username;
       }
       return next;
     });
@@ -218,10 +222,11 @@ function RegisterPage() {
     setOperationalEdited(true);
     setForm((f) => ({ ...f, operationalAddress: event.target.value }));
   }
-  // clearing it re-attaches to the business address (mirrors it again)
+  // the ✕ empties the field (and detaches it, so it stops mirroring); left
+  // blank, it falls back to the business address on submit
   function clearOperational() {
-    setOperationalEdited(false);
-    setForm((f) => ({ ...f, operationalAddress: f.companyAddress }));
+    setOperationalEdited(true);
+    setForm((f) => ({ ...f, operationalAddress: '' }));
   }
 
   // clear a field via its ✕ button (mirrors handleChange's live re-validation)
@@ -448,8 +453,8 @@ function RegisterPage() {
         />
         <div className="form-text">
           {operationalEdited
-            ? 'Where couriers collect your orders. Clear it to use your business address again.'
-            : 'Auto-filled from your business address — change it if you ship from elsewhere.'}
+            ? 'Where couriers collect your orders. Leave blank to use your business address.'
+            : 'Change it if you ship from elsewhere.'}
         </div>
       </div>
     );
@@ -478,7 +483,7 @@ function RegisterPage() {
         {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
         {!errors.username && (
           <div className="form-text">
-            {s === 'idle' && 'Auto-filled from your company name — you can change it.'}
+            {s === 'idle' && 'Suggested from your company name'}
             {s === 'checking' && <span className="text-muted">Checking availability…</span>}
             {s === 'invalid' && <span className="text-danger">3–20 letters, numbers or underscores.</span>}
             {s === 'available' && <span className="text-success">✓ {form.username.trim()} is available</span>}

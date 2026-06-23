@@ -110,6 +110,21 @@ function LoginPage({ variant = 'supplier' }) {
       <Toast message={toast} onClose={() => setToast('')} />
       <h1 className="mb-4 text-center">{config.title}</h1>
 
+      {/* portal switch as a tab bar above the card — anchored here so the card's
+          differing height (the supplier sign-up block) never shifts it */}
+      <ul className="nav nav-pills nav-justified mb-3">
+        <li className="nav-item">
+          <Link to="/admin/login" className={`nav-link ${variant === 'admin' ? 'active' : ''}`}>
+            Admin login
+          </Link>
+        </li>
+        <li className="nav-item">
+          <Link to="/login" className={`nav-link ${variant === 'supplier' ? 'active' : ''}`}>
+            Supplier login
+          </Link>
+        </li>
+      </ul>
+
       <form onSubmit={handleSubmit} className="card card-body shadow-sm text-start" noValidate>
         <div className="mb-3">
           <label className="form-label">Email or username</label>
@@ -172,22 +187,6 @@ function LoginPage({ variant = 'supplier' }) {
           </>
         )}
       </form>
-
-      {/* switch between the two portals — current one is highlighted */}
-      <div className="d-flex gap-2 mt-3">
-        <Link
-          to="/admin/login"
-          className={`btn flex-fill ${variant === 'admin' ? 'btn-primary' : 'btn-outline-secondary'}`}
-        >
-          Admin login
-        </Link>
-        <Link
-          to="/login"
-          className={`btn flex-fill ${variant === 'supplier' ? 'btn-primary' : 'btn-outline-secondary'}`}
-        >
-          Supplier login
-        </Link>
-      </div>
     </div>
   );
 }

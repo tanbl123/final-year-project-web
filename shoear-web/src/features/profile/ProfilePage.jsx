@@ -74,10 +74,21 @@ function ProfilePage() {
     setEditing(true);
   }
 
-  // update an edit-form field and clear its inline error as the user fixes it
+  // update an edit-form field and validate it live (username format is checked
+  // live separately via usernameError)
   function setField(name, value) {
     setForm((f) => ({ ...f, [name]: value }));
-    setFieldErrors((fe) => { if (!fe[name]) return fe; const n = { ...fe }; delete n[name]; return n; });
+    setFieldErrors((fe) => {
+      const n = { ...fe };
+      if (name === 'fullName') {
+        if (!value.trim()) n.fullName = 'Full name is required.'; else delete n.fullName;
+      } else if (name === 'phoneNumber') {
+        if (!value.trim()) n.phoneNumber = 'Phone number is required.'; else delete n.phoneNumber;
+      } else {
+        delete n[name];   // e.g. clear a server-side username error as they retype
+      }
+      return n;
+    });
   }
 
   // has the user actually changed anything in the edit form?
@@ -330,7 +341,11 @@ function ProfilePage() {
                 {me.role === 'DeliveryPersonnel' && me.profile && (
                   <>
                     <dt className="col-sm-4">Vehicle</dt>
-                    <dd className="col-sm-8">{me.profile.vehicleInfo || <span className="text-muted">—</span>}</dd>
+                    <dd className="col-sm-8">
+                      {me.profile.vehicleType && me.profile.vehicleBrand
+                        ? `${me.profile.vehicleType} • ${me.profile.vehicleBrand} ${me.profile.vehicleModel} — ${me.profile.vehiclePlate}`
+                        : <span className="text-muted">—</span>}
+                    </dd>
                   </>
                 )}
 

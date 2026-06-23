@@ -17,7 +17,7 @@ final-year-project/
 ├── database/       schema.sql, seed*.sql, migrations/, NOTES.md
 ├── docs/           API_ENDPOINTS.md (the API contract), STRIPE_TEST_DEMO.md
 ├── shoear-web/     React admin + supplier web portal (Vite)
-├── mobile/         Flutter apps (customer + delivery) — see mobile/README.md
+├── shoear-mobile/  Flutter apps (customer + delivery) — see shoear-mobile/README.md
 └── ml/             (planned) Python/Flask recommender service
 ```
 
@@ -27,8 +27,8 @@ final-year-project/
 |-----|------|-------|--------|
 | Admin + Supplier portal | React (`shoear-web/`) | Admin, Supplier | ✅ built |
 | PHP REST API | PHP (`backend/`) | all apps | ✅ built (web + customer + delivery) |
-| Customer app | Flutter (`mobile/customer/`) | Customer | ⏳ planned |
-| Delivery app | Flutter (`mobile/delivery/`) | Delivery personnel | ⏳ planned |
+| Customer app | Flutter (`shoear-mobile/customer/`) | Customer | ⏳ planned |
+| Delivery app | Flutter (`shoear-mobile/delivery/`) | Delivery personnel | ⏳ planned |
 | ML recommender | Python (`ml/`) | (serves the customer app) | ⏳ planned |
 
 ---

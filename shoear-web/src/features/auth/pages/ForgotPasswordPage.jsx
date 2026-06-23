@@ -63,7 +63,8 @@ function ForgotPasswordPage() {
     return '';
   }
 
-  // live re-check (only once a field already shows an error), like register/login
+  // live validation: validate the field on every keystroke (empty fields don't
+  // show "required" while typing — that's only enforced on submit).
   function handlePwChange(name, val) {
     const nextPw = name === 'password' ? val : password;
     const nextCf = name === 'confirm' ? val : confirm;
@@ -71,14 +72,12 @@ function ForgotPasswordPage() {
     setResetError('');
     setPwErrors((prev) => {
       const next = { ...prev };
-      if (name in prev) {
-        const msg = pwFieldError(name, nextPw, nextCf);
-        if (msg) next[name] = msg; else delete next[name];
-      }
-      // password & confirm are linked — keep the confirm error in sync
-      if (name === 'password' && 'confirm' in prev) {
-        const msg = pwFieldError('confirm', nextPw, nextCf);
-        if (msg) next.confirm = msg; else delete next.confirm;
+      const msg = val === '' ? '' : pwFieldError(name, nextPw, nextCf);
+      if (msg) next[name] = msg; else delete next[name];
+      // password & confirm are linked — re-check confirm once it has content
+      if (name === 'password' && nextCf !== '') {
+        const cm = pwFieldError('confirm', nextPw, nextCf);
+        if (cm) next.confirm = cm; else delete next.confirm;
       }
       return next;
     });
@@ -242,7 +241,11 @@ function ForgotPasswordPage() {
               autoFocus
               className={`form-control ${emailError ? 'is-invalid' : ''}`}
               value={email}
-              onChange={(e) => { setEmail(e.target.value); setEmailError(''); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setEmail(v);
+                setEmailError(v.trim() === '' ? '' : (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) ? '' : 'Please enter a valid email.'));
+              }}
             />
             {emailError && <div className="invalid-feedback d-block">{emailError}</div>}
           </div>

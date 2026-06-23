@@ -78,10 +78,14 @@ List responses include paging info:
 |--------|------|--------|---------|
 | POST | `/auth/register/send-code` | Public | **(Implemented)** Email a 6-digit verification code before the account is created. Always returns a generic success (no account enumeration); if the email already exists it gets an "account exists" notice instead of a code. Requires SMTP. |
 | POST | `/auth/register` | Public | **(Implemented, supplier)** Register. Supplier → `Pending` (await admin); requires a valid `verificationCode`. Customer/Delivery register on their mobile apps. |
+| POST | `/auth/register/customer` | Public | **(Implemented)** Customer self-service sign-up (mobile). `Active` immediately, no approval. |
+| POST | `/auth/register/courier` | Public | **(Implemented)** Courier self-application (delivery app). Body `{ fullName, username, email, phoneNumber, vehicleInfo, password }`. Creates a `DeliveryPersonnel` as `Pending` — awaits admin approval, no auto-login. |
 | POST | `/auth/login` | Public | Returns JWT + role + basic profile. |
 | POST | `/auth/logout` | Any | Client-side token discard (and optional server token blacklist). |
-| GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). |
+| GET  | `/auth/me` | Any | **(Implemented)** Current user's profile (joins role-specific table). Includes `avatarUrl` (null = no photo). |
 | PUT  | `/auth/me` | Any | **(Implemented)** Update own profile (`fullName`, `phoneNumber`). |
+| POST | `/auth/me/avatar` | Any | **(Implemented)** Upload/replace the profile picture (multipart `file`). Returns `{ avatarUrl }`. |
+| DELETE | `/auth/me/avatar` | Any | **(Implemented)** Remove the profile picture (back to initials). |
 | POST | `/auth/change-password` | Any | **(Implemented)** Change own password — verifies `currentPassword` before setting `newPassword`. |
 | POST | `/auth/forgot-password` | Public | **(Implemented)** Email a 6-digit reset code to a registered address. Always returns a generic success (no account enumeration). Requires SMTP. |
 | POST | `/auth/reset-password/verify-code` | Public | **(Implemented)** Check a reset code `{ email, code }` WITHOUT consuming it — lets the UI confirm the code as its own step before the new-password step. |
@@ -141,6 +145,12 @@ The supplier's `businessLicenseUrl` comes from first uploading the document:
 | GET   | `/admin/users` | Admin | **(Implemented)** List/filter users (`?role=Supplier&status=Pending&search=...`). |
 | GET   | `/admin/users/{userId}` | Admin | **(Implemented)** One user's full detail, incl. role-specific `profile`. |
 | PATCH | `/admin/users/{userId}/status` | Admin | **(Implemented)** Approve / reject / suspend / reactivate / delete. Body: `{ "status": "Active" }`. |
+| GET   | `/admin/suppliers/pending` | Admin | **(Implemented)** Supplier approval queue (with KYB fields + document URL). |
+| POST  | `/admin/suppliers/{userId}/approve` | Admin | **(Implemented)** Approve a pending supplier (→ `Active`). |
+| POST  | `/admin/suppliers/{userId}/reject` | Admin | **(Implemented)** Reject a pending supplier. Body `{ reason, terminal? }` — `terminal=true` bans. |
+| GET   | `/admin/couriers/pending` | Admin | **(Implemented)** Courier approval queue (self-applied delivery personnel, with vehicle info). |
+| POST  | `/admin/couriers/{userId}/approve` | Admin | **(Implemented)** Approve a pending courier (→ `Active`). |
+| POST  | `/admin/couriers/{userId}/reject` | Admin | **(Implemented)** Reject a pending courier. Body `{ reason, terminal? }` — reason shown at login; `terminal=true` bans. |
 
 This is how a `Pending` supplier or delivery person becomes `Active`. Guards:
 an admin cannot change **their own** account, and **Admin** accounts cannot be
@@ -349,7 +359,10 @@ updates (Section 11) drive the later stages.
 | GET   | `/deliveries/{deliveryId}` | Delivery(Owner) | **(Implemented)** Detail: **pickup** (the parcel's supplier + `pickupAddress`), customer contact + address, and only THIS supplier's items (OTP **not** returned to the courier). |
 | PATCH | `/deliveries/{deliveryId}/status` | Delivery(Owner) | **(Implemented)** `Assigned→PickedUp→OutForDelivery` (or `→Failed`); the order status is rolled up from all its parcels; going `OutForDelivery` generates this parcel's OTP. |
 | POST  | `/deliveries/{deliveryId}/verify-otp` | Delivery(Owner) | **(Implemented)** Body: `{ "otpCode": "1234" }`. On match (must be OutForDelivery) → this parcel `Delivered`; order → `Delivered` only once **every** parcel is delivered. |
-| POST  | `/deliveries/{deliveryId}/proof` | Delivery(Owner) | **(Implemented)** Attach a proof-of-delivery photo URL (uploaded via `/uploads`). |
+| POST  | `/deliveries/{deliveryId}/proof` | Delivery(Owner) | **(Implemented)** Attach a proof-of-delivery photo (multipart `file`, or JSON `{ proofUrl }`). |
+| POST  | `/deliveries/{deliveryId}/report-issue` | Delivery(Owner) | **(Implemented)** Report a problem. Multipart `reason`,`note?`,`file?` (or JSON). Records a `delivery_issue`; a fail-reason → parcel `Failed`, `vehicle_emergency` → back to dispatch (`Pending`, unassigned); customer is notified. Reasons: `customer_unreachable`,`customer_unavailable`,`customer_refused`,`wrong_address`,`package_damaged`,`vehicle_emergency`,`other`. |
+| GET   | `/admin/delivery-issues` | Admin | **(Implemented)** Reported-issue queue (Open first); optional `?status=Open\|Resolved`. |
+| PATCH | `/admin/delivery-issues/{issueId}/resolve` | Admin | **(Implemented)** Mark a reported issue resolved. |
 
 > **Split fulfilment (one parcel per supplier).** An order can contain items
 > from several suppliers, so on payment the order is split into **one delivery
@@ -408,6 +421,27 @@ updates (Section 11) drive the later stages.
 | GET   | `/supplier/refunds` | Supplier | **(Implemented)** Refunds on orders containing the supplier's products (read-only, no customer PII); optional `?status=`. |
 | PATCH | `/admin/refunds/{refundId}/status` | Admin | **(Implemented)** Transitions: `Pending`→`Approved`/`Rejected`, `Approved`→`Completed`. On `Completed` → payment becomes `Refunded`. |
 | GET   | `/supplier/orders/{orderId}` | Supplier | **(Implemented)** Order detail embeds `refunds[]` for that order (per-order, so suppliers see refunds on their orders here). The list `/supplier/orders` carries the latest `refundStatus` per order. |
+
+---
+
+## 13b. NOTIFICATIONS  (Customer app — the bell)
+
+| Method | Path | Access | Purpose |
+|--------|------|--------|---------|
+| GET   | `/notifications` | Customer | **(Implemented)** The user's notifications (newest first, max 100) + `unreadCount` for the bell badge. |
+| PATCH | `/notifications/{id}/read` | Customer(Owner) | **(Implemented)** Mark one notification read. |
+| POST  | `/notifications/read-all` | Customer | **(Implemented)** Mark all the user's notifications read. |
+| POST  | `/notifications/device` | Customer | **(Implemented)** Register this device's FCM token for background push. Body: `{ token, platform? }`. |
+
+> The backend writes a notification row on every order/refund status change
+> (`recomputeOrderStatus` → Shipped/OutForDelivery/Delivered, payment → Paid,
+> refund → Approved/Rejected/Completed). See `backend/lib/notifications.php`.
+>
+> **Push is a swap seam** (`backend/lib/push.php`, mirroring storage): when a
+> notification is created it ALSO dispatches a Firebase Cloud Messaging push to
+> the user's registered devices — but only if `fcm_service_account` is set in
+> `config.local.php`. Unset (the default), push is a silent no-op and the
+> in-app bell works on its own.
 
 ---
 

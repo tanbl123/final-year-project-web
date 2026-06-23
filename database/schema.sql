@@ -60,6 +60,7 @@ CREATE TABLE `user` (
     email         VARCHAR(120) NOT NULL,
     fullName      VARCHAR(120) NOT NULL,
     phoneNumber   VARCHAR(20)  NOT NULL,
+    avatarUrl     VARCHAR(255) NULL,                     -- profile picture URL (NULL = initials fallback)
     role          ENUM('Admin','Supplier','Customer','DeliveryPersonnel') NOT NULL,
     -- Pending  : supplier/delivery awaiting admin approval
     -- Active    : approved & usable (customers are Active immediately)
@@ -120,7 +121,10 @@ CREATE TABLE customer (
 CREATE TABLE delivery_personnel (
     deliveryPersonnelId VARCHAR(10)  NOT NULL,            -- DEL0001
     userId              VARCHAR(10)  NOT NULL,
-    vehicleInfo         VARCHAR(100) NULL,
+    vehicleType         ENUM('Motorcycle','Car','Van','Truck') NOT NULL DEFAULT 'Motorcycle',
+    vehicleBrand        VARCHAR(50) NOT NULL DEFAULT '',
+    vehicleModel        VARCHAR(50) NOT NULL DEFAULT '',
+    vehiclePlate        VARCHAR(20) NOT NULL DEFAULT '',
     PRIMARY KEY (deliveryPersonnelId),
     UNIQUE KEY uq_delivery_user (userId),
     CONSTRAINT fk_delivery_user FOREIGN KEY (userId) REFERENCES `user`(userId)
@@ -451,6 +455,7 @@ CREATE TABLE supplier_change_request (
     requestId          VARCHAR(10)  NOT NULL,                 -- SCR0001
     supplierId         VARCHAR(10)  NOT NULL,
     companyName        VARCHAR(150) NOT NULL,                 -- proposed values
+    companyAddress     VARCHAR(255) NOT NULL,                 -- registered business address (verified)
     businessRegNo      VARCHAR(50)  NOT NULL,
     taxNumber          VARCHAR(50)  NULL,
     businessLicenseUrl VARCHAR(255) NOT NULL,
@@ -494,6 +499,57 @@ CREATE TABLE password_reset (
     last_sent_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP, -- for the resend cooldown
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (email)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+--  9. NOTIFICATIONS
+-- =====================================================================
+
+-- In-app notifications shown in the customer app's bell. The backend inserts a
+-- row whenever an order or refund changes status. See
+-- migrations/2026_06_22_notifications.sql.
+CREATE TABLE notification (
+    notificationId VARCHAR(10)  NOT NULL,                  -- NTF0001
+    userId         VARCHAR(10)  NOT NULL,                  -- recipient (the customer's userId)
+    type           VARCHAR(40)  NOT NULL,                  -- 'order' | 'refund' | 'system'
+    title          VARCHAR(120) NOT NULL,
+    body           VARCHAR(255) NOT NULL,
+    orderId        VARCHAR(10)  NULL,                       -- deep-link target (optional)
+    isRead         TINYINT(1)   NOT NULL DEFAULT 0,
+    createdAt      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (notificationId),
+    KEY idx_notification_user (userId, createdAt)
+) ENGINE=InnoDB;
+
+-- Device push tokens (Firebase Cloud Messaging) for real background push. Push
+-- is a swap seam (backend/lib/push.php): it only fires once FCM is configured.
+CREATE TABLE device_token (
+    deviceTokenId VARCHAR(10)  NOT NULL,                    -- DVT0001
+    userId        VARCHAR(10)  NOT NULL,
+    token         VARCHAR(255) NOT NULL,                    -- the FCM registration token
+    platform      VARCHAR(20)  NOT NULL DEFAULT 'android',  -- 'android' | 'ios'
+    updatedAt     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (deviceTokenId),
+    UNIQUE KEY uq_device_token (token),
+    KEY idx_device_user (userId)
+) ENGINE=InnoDB;
+
+-- Delivery issues reported by couriers (the "report an issue" flow). See
+-- migrations/2026_06_22_delivery_issue.sql.
+CREATE TABLE delivery_issue (
+    issueId             VARCHAR(10)  NOT NULL,                 -- ISS0001
+    deliveryId          VARCHAR(10)  NOT NULL,
+    orderId             VARCHAR(10)  NOT NULL,
+    deliveryPersonnelId VARCHAR(10)  NULL,
+    reason              VARCHAR(60)  NOT NULL,
+    note                VARCHAR(255) NULL,
+    photoUrl            VARCHAR(255) NULL,
+    issueStatus         ENUM('Open','Resolved') NOT NULL DEFAULT 'Open',
+    createdAt           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolvedAt          DATETIME     NULL,
+    PRIMARY KEY (issueId),
+    KEY idx_issue_status (issueStatus, createdAt),
+    KEY idx_issue_delivery (deliveryId)
 ) ENGINE=InnoDB;
 
 -- =====================================================================

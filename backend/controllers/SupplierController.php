@@ -134,9 +134,12 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
 // ── business details (post-approval changes via admin re-approval) ──────
 // Shared validation for the sensitive business fields. Returns an error
 // message, or null when everything is valid. (Mirrors the registration rules.)
-function businessDetailsError(string $companyName, string $businessRegNo, string $businessLicenseUrl, string $taxNumber): ?string {
-  if ($companyName === '' || $businessRegNo === '' || $businessLicenseUrl === '') {
-    return 'Company name, SSM number and the registration document are required.';
+function businessDetailsError(string $companyName, string $companyAddress, string $businessRegNo, string $businessLicenseUrl, string $taxNumber): ?string {
+  if ($companyName === '' || $companyAddress === '' || $businessRegNo === '' || $businessLicenseUrl === '') {
+    return 'Company name, business address, SSM number and the registration document are required.';
+  }
+  if (mb_strlen($companyAddress) > 255) {
+    return 'Business address is too long.';
   }
   if (!preg_match('/^(\d{12}|\d{6,8}-?[A-Za-z])$/', $businessRegNo)) {
     return 'Enter a valid SSM number, e.g. 202301012345 or 1234567-A.';
@@ -163,7 +166,7 @@ function handleGetBusinessDetails(PDO $pdo, array $auth): void {
   // the most recent request (Pending shows as a live banner; Rejected lets the
   // supplier see why their last attempt was turned down)
   $req = $pdo->prepare(
-    'SELECT requestId, companyName, businessRegNo, taxNumber, businessLicenseUrl,
+    'SELECT requestId, companyName, companyAddress, businessRegNo, taxNumber, businessLicenseUrl,
             requestStatus, reviewNote, created_at, reviewed_at
        FROM supplier_change_request
       WHERE supplierId = :sid
@@ -173,23 +176,6 @@ function handleGetBusinessDetails(PDO $pdo, array $auth): void {
   $latest = $req->fetch() ?: null;
 
   sendJson(200, true, ['current' => $current, 'latestRequest' => $latest]);
-}
-
-// PUT /supplier/company-address — company address is operational (not part of
-// verified identity), so the supplier can change it freely, no review needed.
-function handleUpdateCompanyAddress(PDO $pdo, array $auth): void {
-  $supplierId = requireSupplierId($pdo, $auth);
-  $body    = getJsonBody();
-  $address = trim($body['companyAddress'] ?? '');
-  if ($address === '') {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Company address is required.']);
-  }
-  if (mb_strlen($address) > 255) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Company address is too long.']);
-  }
-  $pdo->prepare('UPDATE supplier SET companyAddress = :ca WHERE supplierId = :sid')
-      ->execute(['ca' => $address, 'sid' => $supplierId]);
-  sendJson(200, true, ['companyAddress' => $address]);
 }
 
 // PUT /supplier/operational-address — the operational (pickup) address is where
@@ -211,18 +197,20 @@ function handleUpdateOperationalAddress(PDO $pdo, array $auth): void {
 }
 
 // POST /supplier/business-details/change-request — propose new values for the
-// verified fields (company name, SSM, SST, document). The account stays Active;
-// an admin reviews and approves/rejects. Only one open request at a time.
+// verified fields (company name, business address, SSM, SST, document). The
+// account stays Active; an admin reviews and approves/rejects. One open request
+// at a time.
 function handleSubmitChangeRequest(PDO $pdo, array $auth): void {
   $supplierId = requireSupplierId($pdo, $auth);
 
   $body               = getJsonBody();
   $companyName        = trim($body['companyName'] ?? '');
+  $companyAddress     = trim($body['companyAddress'] ?? '');
   $businessRegNo      = trim($body['businessRegNo'] ?? '');
   $taxNumber          = trim($body['taxNumber'] ?? '');
   $businessLicenseUrl = trim($body['businessLicenseUrl'] ?? '');
 
-  $err = businessDetailsError($companyName, $businessRegNo, $businessLicenseUrl, $taxNumber);
+  $err = businessDetailsError($companyName, $companyAddress, $businessRegNo, $businessLicenseUrl, $taxNumber);
   if ($err !== null) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $err]);
   }
@@ -239,10 +227,10 @@ function handleSubmitChangeRequest(PDO $pdo, array $auth): void {
   $requestId = nextId($pdo, 'supplier_change_request', 'requestId', 'SCR');
   $pdo->prepare(
     'INSERT INTO supplier_change_request
-       (requestId, supplierId, companyName, businessRegNo, taxNumber, businessLicenseUrl)
-     VALUES (:rid, :sid, :cn, :brn, :tax, :blu)'
+       (requestId, supplierId, companyName, companyAddress, businessRegNo, taxNumber, businessLicenseUrl)
+     VALUES (:rid, :sid, :cn, :ca, :brn, :tax, :blu)'
   )->execute([
-    'rid' => $requestId, 'sid' => $supplierId, 'cn' => $companyName,
+    'rid' => $requestId, 'sid' => $supplierId, 'cn' => $companyName, 'ca' => $companyAddress,
     'brn' => $businessRegNo, 'tax' => ($taxNumber === '' ? null : $taxNumber),
     'blu' => $businessLicenseUrl,
   ]);

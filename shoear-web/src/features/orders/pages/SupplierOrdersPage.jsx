@@ -11,6 +11,11 @@ const STATUS_COLORS = {
   Placed: 'secondary', Paid: 'info', Processing: 'primary', Shipped: 'primary',
   OutForDelivery: 'primary', Delivered: 'success', Completed: 'success', Cancelled: 'danger',
 };
+// the supplier's own parcel (delivery) statuses
+const DELIV_COLORS = {
+  Pending: 'warning', Assigned: 'info', PickedUp: 'primary',
+  OutForDelivery: 'primary', Delivered: 'success', Failed: 'danger',
+};
 const label = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2');   // OutForDelivery → Out For Delivery
 const money = (n) => `RM ${Number(n).toFixed(2)}`;
 
@@ -90,6 +95,13 @@ function SupplierOrdersPage() {
                     <span className={`badge text-bg-${STATUS_COLORS[o.orderStatus] || 'secondary'}`}>
                       {label(o.orderStatus)}
                     </span>
+                    {o.myDeliveryStatus && (
+                      <div className="mt-1">
+                        <span className={`badge text-bg-${DELIV_COLORS[o.myDeliveryStatus] || 'secondary'}`}>
+                          Your parcel: {label(o.myDeliveryStatus)}
+                        </span>
+                      </div>
+                    )}
                     {o.refundStatus && (
                       <div className="mt-1">
                         <span className="badge text-bg-light border">Refund: {o.refundStatus}</span>

@@ -5,10 +5,13 @@ require __DIR__ . '/../../lib/jwt.php';
 require __DIR__ . '/../../lib/request.php';
 require __DIR__ . '/../../lib/auth.php';
 require __DIR__ . '/../../lib/ids.php';
+require __DIR__ . '/../../lib/google_auth.php';
 require __DIR__ . '/../../lib/storage.php';
 require __DIR__ . '/../../lib/stripe.php';
 require __DIR__ . '/../../lib/mail.php';
 require __DIR__ . '/../../lib/delivery.php';
+require __DIR__ . '/../../lib/notifications.php';
+require __DIR__ . '/../../lib/push.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
 require __DIR__ . '/../../controllers/ProductController.php';
@@ -26,6 +29,7 @@ require __DIR__ . '/../../controllers/CatalogController.php';
 require __DIR__ . '/../../controllers/CartController.php';
 require __DIR__ . '/../../controllers/WishlistController.php';
 require __DIR__ . '/../../controllers/PaymentController.php';
+require __DIR__ . '/../../controllers/NotificationController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -118,11 +122,18 @@ if ($method === 'GET' && preg_match('#^/orders/([^/]+)$#', $path, $m)) {
   handleGetCustomerOrder($pdo, $auth, $m[1]);
 }
 
-// pay an order (simulated gateway → runs the real post-payment pipeline)
+// create a Stripe PaymentIntent for an order (mobile checkout)
+if ($method === 'POST' && preg_match('#^/orders/([^/]+)/payment-intent$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCreatePaymentIntent($pdo, $config, $auth, $m[1]);
+}
+
+// pay an order: verifies the Stripe PaymentIntent (or simulates) → post-payment pipeline
 if ($method === 'POST' && preg_match('#^/orders/([^/]+)/payment$#', $path, $m)) {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
-  handlePayOrder($pdo, $auth, $m[1]);
+  handlePayOrder($pdo, $config, $auth, $m[1]);
 }
 
 if ($method === 'GET' && preg_match('#^/orders/([^/]+)/receipt$#', $path, $m)) {
@@ -132,6 +143,12 @@ if ($method === 'GET' && preg_match('#^/orders/([^/]+)/receipt$#', $path, $m)) {
 }
 
 // ── customer reviews (create on a purchased product; edit/delete your own) ──
+if ($method === 'GET' && preg_match('#^/products/([^/]+)/reviews/mine$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleGetMyReview($pdo, $auth, $m[1]);
+}
+
 if ($method === 'POST' && preg_match('#^/products/([^/]+)/reviews$#', $path, $m)) {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
@@ -161,6 +178,31 @@ if ($method === 'GET' && $path === '/refunds') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleListCustomerRefunds($pdo, $auth);
+}
+
+// ── in-app notifications (the bell) + device push token (any logged-in user) ──
+if ($method === 'GET' && $path === '/notifications') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleListNotifications($pdo, $auth);
+}
+
+if ($method === 'POST' && $path === '/notifications/read-all') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleMarkAllNotificationsRead($pdo, $auth);
+}
+
+if ($method === 'POST' && $path === '/notifications/device') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRegisterDevice($pdo, $auth);
+}
+
+if ($method === 'PATCH' && preg_match('#^/notifications/([^/]+)/read$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleMarkNotificationRead($pdo, $auth, $m[1]);
 }
 
 // ── delivery personnel / courier (require a DeliveryPersonnel token) ──
@@ -198,6 +240,12 @@ if ($method === 'POST' && preg_match('#^/deliveries/([^/]+)/proof$#', $path, $m)
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleUploadProof($pdo, $auth, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/deliveries/([^/]+)/report-issue$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleReportIssue($pdo, $auth, $m[1]);
 }
 
 // ── customer wishlist (require a Customer token) ──
@@ -241,6 +289,18 @@ if ($method === 'POST' && $path === '/auth/register') {
   handleRegister($pdo);
 }
 
+// customer self-service sign-up (mobile app) — Active immediately, no approval
+if ($method === 'POST' && $path === '/auth/register/customer') {
+  $pdo = getPDO();
+  handleRegisterCustomer($pdo);
+}
+
+// courier self-service sign-up (delivery app) — Pending, awaits admin approval
+if ($method === 'POST' && $path === '/auth/register/courier') {
+  $pdo = getPDO();
+  handleRegisterCourier($pdo);
+}
+
 if ($method === 'POST' && $path === '/auth/login') {
   $pdo = getPDO();
   handleLogin($pdo, $secret);
@@ -279,6 +339,25 @@ if ($method === 'PUT' && $path === '/auth/me') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleUpdateMe($pdo, $auth);
+}
+
+if ($method === 'DELETE' && $path === '/auth/me') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleDeleteMe($pdo, $auth);
+}
+
+// profile picture (multipart upload / remove) — any signed-in user
+if ($method === 'POST' && $path === '/auth/me/avatar') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleUploadAvatar($pdo, $auth);
+}
+
+if ($method === 'DELETE' && $path === '/auth/me/avatar') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRemoveAvatar($pdo, $auth);
 }
 
 if ($method === 'POST' && $path === '/auth/change-password') {
@@ -330,12 +409,6 @@ if ($method === 'GET' && $path === '/supplier/business-details') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleGetBusinessDetails($pdo, $auth);
-}
-
-if ($method === 'PUT' && $path === '/supplier/company-address') {
-  $auth = requireAuth($secret);
-  $pdo  = getPDO();
-  handleUpdateCompanyAddress($pdo, $auth);
 }
 
 if ($method === 'PUT' && $path === '/supplier/operational-address') {
@@ -396,6 +469,28 @@ if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/reject$#', $pat
   handleRejectSupplier($pdo, $m[1]);
 }
 
+// courier approval queue (self-applied delivery personnel awaiting approval)
+if ($method === 'GET' && $path === '/admin/couriers/pending') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListPendingCouriers($pdo);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/couriers/([^/]+)/approve$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleApproveCourier($pdo, $m[1]);
+}
+
+if ($method === 'POST' && preg_match('#^/admin/couriers/([^/]+)/reject$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleRejectCourier($pdo, $m[1]);
+}
+
 // supplier business-detail change requests (re-approval queue)
 if ($method === 'GET' && $path === '/admin/supplier-changes') {
   $auth = requireAuth($secret);
@@ -441,7 +536,8 @@ if ($method === 'POST' && preg_match('#^/admin/products/([^/]+)/reject$#', $path
 
 // ── category routes (require a valid token) ──
 if ($method === 'GET' && $path === '/categories') {
-  $auth = requireAuth($secret);
+  // public: the category list is public taxonomy used by the catalog filters
+  // (guests browse + filter without signing in)
   $pdo  = getPDO();
   handleListCategories($pdo);
 }
@@ -517,6 +613,21 @@ if ($method === 'POST' && preg_match('#^/admin/deliveries/([^/]+)/assign$#', $pa
   requireAdmin($auth);
   $pdo  = getPDO();
   handleAssignDelivery($pdo, $m[1]);
+}
+
+// ── admin delivery-issue queue (the courier "report an issue" reports) ──
+if ($method === 'GET' && $path === '/admin/delivery-issues') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListDeliveryIssues($pdo);
+}
+
+if ($method === 'PATCH' && preg_match('#^/admin/delivery-issues/([^/]+)/resolve$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleResolveDeliveryIssue($pdo, $m[1]);
 }
 
 // ── file uploads (multipart): images + 3D models for products ──

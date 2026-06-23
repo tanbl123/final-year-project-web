@@ -27,8 +27,10 @@ import AdminProductApprovalsPage from './features/admin/pages/AdminProductApprov
 import AdminCategoriesPage from './features/admin/pages/AdminCategoriesPage';
 import AdminBusinessChangesPage from './features/admin/pages/AdminBusinessChangesPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
+import AdminCouriersPage from './features/admin/pages/AdminCouriersPage';
 import AdminCommissionPage from './features/admin/pages/AdminCommissionPage';
 import AdminDeliveriesPage from './features/admin/pages/AdminDeliveriesPage';
+import AdminDeliveryIssuesPage from './features/admin/pages/AdminDeliveryIssuesPage';
 import ProfilePage from './features/profile/ProfilePage';
 import PayoutsPage from './features/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
@@ -121,8 +123,14 @@ const router = createBrowserRouter(
       <Route path="/admin/users" element={
         <ProtectedRoute role="Admin"><AdminUsersPage /></ProtectedRoute>
       } />
+      <Route path="/admin/couriers" element={
+        <ProtectedRoute role="Admin"><AdminCouriersPage /></ProtectedRoute>
+      } />
       <Route path="/admin/deliveries" element={
         <ProtectedRoute role="Admin"><AdminDeliveriesPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/delivery-issues" element={
+        <ProtectedRoute role="Admin"><AdminDeliveryIssuesPage /></ProtectedRoute>
       } />
       <Route path="/admin/reviews" element={
         <ProtectedRoute role="Admin"><AdminReviewsPage /></ProtectedRoute>

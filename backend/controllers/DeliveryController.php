@@ -290,17 +290,158 @@ function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId): void {
   sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => 'Delivered']);
 }
 
-// POST /deliveries/{deliveryId}/proof — body: { proofUrl }. Attach a
-// proof-of-delivery photo (uploaded via /uploads first).
+// POST /deliveries/{deliveryId}/proof — attach a proof-of-delivery photo.
+// Accepts EITHER a direct multipart upload (field `file`) — what the courier
+// app sends — OR a JSON `{ proofUrl }` that was already uploaded elsewhere.
 function handleUploadProof(PDO $pdo, array $auth, string $deliveryId): void {
   $courierId = requireDeliveryPersonnelId($pdo, $auth);
-  $body = getJsonBody();
-  $url  = trim($body['proofUrl'] ?? '');
-  if ($url === '') {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A proof image URL is required.']);
-  }
   requireOwnDelivery($pdo, $courierId, $deliveryId);
+
+  if (isset($_FILES['file'])) {
+    // courier snapped/picked a photo → store it, then attach
+    $url = storeUploadedFile($_FILES['file'], 'image');
+  } else {
+    $body = getJsonBody();
+    $url  = trim($body['proofUrl'] ?? '');
+    if ($url === '') {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A proof photo is required.']);
+    }
+  }
+
   $pdo->prepare('UPDATE delivery SET proofOfDelivery = :url WHERE deliveryId = :id')
       ->execute(['url' => $url, 'id' => $deliveryId]);
   sendJson(200, true, ['deliveryId' => $deliveryId, 'proofOfDelivery' => $url]);
+}
+
+// Reasons a courier can report, mapped to what happens to the parcel:
+//   'fail'     → the delivery is marked Failed
+//   'reassign' → the parcel returns to the dispatch queue (Pending, unassigned)
+//   'none'     → just recorded for the admin to action
+const DELIVERY_ISSUE_REASONS = [
+  'customer_unreachable' => 'fail',
+  'customer_unavailable' => 'fail',
+  'customer_refused'     => 'fail',
+  'wrong_address'        => 'fail',
+  'package_damaged'      => 'fail',
+  'vehicle_emergency'    => 'reassign',
+  'other'                => 'none',
+];
+
+// POST /deliveries/{deliveryId}/report-issue — courier reports a problem.
+// Accepts multipart (reason, note, optional file) OR JSON { reason, note }.
+// Records the issue, applies the outcome, and notifies the customer.
+function handleReportIssue(PDO $pdo, array $auth, string $deliveryId): void {
+  $courierId = requireDeliveryPersonnelId($pdo, $auth);
+  $del = requireOwnDelivery($pdo, $courierId, $deliveryId);
+
+  if (in_array($del['deliveryStatus'], ['Delivered', 'Failed'], true)) {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This delivery is already closed.']);
+  }
+
+  // fields come via multipart ($_POST) when a photo is attached, else JSON
+  $reason = $_POST['reason'] ?? null;
+  $note   = $_POST['note'] ?? null;
+  if ($reason === null) {
+    $body   = getJsonBody();
+    $reason = $body['reason'] ?? '';
+    $note   = $body['note'] ?? '';
+  }
+  $reason = trim((string) $reason);
+  $note   = trim((string) ($note ?? ''));
+  if ($note !== '') { $note = mb_substr($note, 0, 255); }
+
+  if (!isset(DELIVERY_ISSUE_REASONS[$reason])) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please choose a valid reason.']);
+  }
+
+  $photoUrl = isset($_FILES['file']) ? storeUploadedFile($_FILES['file'], 'image') : null;
+  $outcome  = DELIVERY_ISSUE_REASONS[$reason];
+
+  try {
+    $pdo->beginTransaction();
+
+    $id = nextId($pdo, 'delivery_issue', 'issueId', 'ISS');
+    $pdo->prepare(
+      "INSERT INTO delivery_issue (issueId, deliveryId, orderId, deliveryPersonnelId, reason, note, photoUrl, issueStatus, createdAt)
+       VALUES (:id, :did, :oid, :dp, :reason, :note, :photo, 'Open', NOW())"
+    )->execute([
+      'id' => $id, 'did' => $deliveryId, 'oid' => $del['orderId'], 'dp' => $courierId,
+      'reason' => $reason, 'note' => $note !== '' ? $note : null, 'photo' => $photoUrl,
+    ]);
+
+    if ($outcome === 'fail') {
+      $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Failed' WHERE deliveryId = :id")
+          ->execute(['id' => $deliveryId]);
+      recomputeOrderStatus($pdo, $del['orderId']);
+    } elseif ($outcome === 'reassign') {
+      // hand the parcel back to dispatch (clears OTP + courier)
+      $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Pending', deliveryPersonnelId = NULL, otpCode = NULL WHERE deliveryId = :id")
+          ->execute(['id' => $deliveryId]);
+    }
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+    sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not report the issue.']);
+  }
+
+  // Notify the buyer too — but with a CUSTOMER-friendly, reason-specific
+  // message (the courier's raw note/photo stay internal to the admin queue).
+  if (function_exists('notifyOrderCustomer')) {
+    $oid = $del['orderId'];
+    $customerMsg = [
+      'customer_unreachable' => ['We missed you', "We tried to deliver order {$oid} but couldn't reach you — we'll try again soon."],
+      'customer_unavailable' => ['Delivery attempt unsuccessful', "No one was available to receive order {$oid}. We'll arrange another attempt."],
+      'customer_refused'     => ['Delivery cancelled', "Order {$oid} was marked refused at delivery. Contact support if this isn't right."],
+      'wrong_address'        => ['Address problem', "We couldn't deliver order {$oid} — the address looks incomplete. Please check your delivery address."],
+      'package_damaged'      => ['Delivery issue', "There was a problem with your parcel for order {$oid}. Our team will be in touch."],
+      'vehicle_emergency'    => ['Delivery delayed', "Your delivery for order {$oid} is delayed due to a logistics issue — we'll reassign it shortly."],
+      'other'                => ['Delivery issue', "There was a problem with your delivery for order {$oid}. Our team is looking into it."],
+    ];
+    [$ctitle, $cbody] = $customerMsg[$reason] ?? $customerMsg['other'];
+    notifyOrderCustomer($pdo, $oid, 'delivery', $ctitle, $cbody);
+  }
+
+  sendJson(201, true, ['issueId' => $id, 'deliveryId' => $deliveryId, 'reason' => $reason, 'outcome' => $outcome]);
+}
+
+// GET /admin/delivery-issues — the issue queue (Open first). Optional ?status=.
+function handleListDeliveryIssues(PDO $pdo): void {
+  $status  = trim($_GET['status'] ?? '');
+  $where   = [];
+  $params  = [];
+  if (in_array($status, ['Open', 'Resolved'], true)) {
+    $where[] = 'i.issueStatus = :st'; $params['st'] = $status;
+  }
+
+  $sql =
+    "SELECT i.issueId, i.deliveryId, i.orderId, i.reason, i.note, i.photoUrl,
+            i.issueStatus, i.createdAt, i.resolvedAt,
+            d.deliveryStatus,
+            i.deliveryPersonnelId, courier.fullName AS courierName,
+            buyer.fullName AS customerName, s.companyName AS supplierName
+       FROM delivery_issue i
+       JOIN delivery d              ON d.deliveryId = i.deliveryId
+       JOIN `order` o               ON o.orderId = i.orderId
+       JOIN customer c              ON c.customerId = o.customerId
+       JOIN `user` buyer            ON buyer.userId = c.userId
+       JOIN supplier s              ON s.supplierId = d.supplierId
+       LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = i.deliveryPersonnelId
+       LEFT JOIN `user` courier        ON courier.userId = dp.userId";
+  if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
+  $sql .= " ORDER BY FIELD(i.issueStatus, 'Open','Resolved'), i.createdAt DESC";
+
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  sendJson(200, true, ['issues' => $stmt->fetchAll()]);
+}
+
+// PATCH /admin/delivery-issues/{issueId}/resolve — close an issue.
+function handleResolveDeliveryIssue(PDO $pdo, string $issueId): void {
+  $stmt = $pdo->prepare("UPDATE delivery_issue SET issueStatus = 'Resolved', resolvedAt = NOW() WHERE issueId = :id");
+  $stmt->execute(['id' => $issueId]);
+  if ($stmt->rowCount() === 0) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Issue not found.']);
+  }
+  sendJson(200, true, ['issueId' => $issueId, 'issueStatus' => 'Resolved']);
 }

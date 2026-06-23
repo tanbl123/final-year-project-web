@@ -19,7 +19,14 @@ function AdminCommissionPage() {
   function load() {
     setLoading(true);
     Promise.all([getCommission(), getCommissionReport()])
-      .then(([c, r]) => { setCommissionState(c); setData(r); })
+      .then(([c, r]) => {
+        setCommissionState(c);
+        setData(r);
+        // prefill the input with the current rate so the admin can nudge it with
+        // the spinner (e.g. 10 → 11) instead of starting from an empty field
+        const cur = c?.current?.commissionRateValue;
+        if (cur != null) setNewRate(String(Number(cur)));
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
@@ -42,8 +49,7 @@ function AdminCommissionPage() {
     try {
       await setCommission(Number(newRate));
       setToast(`Commission rate set to ${Number(newRate)}%.`);
-      setNewRate('');
-      load();
+      load();   // reloads + prefills the input with the new current rate
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,7 +57,8 @@ function AdminCommissionPage() {
     }
   }
 
-  const currentRate = commission?.current?.commissionRateValue;
+  const currentRate = commission?.current?.commissionRateValue != null
+    ? Number(commission.current.commissionRateValue) : null;
 
   return (
     <div className="container py-4 text-start">

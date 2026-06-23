@@ -1,2 +1,6 @@
 # Local secret overrides — never commit real keys
 config.local.php
+
+# Firebase service-account key (if placed inside the repo)
+*service-account*.json
+*firebase-adminsdk*.json

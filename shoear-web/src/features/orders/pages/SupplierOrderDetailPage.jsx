@@ -9,6 +9,10 @@ const STATUS_COLORS = {
 };
 const PAY_COLORS = { Successful: 'success', Pending: 'warning', Failed: 'danger', Refunded: 'secondary' };
 const REFUND_COLORS = { Pending: 'warning', Approved: 'info', Rejected: 'danger', Completed: 'success' };
+const DELIV_COLORS = {
+  Pending: 'warning', Assigned: 'info', PickedUp: 'primary',
+  OutForDelivery: 'primary', Delivered: 'success', Failed: 'danger',
+};
 const label = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2');
 const money = (n) => `RM ${Number(n).toFixed(2)}`;
 
@@ -134,6 +138,34 @@ function SupplierOrderDetailPage() {
               </table>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* this supplier's own parcel (split fulfilment) — their fulfilment status,
+          not the order-wide rollup which may reflect another supplier's parcel */}
+      <div className="card mt-4">
+        <div className="card-header bg-white fw-semibold">Your parcel delivery</div>
+        <div className="card-body">
+          {order.myDelivery ? (
+            <dl className="row mb-0">
+              <dt className="col-sm-3">Status</dt>
+              <dd className="col-sm-9">
+                <span className={`badge text-bg-${DELIV_COLORS[order.myDelivery.deliveryStatus] || 'secondary'}`}>
+                  {label(order.myDelivery.deliveryStatus)}
+                </span>
+              </dd>
+              <dt className="col-sm-3">Courier</dt>
+              <dd className="col-sm-9">{order.myDelivery.courierName || <span className="text-muted">Not assigned yet</span>}</dd>
+              <dt className="col-sm-3">Est. delivery</dt>
+              <dd className="col-sm-9">
+                {order.myDelivery.estimatedDeliveryTime
+                  ? new Date(order.myDelivery.estimatedDeliveryTime).toLocaleString()
+                  : <span className="text-muted">—</span>}
+              </dd>
+            </dl>
+          ) : (
+            <p className="text-muted mb-0">Not dispatched yet — a courier is assigned once the order is paid.</p>
+          )}
         </div>
       </div>
 

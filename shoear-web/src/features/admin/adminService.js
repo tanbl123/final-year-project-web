@@ -16,6 +16,23 @@ export function rejectSupplier(userId, { reason, terminal = false } = {}) {
   return apiPost(`/admin/suppliers/${userId}/reject`, { reason, terminal }, getToken());
 }
 
+// ── courier (delivery personnel) approvals ───────────────────────────
+// Couriers awaiting approval (self-applied via the delivery app).
+export function getPendingCouriers() {
+  return apiGet('/admin/couriers/pending', getToken());
+}
+
+// Approve a pending courier (status → Active, so they can log in).
+export function approveCourier(userId) {
+  return apiPost(`/admin/couriers/${userId}/approve`, {}, getToken());
+}
+
+// Reject a pending courier. reason is required and shown to the courier at login;
+// terminal=true bans them permanently.
+export function rejectCourier(userId, { reason, terminal = false } = {}) {
+  return apiPost(`/admin/couriers/${userId}/reject`, { reason, terminal }, getToken());
+}
+
 // Products awaiting approval.
 export function getPendingProducts() {
   return apiGet('/admin/products/pending', getToken());
@@ -100,6 +117,19 @@ export function getCouriers() {
 // Manually (re)assign a courier to a delivery.
 export function assignDelivery(deliveryId, deliveryPersonnelId) {
   return apiPost(`/admin/deliveries/${deliveryId}/assign`, { deliveryPersonnelId }, getToken());
+}
+
+// Delivery issues reported by couriers. Optional { status: 'Open' | 'Resolved' }.
+export function getDeliveryIssues(filters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiGet(`/admin/delivery-issues${suffix}`, getToken());
+}
+
+// Mark a reported issue resolved.
+export function resolveDeliveryIssue(issueId) {
+  return apiPatch(`/admin/delivery-issues/${issueId}/resolve`, {}, getToken());
 }
 
 // ── reports ──────────────────────────────────────────────────────────
