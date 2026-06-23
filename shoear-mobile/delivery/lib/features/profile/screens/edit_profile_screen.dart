@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -252,6 +253,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 focusNode: _phoneFocus,
                 keyboard: TextInputType.phone,
                 error: _phoneError,
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
                 onChanged: (v) => setState(() => _phoneError = _validatePhone(v))),
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -326,7 +328,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _field(TextEditingController c, String label,
-          {FocusNode? focusNode, int maxLines = 1, int? maxLength, TextInputType? keyboard, String? error, void Function(String)? onChanged}) =>
+          {FocusNode? focusNode, int maxLines = 1, int? maxLength, TextInputType? keyboard, String? error, void Function(String)? onChanged, List<TextInputFormatter>? inputFormatters}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: TextField(
@@ -335,6 +337,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           keyboardType: keyboard,
           maxLines: maxLines,
           maxLength: maxLength,
+          inputFormatters: inputFormatters,
           onChanged: onChanged,
           decoration: InputDecoration(
             labelText: label,

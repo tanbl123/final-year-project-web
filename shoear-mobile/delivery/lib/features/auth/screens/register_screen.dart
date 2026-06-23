@@ -254,6 +254,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             label: 'Phone number',
             keyboard: TextInputType.phone,
             error: _phoneError,
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
             onChanged: (v) => setState(() => _phoneError = _validatePhone(v)),
           ),
           // ── Vehicle details ──
@@ -356,6 +357,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextInputType? keyboard,
     int maxLines = 1,
     int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -365,6 +367,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: keyboard,
           maxLines: maxLines,
           maxLength: maxLength,
+          inputFormatters: inputFormatters,
           onChanged: onChanged,
           decoration: InputDecoration(
             labelText: label,
