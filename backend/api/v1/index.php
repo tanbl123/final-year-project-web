@@ -30,6 +30,7 @@ require __DIR__ . '/../../controllers/CartController.php';
 require __DIR__ . '/../../controllers/WishlistController.php';
 require __DIR__ . '/../../controllers/PaymentController.php';
 require __DIR__ . '/../../controllers/NotificationController.php';
+require __DIR__ . '/../../controllers/VehicleController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -76,6 +77,16 @@ if ($method === 'GET' && $path === '/db-test') {
   $stmt = $pdo->query('SELECT COUNT(*) AS total FROM product');
   $row  = $stmt->fetch();
   sendJson(200, true, ['productCount' => (int) $row['total']]);
+}
+
+// ── vehicle catalogue (public — needed before a courier account exists) ──
+if ($method === 'GET' && preg_match('#^/vehicles/makes/([^/]+)$#', $path, $m)) {
+    $pdo = getPDO();
+    handleGetVehicleMakes($pdo, urldecode($m[1]));
+}
+if ($method === 'GET' && preg_match('#^/vehicles/models/([^/]+)/(.+)$#', $path, $m)) {
+    $pdo = getPDO();
+    handleGetVehicleModels($pdo, urldecode($m[1]), urldecode($m[2]));
 }
 
 // ── customer cart (require a Customer token) ──
