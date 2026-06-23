@@ -23,7 +23,6 @@ class AccountService {
     required String username,
     required String email,
     required String password,
-    required String fullName,
     required String phoneNumber,
     String? shippingAddress,
   }) async {
@@ -31,7 +30,6 @@ class AccountService {
       'username': username,
       'email': email,
       'password': password,
-      'fullName': fullName,
       'phoneNumber': phoneNumber,
       if (shippingAddress != null && shippingAddress.isNotEmpty) 'shippingAddress': shippingAddress,
     });

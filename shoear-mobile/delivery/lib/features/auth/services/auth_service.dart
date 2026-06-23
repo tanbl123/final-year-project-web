@@ -6,7 +6,7 @@ class AuthService {
   final ApiClient api;
   AuthService(this.api);
 
-  /// POST /auth/login — [identifier] may be an email or a username.
+  /// POST /auth/login — [identifier] is the courier's email.
   Future<CourierSession> login(String identifier, String password) async {
     final data = await api.post('/auth/login', {
       'identifier': identifier,
@@ -20,7 +20,6 @@ class AuthService {
   /// returns the server's confirmation message.
   Future<String> registerCourier({
     required String fullName,
-    required String username,
     required String email,
     required String phoneNumber,
     required String vehicleType,
@@ -31,7 +30,6 @@ class AuthService {
   }) async {
     final data = await api.post('/auth/register/courier', {
       'fullName': fullName,
-      'username': username,
       'email': email,
       'phoneNumber': phoneNumber,
       'vehicleType':  vehicleType,

@@ -28,7 +28,6 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _fullName = TextEditingController();
-  final _username = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   String _vehicleType = 'Motorcycle';
@@ -40,7 +39,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // a focus node per validated field so we can validate on blur (like the web)
   final _fullNameFocus = FocusNode();
-  final _usernameFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _phoneFocus = FocusNode();
   // Brand & model are dropdowns (VehiclePicker) — no blur focus needed.
@@ -52,7 +50,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
   // per-field inline errors
   String? _fullNameError;
-  String? _usernameError;
   String? _emailError;
   String? _phoneError;
   String? _vehicleBrandError;
@@ -65,7 +62,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _fullNameFocus.addListener(() => _onBlur(_fullNameFocus, () => _fullNameError = _validateFullName(_fullName.text)));
-    _usernameFocus.addListener(() => _onBlur(_usernameFocus, () => _usernameError = _validateUsername(_username.text)));
     _emailFocus.addListener(() => _onBlur(_emailFocus, () => _emailError = _validateEmail(_email.text)));
     _phoneFocus.addListener(() => _onBlur(_phoneFocus, () => _phoneError = _validatePhone(_phone.text)));
     _vehiclePlateFocus.addListener(() => _onBlur(_vehiclePlateFocus, () => _vehiclePlateError = _validatePlate(_vehiclePlate.text)));
@@ -79,10 +75,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    for (final c in [_fullName, _username, _email, _phone, _vehicleBrand, _vehicleModel, _vehiclePlate, _password, _confirm]) {
+    for (final c in [_fullName, _email, _phone, _vehicleBrand, _vehicleModel, _vehiclePlate, _password, _confirm]) {
       c.dispose();
     }
-    for (final f in [_fullNameFocus, _usernameFocus, _emailFocus, _phoneFocus, _vehiclePlateFocus, _passwordFocus, _confirmFocus]) {
+    for (final f in [_fullNameFocus, _emailFocus, _phoneFocus, _vehiclePlateFocus, _passwordFocus, _confirmFocus]) {
       f.dispose();
     }
     super.dispose();
@@ -90,13 +86,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // ── field validators (same rules as the backend) ──
   String? _validateFullName(String v) => v.trim().isEmpty ? 'Full name is required.' : null;
-
-  String? _validateUsername(String v) {
-    final t = v.trim();
-    if (t.isEmpty) return 'Username is required.';
-    if (!RegExp(r'^[A-Za-z0-9_]{3,20}$').hasMatch(t)) return 'Username must be 3–20 letters, numbers or underscores.';
-    return null;
-  }
 
   String? _validateEmail(String v) {
     final t = v.trim();
@@ -150,7 +139,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     setState(() {
       _fullNameError     = _validateFullName(_fullName.text);
-      _usernameError     = _validateUsername(_username.text);
       _emailError        = _validateEmail(_email.text);
       _phoneError        = _validatePhone(_phone.text);
       _vehicleBrandError = _validateBrand(_vehicleBrand.text);
@@ -160,7 +148,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _confirmError      = _validateConfirm();
     });
     if (_fullNameError != null ||
-        _usernameError != null ||
         _emailError != null ||
         _phoneError != null ||
         _vehicleBrandError != null ||
@@ -174,7 +161,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final message = await context.read<AuthProvider>().authService.registerCourier(
             fullName:     _fullName.text.trim(),
-            username:     _username.text.trim(),
             email:        _email.text.trim(),
             phoneNumber:  _phone.text.trim(),
             vehicleType:  _vehicleType,
@@ -193,9 +179,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final msg = e.toString();
       final lower = msg.toLowerCase();
       setState(() {
-        if (lower.contains('username')) {
-          _usernameError = msg;
-        } else if (lower.contains('email')) {
+        if (lower.contains('email')) {
           _emailError = msg;
         } else if (lower.contains('brand')) {
           _vehicleBrandError = msg;
@@ -232,13 +216,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             error: _fullNameError,
             maxLength: 120,
             onChanged: (v) => setState(() => _fullNameError = _validateFullName(v)),
-          ),
-          _field(
-            controller: _username,
-            focusNode: _usernameFocus,
-            label: 'Username',
-            error: _usernameError,
-            onChanged: (v) => setState(() => _usernameError = _validateUsername(v)),
           ),
           _field(
             controller: _email,

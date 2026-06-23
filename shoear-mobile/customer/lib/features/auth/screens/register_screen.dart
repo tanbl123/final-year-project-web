@@ -26,7 +26,6 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _fullName = TextEditingController();
   final _username = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
@@ -35,7 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirm = TextEditingController();
 
   // a focus node per validated field so we can validate on blur (like the web)
-  final _fullNameFocus = FocusNode();
   final _usernameFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _phoneFocus = FocusNode();
@@ -45,7 +43,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscure = true;
   bool _loading = false;
   // per-field inline errors
-  String? _fullNameError;
   String? _usernameError;
   String? _emailError;
   String? _phoneError;
@@ -56,7 +53,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     // validate a field when it loses focus (real-time, on blur)
-    _fullNameFocus.addListener(() => _onBlur(_fullNameFocus, () => _fullNameError = _validateFullName(_fullName.text)));
     _usernameFocus.addListener(() => _onBlur(_usernameFocus, () => _usernameError = _validateUsername(_username.text)));
     _emailFocus.addListener(() => _onBlur(_emailFocus, () => _emailError = _validateEmail(_email.text)));
     _phoneFocus.addListener(() => _onBlur(_phoneFocus, () => _phoneError = _validatePhone(_phone.text)));
@@ -70,18 +66,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    for (final c in [_fullName, _username, _email, _phone, _address, _password, _confirm]) {
+    for (final c in [_username, _email, _phone, _address, _password, _confirm]) {
       c.dispose();
     }
-    for (final f in [_fullNameFocus, _usernameFocus, _emailFocus, _phoneFocus, _passwordFocus, _confirmFocus]) {
+    for (final f in [_usernameFocus, _emailFocus, _phoneFocus, _passwordFocus, _confirmFocus]) {
       f.dispose();
     }
     super.dispose();
   }
 
   // ── field validators (same rules as the web register form) ──
-  String? _validateFullName(String v) => v.trim().isEmpty ? 'Full name is required.' : null;
-
   String? _validateUsername(String v) {
     final t = v.trim();
     if (t.isEmpty) return 'Username is required.';
@@ -119,15 +113,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     setState(() {
-      _fullNameError = _validateFullName(_fullName.text);
       _usernameError = _validateUsername(_username.text);
       _emailError = _validateEmail(_email.text);
       _phoneError = _validatePhone(_phone.text);
       _passwordError = _validatePassword(_password.text);
       _confirmError = _validateConfirm();
     });
-    if (_fullNameError != null ||
-        _usernameError != null ||
+    if (_usernameError != null ||
         _emailError != null ||
         _phoneError != null ||
         _passwordError != null ||
@@ -140,12 +132,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             username: _username.text.trim(),
             email: _email.text.trim(),
             password: _password.text,
-            fullName: _fullName.text.trim(),
             phoneNumber: _phone.text.trim(),
             shippingAddress: _address.text.trim(),
           );
       // created — log straight in with the new credentials
-      await context.read<AuthProvider>().login(_username.text.trim(), _password.text);
+      await context.read<AuthProvider>().login(_email.text.trim(), _password.text);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       // route the server error to the most likely field, else under the password
@@ -172,13 +163,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _field(
-            controller: _fullName,
-            focusNode: _fullNameFocus,
-            label: 'Full name',
-            error: _fullNameError,
-            onChanged: (v) => setState(() => _fullNameError = _validateFullName(v)),
-          ),
           _field(
             controller: _username,
             focusNode: _usernameFocus,

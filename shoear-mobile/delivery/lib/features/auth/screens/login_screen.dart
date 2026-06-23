@@ -29,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     setState(() {
-      _identifierError = _identifier.text.trim().isEmpty ? 'Email or username is required.' : null;
+      _identifierError = _identifier.text.trim().isEmpty ? 'Email is required.' : null;
       _passwordError = _password.text.isEmpty ? 'Password is required.' : null;
     });
     if (_identifierError != null || _passwordError != null) return;
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textInputAction: TextInputAction.next,
                           onChanged: _identifierError == null ? null : (_) => setState(() => _identifierError = null),
                           decoration: InputDecoration(
-                            labelText: 'Email or username',
+                            labelText: 'Email',
                             border: const OutlineInputBorder(),
                             errorText: _identifierError,
                           ),

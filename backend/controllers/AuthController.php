@@ -289,12 +289,11 @@ function handleRegisterCustomer(PDO $pdo): void {
   $username    = trim($body['username'] ?? '');
   $email       = trim($body['email'] ?? '');
   $password    = $body['password'] ?? '';
-  $fullName    = trim($body['fullName'] ?? '');
   $phoneNumber = trim($body['phoneNumber'] ?? '');
   $shipping    = trim($body['shippingAddress'] ?? '');
 
-  if ($fullName === '' || $username === '' || $email === '' || $phoneNumber === '') {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Name, username, email and phone number are required.']);
+  if ($username === '' || $email === '' || $phoneNumber === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Username, email and phone number are required.']);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
@@ -327,7 +326,7 @@ function handleRegisterCustomer(PDO $pdo): void {
     $pdo->prepare(
       'INSERT INTO `user` (userId, username, password, email, fullName, phoneNumber, role, status)
        VALUES (:id, :un, :pw, :em, :fn, :ph, "Customer", "Active")'
-    )->execute(['id' => $userId, 'un' => $username, 'pw' => $hash, 'em' => $email, 'fn' => $fullName, 'ph' => $phoneNumber]);
+    )->execute(['id' => $userId, 'un' => $username, 'pw' => $hash, 'em' => $email, 'fn' => $username, 'ph' => $phoneNumber]);
 
     $customerId = nextId($pdo, 'customer', 'customerId', 'CUS');
     $pdo->prepare('INSERT INTO customer (customerId, userId, shippingAddress) VALUES (:cid, :uid, :sa)')
@@ -349,7 +348,6 @@ function handleRegisterCustomer(PDO $pdo): void {
 // gate, and this keeps the mobile flow simple.
 function handleRegisterCourier(PDO $pdo): void {
   $body        = getJsonBody();
-  $username    = trim($body['username'] ?? '');
   $email       = trim($body['email'] ?? '');
   $password    = $body['password'] ?? '';
   $fullName    = trim($body['fullName'] ?? '');
@@ -359,7 +357,7 @@ function handleRegisterCourier(PDO $pdo): void {
   $vehicleModel = trim($body['vehicleModel'] ?? '');
   $vehiclePlate = strtoupper(trim($body['vehiclePlate'] ?? ''));
 
-  if ($fullName === '' || $username === '' || $email === '' || $phoneNumber === '' ||
+  if ($fullName === '' || $email === '' || $phoneNumber === '' ||
       $vehicleBrand === '' || $vehicleModel === '' || $vehiclePlate === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields including vehicle details are required.']);
   }
@@ -388,10 +386,6 @@ function handleRegisterCourier(PDO $pdo): void {
   if (mb_strlen($fullName) > 120) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Full name is too long (max 120 characters).']);
   }
-  $fmtErr = usernameFormatError($username);
-  if ($fmtErr) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $fmtErr]);
-  }
   $pwErr = passwordPolicyError($password);
   if ($pwErr) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $pwErr]);
@@ -402,9 +396,9 @@ function handleRegisterCourier(PDO $pdo): void {
   if ($chk->fetch()) {
     sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That email is already registered.']);
   }
-  if (usernameTaken($pdo, $username)) {
-    sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That username is already taken.']);
-  }
+
+  // auto-generate a unique username from the courier's full name
+  $username = generateUsername($pdo, $fullName);
 
   $pdo->beginTransaction();
   try {
