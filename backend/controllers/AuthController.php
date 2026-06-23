@@ -357,7 +357,7 @@ function handleRegisterCourier(PDO $pdo): void {
   $vehicleType  = trim($body['vehicleType']  ?? 'Motorcycle');
   $vehicleBrand = trim($body['vehicleBrand'] ?? '');
   $vehicleModel = trim($body['vehicleModel'] ?? '');
-  $vehiclePlate = trim($body['vehiclePlate'] ?? '');
+  $vehiclePlate = strtoupper(trim($body['vehiclePlate'] ?? ''));
 
   if ($fullName === '' || $username === '' || $email === '' || $phoneNumber === '' ||
       $vehicleBrand === '' || $vehicleModel === '' || $vehiclePlate === '') {
@@ -566,7 +566,7 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
     $vType  = trim((string) ($body['vehicleType']  ?? 'Motorcycle'));
     $vBrand = trim((string) ($body['vehicleBrand'] ?? ''));
     $vModel = trim((string) ($body['vehicleModel'] ?? ''));
-    $vPlate = trim((string) ($body['vehiclePlate'] ?? ''));
+    $vPlate = strtoupper(trim((string) ($body['vehiclePlate'] ?? '')));
     if (!in_array($vType, $allowedTypes, true)) $vType = 'Motorcycle';
     if ($vPlate !== '' && mb_strlen($vPlate) < 3) {
       sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Plate number must be at least 3 characters.']);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:delivery/features/auth/state/auth_provider.dart';
@@ -128,10 +129,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String? _validatePlate(String v) {
-    final t = v.trim();
+    final t = v.trim().toUpperCase();
     if (t.isEmpty) return 'Plate number is required.';
     if (t.length < 3) return 'Plate number must be at least 3 characters.';
-    if (!RegExp(r'^[A-Za-z0-9 \-]+$').hasMatch(t)) return 'Only letters, numbers, spaces or hyphens.';
+    if (!RegExp(r'^[A-Z0-9 \-]+$').hasMatch(t)) return 'Only letters, numbers, spaces or hyphens.';
     return null;
   }
 
@@ -283,13 +284,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onBrandChanged: () => setState(() => _vehicleBrandError = _validateBrand(_vehicleBrand.text)),
             onModelChanged: () => setState(() => _vehicleModelError = _validateModel(_vehicleModel.text)),
           ),
-          _field(
-            controller: _vehiclePlate,
-            focusNode: _vehiclePlateFocus,
-            label: 'Plate number (e.g. ABC 1234)',
-            error: _vehiclePlateError,
-            maxLength: 20,
-            onChanged: (v) => setState(() => _vehiclePlateError = _validatePlate(v)),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: TextField(
+              controller: _vehiclePlate,
+              focusNode: _vehiclePlateFocus,
+              maxLength: 20,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [UpperCaseTextFormatter()],
+              onChanged: (v) => setState(() => _vehiclePlateError = _validatePlate(v)),
+              decoration: InputDecoration(
+                labelText: 'Plate number (e.g. ABC 1234)',
+                border: const OutlineInputBorder(),
+                errorText: _vehiclePlateError,
+                counterText: '',
+              ),
+            ),
           ),
           TextField(
             controller: _password,
@@ -363,4 +373,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       );
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) =>
+      next.copyWith(text: next.text.toUpperCase());
 }
