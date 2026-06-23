@@ -41,7 +41,7 @@ class _VehiclePickerState extends State<VehiclePicker> {
 
   List<String>? _brands;
   List<String>? _models;
-  bool _loadingBrands = false;
+  bool _loadingBrands = true; // a brand load is kicked off in initState
   bool _loadingModels = false;
   bool _brandManual = false;
   bool _modelManual = false;
@@ -49,9 +49,15 @@ class _VehiclePickerState extends State<VehiclePicker> {
   @override
   void initState() {
     super.initState();
+    // NOTE: never setState() synchronously here — these helpers only call
+    // setState after their first await, so the leading loading flags are set
+    // by direct assignment instead (safe before the first build).
     _loadBrands();
     // Editing an existing courier: a brand may already be set — preload models.
-    if (widget.brand.text.trim().isNotEmpty) _loadModels(widget.brand.text.trim());
+    if (widget.brand.text.trim().isNotEmpty) {
+      _loadingModels = true;
+      _loadModels(widget.brand.text.trim());
+    }
   }
 
   @override
@@ -59,19 +65,22 @@ class _VehiclePickerState extends State<VehiclePicker> {
     super.didUpdateWidget(old);
     if (old.vehicleType != widget.vehicleType) {
       // Type changed → the brand list is stale; clear and reload from scratch.
+      // didUpdateWidget triggers a rebuild on its own, so assign directly.
       widget.brand.clear();
       widget.model.clear();
+      _brands = null;
       _models = null;
+      _loadingBrands = true;
+      _loadingModels = false;
       _brandManual = false;
       _modelManual = false;
-      widget.onBrandChanged?.call();
-      widget.onModelChanged?.call();
+      // Don't call onBrand/ModelChanged here — it's the parent's setState and
+      // we're inside the parent's build. Brand/model re-validate on submit.
       _loadBrands();
     }
   }
 
   Future<void> _loadBrands() async {
-    setState(() => _loadingBrands = true);
     try {
       final makes = await _service.makesForType(widget.vehicleType);
       if (!mounted) return;
@@ -94,7 +103,6 @@ class _VehiclePickerState extends State<VehiclePicker> {
   }
 
   Future<void> _loadModels(String make) async {
-    setState(() => _loadingModels = true);
     try {
       final models = await _service.modelsForMake(make);
       if (!mounted) return;
@@ -171,6 +179,7 @@ class _VehiclePickerState extends State<VehiclePicker> {
             widget.model.clear();
             _models = null;
             _modelManual = false;
+            _loadingModels = true;
           });
           widget.onBrandChanged?.call();
           widget.onModelChanged?.call();
