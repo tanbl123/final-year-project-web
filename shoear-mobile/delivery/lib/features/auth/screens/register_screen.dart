@@ -302,7 +302,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             decoration: InputDecoration(
               labelText: 'Password',
               border: const OutlineInputBorder(),
-              helperText: '8+ chars with upper, lower, number & symbol',
+
               errorText: _passwordError,
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
