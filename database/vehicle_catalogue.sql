@@ -2,6 +2,8 @@
 -- Run this once in phpMyAdmin (or include it after schema.sql).
 -- The app serves brand/model data from these tables instead of calling
 -- the NHTSA API directly from the mobile client (which times out from Malaysia).
+-- The backend uses a stale-while-revalidate strategy: always return from DB
+-- immediately, then refresh from NHTSA in the background when data is >30 days old.
 
 CREATE TABLE IF NOT EXISTS vehicle_makes (
   id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -16,6 +18,13 @@ CREATE TABLE IF NOT EXISTS vehicle_models (
   makeName    VARCHAR(100) NOT NULL,
   modelName   VARCHAR(100) NOT NULL,
   UNIQUE KEY uq_type_make_model (vehicleType, makeName, modelName)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tracks when each cache key (e.g. 'makes_Motorcycle', 'models_Car_Honda')
+-- was last successfully refreshed from NHTSA.
+CREATE TABLE IF NOT EXISTS vehicle_cache_log (
+  cacheKey  VARCHAR(200) PRIMARY KEY,
+  cachedAt  DATETIME     NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── Seed: Motorcycle makes ────────────────────────────────────────────────────
