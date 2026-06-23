@@ -60,7 +60,9 @@ class VehicleLookupService {
       final combined = {...apiMakes, ...local}.toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
       return combined;
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[VehicleLookup] makesForType($vehicleType) failed: $e');
       // API unreachable — return local brands so the form still works offline.
       return local..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     }
