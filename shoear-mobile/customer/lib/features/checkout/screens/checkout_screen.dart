@@ -20,13 +20,32 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _addressCtrl = TextEditingController();
   final _phoneCtrl   = TextEditingController();
-  String _method     = 'Stripe';
-  bool _loadingAddr  = true;
-  bool _placing      = false;
+  String _method      = 'Stripe';
+  bool _loadingAddr   = true;
+  bool _placing       = false;
+  bool _phoneTouched  = false;
+  bool _addrTouched   = false;
   String? _addrError;
   String? _phoneError;
 
   bool get _needsPhone => context.read<AuthProvider>().user?.phoneNumber == null;
+
+  String? _validatePhone(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return 'Phone number is required for delivery contact.';
+    if (!RegExp(r'^\+?[1-9]\d{7,14}$').hasMatch(v)) {
+      return 'Enter a valid phone number, e.g. +60123456789.';
+    }
+    return null;
+  }
+
+  String? _validateAddress(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return 'A delivery address is required.';
+    if (v.length < 10) return 'Please enter a complete delivery address.';
+    if (v.length > 255) return 'Address is too long (max 255 characters).';
+    return null;
+  }
 
   @override
   void initState() {
@@ -55,30 +74,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
-    final address = _addressCtrl.text.trim();
-    if (address.isEmpty) {
-      setState(() => _addrError = 'A delivery address is required.');
-      return;
-    }
-    if (address.length < 10) {
-      setState(() => _addrError = 'Please enter a complete delivery address.');
-      return;
-    }
-    if (address.length > 255) {
-      setState(() => _addrError = 'Address is too long (max 255 characters).');
-      return;
-    }
+    // Mark both touched so errors show immediately on submit.
+    setState(() {
+      _addrTouched  = true;
+      _phoneTouched = true;
+      _addrError    = _validateAddress(_addressCtrl.text);
+      if (_needsPhone) _phoneError = _validatePhone(_phoneCtrl.text);
+    });
+
+    if (_addrError != null) return;
+    if (_needsPhone && _phoneError != null) return;
 
     if (_needsPhone) {
-      final phone = _phoneCtrl.text.trim();
-      if (phone.isEmpty) {
-        setState(() => _phoneError = 'Phone number is required for delivery contact.');
-        return;
-      }
-      if (!RegExp(r'^\+?[1-9]\d{7,14}$').hasMatch(phone)) {
-        setState(() => _phoneError = 'Enter a valid phone number, e.g. +60123456789.');
-        return;
-      }
       setState(() => _phoneError = null);
       try {
         await context.read<AccountService>().updatePhone(phone);
@@ -184,10 +191,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             filled: true,
                             fillColor: Colors.white,
                           ),
-                          onChanged: (_) {
-                            if (_phoneError != null) {
-                              setState(() => _phoneError = null);
-                            }
+                          onChanged: (v) {
+                            if (!_phoneTouched) setState(() => _phoneTouched = true);
+                            setState(() => _phoneError = _validatePhone(v));
                           },
                         ),
                         const SizedBox(height: 20),
@@ -216,10 +222,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   child: Icon(Icons.edit_location_alt_outlined),
                                 ),
                               ),
-                              onChanged: (_) {
-                                if (_addrError != null) {
-                                  setState(() => _addrError = null);
-                                }
+                              onChanged: (v) {
+                                if (!_addrTouched) setState(() => _addrTouched = true);
+                                setState(() => _addrError = _validateAddress(v));
                               },
                             ),
                     ],
