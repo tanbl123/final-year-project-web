@@ -20,6 +20,24 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _identifierError;
   String? _passwordError;
+  String? _loginError; // shown under password; turns BOTH fields red
+
+  @override
+  void dispose() {
+    _identifier.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  String? _validateIdentifier(String val) {
+    if (val.trim().isEmpty) return 'Email or username is required.';
+    return null;
+  }
+
+  String? _validatePassword(String val) {
+    if (val.isEmpty) return 'Password is required.';
+    return null;
+  }
 
   Future<void> _openForgotPassword() async {
     final reset = await Navigator.of(context).push<bool>(
@@ -32,17 +50,11 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _identifier.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
   Future<void> _submit() async {
     setState(() {
-      _identifierError = _identifier.text.trim().isEmpty ? 'Email is required.' : null;
-      _passwordError = _password.text.isEmpty ? 'Password is required.' : null;
+      _identifierError = _validateIdentifier(_identifier.text);
+      _passwordError   = _validatePassword(_password.text);
+      _loginError      = null;
     });
     if (_identifierError != null || _passwordError != null) return;
 
@@ -51,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await context.read<AuthProvider>().login(_identifier.text.trim(), _password.text);
       // the shell swaps to the assignments screen on success
     } catch (e) {
-      if (mounted) setState(() => _passwordError = e.toString());
+      if (mounted) setState(() => _loginError = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -73,7 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 Icon(Icons.local_shipping, size: 48, color: theme.colorScheme.primary),
                 const SizedBox(height: 8),
                 const Text('ShoeAR Express',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 4),
                 Text('Delivery personnel sign in',
                     textAlign: TextAlign.center,
@@ -87,39 +100,63 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        TextField(
-                          controller: _identifier,
-                          textInputAction: TextInputAction.next,
-                          onChanged: _identifierError == null ? null : (_) => setState(() => _identifierError = null),
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            border: const OutlineInputBorder(),
-                            errorText: _identifierError,
+                        // ── Email or username ──
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _identifier,
+                          builder: (_, val, __) => TextField(
+                            controller:      _identifier,
+                            textInputAction: TextInputAction.next,
+                            onChanged: (v) => setState(() {
+                              _identifierError = _validateIdentifier(v);
+                              _loginError = null;
+                            }),
+                            decoration: InputDecoration(
+                              labelText:  'Email or username',
+                              border:     const OutlineInputBorder(),
+                              helperText: ' ',
+                              errorText:  _identifierError ?? (_loginError != null ? '' : null),
+                              suffixIcon: val.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () => setState(() {
+                                        _identifier.clear();
+                                        _identifierError = _validateIdentifier('');
+                                        _loginError = null;
+                                      }),
+                                    )
+                                  : null,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        // ── Password ──
                         TextField(
-                          controller: _password,
+                          controller:  _password,
                           obscureText: _obscure,
-                          onChanged: _passwordError == null ? null : (_) => setState(() => _passwordError = null),
+                          onChanged: (v) => setState(() {
+                            _passwordError = _validatePassword(v);
+                            _loginError = null;
+                          }),
                           onSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
-                            labelText: 'Password',
-                            border: const OutlineInputBorder(),
-                            errorText: _passwordError,
+                            labelText:  'Password',
+                            border:     const OutlineInputBorder(),
+                            helperText: ' ',
+                            errorText:  _passwordError ?? _loginError,
                             suffixIcon: IconButton(
                               icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                               onPressed: () => setState(() => _obscure = !_obscure),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 4),
                         FilledButton(
                           onPressed: _loading ? null : _submit,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             child: _loading
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                ? const SizedBox(
+                                    height: 20, width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Text('Login'),
                           ),
                         ),
