@@ -18,12 +18,19 @@ class AccountService {
     await api.delete('/auth/me/avatar');
   }
 
+  /// POST /auth/register/send-code — email a 6-digit verification code to the
+  /// address the customer is about to register with.
+  Future<void> sendRegisterCode(String email) async {
+    await api.post('/auth/register/send-code', {'email': email});
+  }
+
   /// POST /auth/register/customer — create a customer account (Active at once).
   Future<void> registerCustomer({
     required String username,
     required String email,
     required String password,
     required String phoneNumber,
+    required String verificationCode,
     String? shippingAddress,
   }) async {
     await api.post('/auth/register/customer', {
@@ -31,6 +38,7 @@ class AccountService {
       'email': email,
       'password': password,
       'phoneNumber': phoneNumber,
+      'verificationCode': verificationCode,
       if (shippingAddress != null && shippingAddress.isNotEmpty) 'shippingAddress': shippingAddress,
     });
   }
