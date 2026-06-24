@@ -127,22 +127,23 @@ function handleGetVehicleMakes(PDO $pdo, string $vehicleType): void {
     $makes = $stmt->fetchAll(PDO::FETCH_COLUMN);
     $cacheKey = 'makes_' . $vehicleType;
 
-    if (empty($makes)) {
-        // DB completely empty — fetch synchronously so first launch isn't blank.
+    // Fetch from NHTSA synchronously when no NHTSA rows exist yet (only local
+    // seeds are present) or when the 30-day cache has expired. Background detach
+    // is unreliable on Apache/XAMPP, so we do it inline and accept the one-time
+    // latency (once every 30 days at most).
+    $nhtsaCheck = $pdo->prepare(
+        'SELECT 1 FROM vehicle_makes WHERE vehicleType = ? AND source = ? LIMIT 1'
+    );
+    $nhtsaCheck->execute([$vehicleType, 'nhtsa']);
+    $hasNhtsa = (bool) $nhtsaCheck->fetch();
+
+    if (!$hasNhtsa || _isCacheStale($pdo, $cacheKey)) {
         _replaceMakesFromNhtsa($pdo, $vehicleType, $cacheKey);
         $stmt->execute([$vehicleType]);
         $makes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        sendJson(200, true, array_values($makes));
-        return;
     }
 
-    // Return current data to the client immediately.
-    _sendAndDetach(array_values($makes));
-
-    // Background: replace stale NHTSA rows if cache expired.
-    if (_isCacheStale($pdo, $cacheKey)) {
-        _replaceMakesFromNhtsa($pdo, $vehicleType, $cacheKey);
-    }
+    sendJson(200, true, array_values($makes));
 }
 
 // GET /vehicles/models/{vehicleType}/{make}
@@ -161,21 +162,20 @@ function handleGetVehicleModels(PDO $pdo, string $vehicleType, string $make): vo
     $models = $stmt->fetchAll(PDO::FETCH_COLUMN);
     $cacheKey = 'models_' . $vehicleType . '_' . $make;
 
-    if (empty($models)) {
-        // Nothing cached — try NHTSA synchronously.
+    // Same synchronous-refresh approach as makes — background detach is
+    // unreliable on Apache/XAMPP.
+    $nhtsaCheck = $pdo->prepare(
+        'SELECT 1 FROM vehicle_models WHERE vehicleType = ? AND makeName = ? AND source = ? LIMIT 1'
+    );
+    $nhtsaCheck->execute([$vehicleType, $make, 'nhtsa']);
+    $hasNhtsa = (bool) $nhtsaCheck->fetch();
+
+    if (empty($models) || !$hasNhtsa || _isCacheStale($pdo, $cacheKey)) {
         _replaceModelsFromNhtsa($pdo, $vehicleType, $make, $cacheKey);
         $stmt->execute([$vehicleType, $make]);
         $models = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        // Empty list is valid — VehiclePicker falls back to free-text entry.
-        sendJson(200, true, array_values($models));
-        return;
     }
 
-    // Return current data immediately.
-    _sendAndDetach(array_values($models));
-
-    // Background: replace stale NHTSA rows if cache expired.
-    if (_isCacheStale($pdo, $cacheKey)) {
-        _replaceModelsFromNhtsa($pdo, $vehicleType, $make, $cacheKey);
-    }
+    // Empty list is valid — VehiclePicker falls back to free-text entry.
+    sendJson(200, true, array_values($models));
 }
