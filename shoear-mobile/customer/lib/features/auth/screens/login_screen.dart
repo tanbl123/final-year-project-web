@@ -133,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Email or username',
                               border:    const OutlineInputBorder(),
+                              helperText: ' ',
                               errorText: _identifierError ?? (_loginError != null ? '' : null),
                               suffixIcon: val.text.isNotEmpty
                                   ? IconButton(
@@ -155,6 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             border: const OutlineInputBorder(),
+                            helperText: ' ',
                             errorText: _passwordError ?? _loginError,
                             suffixIcon: IconButton(
                               icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
