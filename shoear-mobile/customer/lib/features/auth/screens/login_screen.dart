@@ -111,27 +111,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // ── Google Sign-In ──
-                        _GoogleButton(
-                          onPressed: _loading ? null : _signInWithGoogle,
-                          label: 'Continue with Google',
-                        ),
-                        if (_googleError != null) ...[
-                          const SizedBox(height: 8),
-                          Text(_googleError!,
-                              style: TextStyle(color: theme.colorScheme.error, fontSize: 13)),
-                        ],
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Row(children: [
-                            Expanded(child: Divider()),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
-                              child: Text('or'),
-                            ),
-                            Expanded(child: Divider()),
-                          ]),
-                        ),
                         // ── Email / password ──
                         TextField(
                           controller: _identifier,
@@ -175,6 +154,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : const Text('Login'),
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        // ── Google Sign-In ──
+                        _GoogleButton(
+                          onPressed: _loading ? null : _signInWithGoogle,
+                          label: 'Continue with Google',
+                        ),
+                        if (_googleError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(_googleError!,
+                              style: TextStyle(color: theme.colorScheme.error, fontSize: 13)),
+                        ],
                         const SizedBox(height: 10),
                         OutlinedButton(
                           onPressed: _loading ? null : _openForgotPassword,
