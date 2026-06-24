@@ -155,17 +155,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // ── Google Sign-In ──
-                        _GoogleButton(
-                          onPressed: _loading ? null : _signInWithGoogle,
-                          label: 'Continue with Google',
-                        ),
-                        if (_googleError != null) ...[
-                          const SizedBox(height: 8),
-                          Text(_googleError!,
-                              style: TextStyle(color: theme.colorScheme.error, fontSize: 13)),
-                        ],
-                        const SizedBox(height: 10),
                         OutlinedButton(
                           onPressed: _loading ? null : _openForgotPassword,
                           child: const Padding(
@@ -177,11 +166,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           padding: EdgeInsets.symmetric(vertical: 12),
                           child: Divider(),
                         ),
-                        Text('New to ShoeAR?',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
-                        const SizedBox(height: 8),
+                        // ── Google Sign-In ──
+                        _GoogleButton(
+                          onPressed: _loading ? null : _signInWithGoogle,
+                          label: 'Continue with Google',
+                        ),
+                        if (_googleError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(_googleError!,
+                              style: TextStyle(color: theme.colorScheme.error, fontSize: 13)),
+                        ],
+                        const SizedBox(height: 10),
                         OutlinedButton(
                           onPressed: _loading
                               ? null
