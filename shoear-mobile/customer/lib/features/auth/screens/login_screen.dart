@@ -31,8 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _validateIdentifier(String val) {
     final trimmed = val.trim();
-    if (trimmed.isEmpty) return 'Email is required.';
-    if (!trimmed.contains('@')) return 'Enter a valid email address.';
+    if (trimmed.isEmpty) return 'Email or username is required.';
     return null;
   }
 
@@ -123,16 +122,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // ── Email / password ──
-                        TextField(
-                          controller: _identifier,
-                          textInputAction: TextInputAction.next,
-                          keyboardType: TextInputType.emailAddress,
-                          onChanged: (val) => setState(() => _identifierError = _validateIdentifier(val)),
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            border: const OutlineInputBorder(),
-                            errorText: _identifierError,
+                        // ── Email or username / password ──
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _identifier,
+                          builder: (_, val, __) => TextField(
+                            controller:      _identifier,
+                            textInputAction: TextInputAction.next,
+                            onChanged: (v) => setState(() => _identifierError = _validateIdentifier(v)),
+                            decoration: InputDecoration(
+                              labelText: 'Email or username',
+                              border:    const OutlineInputBorder(),
+                              errorText: _identifierError,
+                              suffixIcon: val.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () => setState(() {
+                                        _identifier.clear();
+                                        _identifierError = _validateIdentifier('');
+                                      }),
+                                    )
+                                  : null,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
