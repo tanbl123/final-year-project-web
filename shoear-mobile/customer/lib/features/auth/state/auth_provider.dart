@@ -81,6 +81,7 @@ class AuthProvider extends ChangeNotifier {
         fullName:    fullName,
         status:      s.user.status,
         phoneNumber: s.user.phoneNumber,
+        hasPassword: s.user.hasPassword,
       ),
     );
     final prefs = await SharedPreferences.getInstance();
@@ -100,6 +101,7 @@ class AuthProvider extends ChangeNotifier {
         fullName:    s.user.fullName,
         status:      s.user.status,
         phoneNumber: phoneNumber,
+        hasPassword: s.user.hasPassword,
       ),
     );
     final prefs = await SharedPreferences.getInstance();

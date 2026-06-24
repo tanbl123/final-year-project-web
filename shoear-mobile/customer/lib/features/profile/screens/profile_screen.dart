@@ -83,12 +83,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.edit),
                 label: const Text('Edit profile'),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _openChangePassword,
-                icon: const Icon(Icons.lock_outline),
-                label: const Text('Change password'),
-              ),
+              if (context.read<AuthProvider>().user?.hasPassword == true) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _openChangePassword,
+                  icon: const Icon(Icons.lock_outline),
+                  label: const Text('Change password'),
+                ),
+              ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _confirmDelete,

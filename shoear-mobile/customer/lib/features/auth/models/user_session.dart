@@ -8,6 +8,9 @@ class AuthUser {
   /// ''    = legacy session loaded before phoneNumber was tracked (assume set).
   /// other = the actual phone number.
   final String? phoneNumber;
+  /// false = Google-only account (no password set); hide "Change password".
+  /// Defaults true for legacy stored sessions that pre-date this field.
+  final bool hasPassword;
 
   AuthUser({
     required this.userId,
@@ -15,6 +18,7 @@ class AuthUser {
     required this.fullName,
     required this.status,
     this.phoneNumber,
+    this.hasPassword = true,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> j) => AuthUser(
@@ -22,8 +26,8 @@ class AuthUser {
         role:        j['role']     as String? ?? '',
         fullName:    j['fullName'] as String? ?? '',
         status:      j['status']   as String? ?? '',
-        // 'phoneNumber' absent from legacy stored sessions → treat as already set ('')
         phoneNumber: j.containsKey('phoneNumber') ? j['phoneNumber'] as String? : '',
+        hasPassword: j['hasPassword'] as bool? ?? true,
       );
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +36,7 @@ class AuthUser {
         'fullName':    fullName,
         'status':      status,
         'phoneNumber': phoneNumber,
+        'hasPassword': hasPassword,
       };
 }
 

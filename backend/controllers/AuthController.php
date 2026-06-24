@@ -526,7 +526,8 @@ function handleGoogleAuth(PDO $pdo, string $secret, array $config): void {
 
   // 1. Look up by googleId (already linked)
   $stmt = $pdo->prepare(
-    'SELECT userId, role, fullName, phoneNumber, status, rejectionReason, googleId AS gid
+    'SELECT userId, role, fullName, phoneNumber, status, rejectionReason, googleId AS gid,
+            (password IS NOT NULL) AS hasPassword
        FROM `user` WHERE googleId = :g LIMIT 1'
   );
   $stmt->execute(['g' => $googleId]);
@@ -535,7 +536,8 @@ function handleGoogleAuth(PDO $pdo, string $secret, array $config): void {
   // 2. Fall back to email match (implicit link — first Google sign-in for this email)
   if (!$user) {
     $stmt = $pdo->prepare(
-      'SELECT userId, role, fullName, phoneNumber, status, rejectionReason, googleId AS gid
+      'SELECT userId, role, fullName, phoneNumber, status, rejectionReason, googleId AS gid,
+              (password IS NOT NULL) AS hasPassword
          FROM `user` WHERE email = :e LIMIT 1'
     );
     $stmt->execute(['e' => $email]);
@@ -587,7 +589,8 @@ function handleGoogleAuth(PDO $pdo, string $secret, array $config): void {
       sendJson(500, false, null, ['code' => 'SERVER', 'message' => 'Could not create the account. Please try again.']);
     }
     $stmt = $pdo->prepare(
-      'SELECT userId, role, fullName, phoneNumber, status, rejectionReason
+      'SELECT userId, role, fullName, phoneNumber, status, rejectionReason,
+              (password IS NOT NULL) AS hasPassword
          FROM `user` WHERE userId = :id'
     );
     $stmt->execute(['id' => $userId]);
@@ -611,6 +614,7 @@ function handleGoogleAuth(PDO $pdo, string $secret, array $config): void {
       'phoneNumber'     => $user['phoneNumber'],
       'status'          => $user['status'],
       'rejectionReason' => $user['rejectionReason'],
+      'hasPassword'     => isset($user['hasPassword']) ? (bool) $user['hasPassword'] : false,
     ],
   ]);
 }
@@ -680,6 +684,7 @@ function handleLogin(PDO $pdo, string $secret): void {
       'phoneNumber'     => $user['phoneNumber'],
       'status'          => $user['status'],
       'rejectionReason' => $user['rejectionReason'],
+      'hasPassword'     => true, // password was verified above, so it is never null here
     ],
   ]);
 }
@@ -687,7 +692,8 @@ function handleLogin(PDO $pdo, string $secret): void {
 // GET /auth/me — the signed-in user's own profile (+ role-specific details).
 function handleMe(PDO $pdo, array $auth): void {
   $stmt = $pdo->prepare(
-    'SELECT userId, username, fullName, email, phoneNumber, avatarUrl, role, status, created_at
+    'SELECT userId, username, fullName, email, phoneNumber, avatarUrl, role, status, created_at,
+            (password IS NOT NULL) AS hasPassword
        FROM `user` WHERE userId = :id'
   );
   $stmt->execute(['id' => $auth['userId']]);
