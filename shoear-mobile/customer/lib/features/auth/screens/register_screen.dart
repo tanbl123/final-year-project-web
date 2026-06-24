@@ -355,16 +355,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text('Already have an account?',
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
-          TextButton(
-            onPressed: _loading ? null : () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
-            child: const Text('Sign in'),
+        OutlinedButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('I already have an account'),
           ),
-        ]),
+        ),
       ],
     );
   }
