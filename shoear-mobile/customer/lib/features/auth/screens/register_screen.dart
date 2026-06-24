@@ -169,7 +169,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             username:         _username.text.trim(),
             email:            _email.text.trim(),
             password:         _password.text,
-            fullName:         _username.text.trim(),
             phoneNumber:      _phone.text.trim(),
             verificationCode: code,
             shippingAddress:  _address.text.trim(),
