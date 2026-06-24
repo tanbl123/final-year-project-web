@@ -115,9 +115,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _identifier,
                           textInputAction: TextInputAction.next,
-                          onChanged: _identifierError == null
-                              ? null
-                              : (_) => setState(() => _identifierError = null),
+                          keyboardType: TextInputType.emailAddress,
+                          onChanged: (val) {
+                            final trimmed = val.trim();
+                            setState(() {
+                              if (trimmed.isEmpty) {
+                                _identifierError = 'Email is required.';
+                              } else if (!trimmed.contains('@')) {
+                                _identifierError = 'Enter a valid email address.';
+                              } else {
+                                _identifierError = null;
+                              }
+                            });
+                          },
                           decoration: InputDecoration(
                             labelText: 'Email',
                             border: const OutlineInputBorder(),
@@ -128,9 +138,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _password,
                           obscureText: _obscure,
-                          onChanged: _passwordError == null
-                              ? null
-                              : (_) => setState(() => _passwordError = null),
+                          onChanged: (val) {
+                            setState(() {
+                              _passwordError = val.isEmpty ? 'Password is required.' : null;
+                            });
+                          },
                           onSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
                             labelText: 'Password',
