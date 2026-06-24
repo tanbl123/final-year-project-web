@@ -47,6 +47,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscure   = true;
   bool _loading   = false;
   bool _resending = false;
+  // The username mirrors the email's local part until the user edits it
+  // (same "follow until touched" pattern as the supplier web register page).
+  bool _usernameEdited = false;
 
   String? _usernameError;
   String? _emailError;
@@ -102,6 +105,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (t.isEmpty) return 'Email is required.';
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(t)) return 'Please enter a valid email.';
     return null;
+  }
+
+  // Reduce an email's local part to a valid username body — lowercase,
+  // [a-z0-9_] only, max 20 chars — mirroring the backend's usernameSlug().
+  String _usernameFromEmail(String email) {
+    final local = email.split('@').first;
+    final slug  = local.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    return slug.length > 20 ? slug.substring(0, 20) : slug;
+  }
+
+  // While the user hasn't touched the username field, keep it in sync with
+  // the email they're typing.
+  void _syncUsernameFromEmail(String email) {
+    if (_usernameEdited) return;
+    final derived = _usernameFromEmail(email);
+    _username.text = derived;
+    _usernameError = derived.isEmpty ? null : _validateUsername(derived);
   }
 
   String? _validatePassword(String v) {
@@ -272,7 +292,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           focusNode:  _usernameFocus,
           label:  'Username',
           error:  _usernameError,
-          onChanged: (v) => setState(() => _usernameError = _validateUsername(v)),
+          onChanged: (v) => setState(() {
+            _usernameEdited = true;          // stop mirroring the email
+            _usernameError  = _validateUsername(v);
+          }),
         ),
         _field(
           controller: _email,
@@ -280,7 +303,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           label:    'Email',
           keyboard: TextInputType.emailAddress,
           error:    _emailError,
-          onChanged: (v) => setState(() => _emailError = _validateEmail(v)),
+          onChanged: (v) => setState(() {
+            _emailError = _validateEmail(v);
+            _syncUsernameFromEmail(v.trim());
+          }),
         ),
         TextField(
           controller:  _password,
