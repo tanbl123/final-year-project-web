@@ -132,6 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 16),
                         // ── Password ──
                         TextField(
                           controller:  _password,
@@ -153,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 20),
                         FilledButton(
                           onPressed: _loading ? null : _submit,
                           child: Padding(
