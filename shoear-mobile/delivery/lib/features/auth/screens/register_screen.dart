@@ -49,8 +49,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordFocus     = FocusNode();
   final _confirmFocus      = FocusNode();
 
-  bool _obscure   = true;
-  bool _loading   = false;
+  bool _obscurePw  = true;
+  bool _obscureCfm = true;
+  bool _loading    = false;
   bool _resending = false;
 
   String? _fullNameError;
@@ -300,6 +301,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
             onChanged: (v) => setState(() => _phoneError = _validatePhone(v)),
           ),
+          // ── Account security ──
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: TextField(
+              controller:  _password,
+              focusNode:   _passwordFocus,
+              obscureText: _obscurePw,
+              onChanged: (v) => setState(() {
+                _passwordError = _validatePassword(v);
+                if (_confirm.text.isNotEmpty) _confirmError = _validateConfirm();
+              }),
+              decoration: InputDecoration(
+                labelText:  'Password',
+                border:     const OutlineInputBorder(),
+                errorText:  _passwordError,
+                suffixIcon: IconButton(
+                  icon: Icon(_obscurePw ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscurePw = !_obscurePw),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: TextField(
+              controller:  _confirm,
+              focusNode:   _confirmFocus,
+              obscureText: _obscureCfm,
+              onChanged:   (_) => setState(() => _confirmError = _validateConfirm()),
+              decoration:  InputDecoration(
+                labelText:  'Confirm password',
+                border:     const OutlineInputBorder(),
+                errorText:  _confirmError,
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureCfm ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureCfm = !_obscureCfm),
+                ),
+              ),
+            ),
+          ),
           // ── Vehicle details ──
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -328,7 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onModelChanged: () => setState(() => _vehicleModelError = _validateModel(_vehicleModel.text)),
           ),
           Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: 24),
             child: TextField(
               controller:         _vehiclePlate,
               focusNode:          _vehiclePlateFocus,
@@ -344,44 +385,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ),
-          TextField(
-            controller:  _password,
-            focusNode:   _passwordFocus,
-            obscureText: _obscure,
-            onChanged: (v) => setState(() {
-              _passwordError = _validatePassword(v);
-              if (_confirm.text.isNotEmpty) _confirmError = _validateConfirm();
-            }),
-            decoration: InputDecoration(
-              labelText:  'Password',
-              border:     const OutlineInputBorder(),
-              errorText:  _passwordError,
-              suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscure = !_obscure),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller:  _confirm,
-            focusNode:   _confirmFocus,
-            obscureText: _obscure,
-            onChanged:   (_) => setState(() => _confirmError = _validateConfirm()),
-            decoration:  InputDecoration(
-              labelText: 'Confirm password',
-              border:    const OutlineInputBorder(),
-              errorText: _confirmError,
-            ),
-          ),
-          const SizedBox(height: 24),
           FilledButton(
             onPressed: _loading ? null : _sendCode,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: _loading
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Send verification code'),
+                  : const Text('Submit'),
             ),
           ),
         ],
