@@ -263,7 +263,11 @@ class _VehiclePickerState extends State<VehiclePicker> {
               errorText: error,
               suffixIcon: const Icon(Icons.arrow_drop_down),
             ),
-            child: value == null ? null : Text(value, overflow: TextOverflow.ellipsis),
+            child: value == null ? null : Text(
+              value,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            ),
           ),
         ),
       );
