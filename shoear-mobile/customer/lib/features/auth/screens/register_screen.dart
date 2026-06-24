@@ -362,9 +362,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 12),
         OutlinedButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-              ),
+          onPressed: _loading ? null : () => Navigator.of(context).pop(),
           child: const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Text('I already have an account'),

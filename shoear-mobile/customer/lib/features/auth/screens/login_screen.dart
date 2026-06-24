@@ -189,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         OutlinedButton(
                           onPressed: _loading
                               ? null
-                              : () => Navigator.of(context).pushReplacement(
+                              : () => Navigator.of(context).push(
                                     MaterialPageRoute(builder: (_) => const RegisterScreen()),
                                   ),
                           child: const Padding(
