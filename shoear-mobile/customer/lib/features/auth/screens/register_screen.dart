@@ -44,7 +44,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordFocus = FocusNode();
   final _confirmFocus  = FocusNode();
 
-  bool _obscure   = true;
+  bool _obscurePw  = true;
+  bool _obscureCfm = true;
   bool _loading   = false;
   bool _resending = false;
   // The username mirrors the email's local part until the user edits it
@@ -306,7 +307,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         TextField(
           controller:  _password,
           focusNode:   _passwordFocus,
-          obscureText: _obscure,
+          obscureText: _obscurePw,
           onChanged: (v) => setState(() {
             _passwordError = _validatePassword(v);
             if (_confirm.text.isNotEmpty) _confirmError = _validateConfirm();
@@ -316,8 +317,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             border:     const OutlineInputBorder(),
             errorText:  _passwordError,
             suffixIcon: IconButton(
-              icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(_obscurePw ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => _obscurePw = !_obscurePw),
             ),
           ),
         ),
@@ -325,15 +326,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         TextField(
           controller:  _confirm,
           focusNode:   _confirmFocus,
-          obscureText: _obscure,
+          obscureText: _obscureCfm,
           onChanged:   (_) => setState(() => _confirmError = _validateConfirm()),
           decoration:  InputDecoration(
             labelText: 'Confirm password',
             border:    const OutlineInputBorder(),
             errorText: _confirmError,
             suffixIcon: IconButton(
-              icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(_obscureCfm ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => _obscureCfm = !_obscureCfm),
             ),
           ),
         ),
