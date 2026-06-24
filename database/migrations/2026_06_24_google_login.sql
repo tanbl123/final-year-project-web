@@ -7,5 +7,5 @@
 ALTER TABLE `user`
   MODIFY COLUMN password     VARCHAR(255) NULL    COMMENT 'NULL for Google Sign-In-only accounts',
   MODIFY COLUMN phoneNumber  VARCHAR(20)  NULL    COMMENT 'NULL for Google users until collected at checkout',
-  ADD    COLUMN googleId     VARCHAR(255) NULL UNIQUE AFTER password
-         COMMENT 'Google sub claim; NULL for email/password accounts';
+  ADD    COLUMN googleId     VARCHAR(255) NULL UNIQUE
+         COMMENT 'Google sub claim; NULL for email/password accounts' AFTER password;
