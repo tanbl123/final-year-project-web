@@ -304,9 +304,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboard: TextInputType.emailAddress,
           error:    _emailError,
           onChanged: (v) => setState(() {
-            _emailError      = _validateEmail(v);
-            _usernameEdited  = false;   // editing email always re-derives username
-            _syncUsernameFromEmail(v.trim());
+            _emailError = _validateEmail(v);
+            // Only auto-fill username once the email is fully valid —
+            // same behaviour as Instagram (wait for a real address first).
+            if (_emailError == null) {
+              _usernameEdited = false;
+              _syncUsernameFromEmail(v.trim());
+            }
           }),
         ),
         TextField(
