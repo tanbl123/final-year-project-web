@@ -104,7 +104,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (_addrError != null) return;
     if (_needsPhone && _phoneError != null) return;
 
+    final address = _addressCtrl.text.trim();
+
     if (_needsPhone) {
+      final phone = _phoneCtrl.text.trim();
       setState(() => _phoneError = null);
       try {
         await context.read<AccountService>().updatePhone(phone);
