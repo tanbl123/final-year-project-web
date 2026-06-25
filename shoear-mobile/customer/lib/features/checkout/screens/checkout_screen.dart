@@ -21,7 +21,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _nameCtrl    = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl   = TextEditingController();
-  String _method      = 'Stripe';
   bool _loadingAddr   = true;
   bool _placing       = false;
   bool _nameTouched   = false;
@@ -127,22 +126,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final created = await orders.checkout(address);
 
-      if (_method == 'Stripe') {
-        final pi = await orders.createPaymentIntent(created.orderId);
-        Stripe.publishableKey = pi['publishableKey'] as String? ?? '';
-        await Stripe.instance.applySettings();
-        await Stripe.instance.initPaymentSheet(
-          paymentSheetParameters: SetupPaymentSheetParameters(
-            paymentIntentClientSecret: pi['clientSecret'] as String,
-            merchantDisplayName: 'ShoeAR',
-          ),
-        );
-        await Stripe.instance.presentPaymentSheet();
-        await orders.pay(created.orderId, 'Stripe',
-            paymentIntentId: pi['paymentIntentId'] as String?);
-      } else {
-        await orders.pay(created.orderId, _method);
-      }
+      final pi = await orders.createPaymentIntent(created.orderId);
+      Stripe.publishableKey = pi['publishableKey'] as String? ?? '';
+      await Stripe.instance.applySettings();
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: pi['clientSecret'] as String,
+          merchantDisplayName: 'ShoeAR',
+        ),
+      );
+      await Stripe.instance.presentPaymentSheet();
+      await orders.pay(created.orderId, 'Stripe',
+          paymentIntentId: pi['paymentIntentId'] as String?);
 
       final receipt = await orders.getReceipt(created.orderId);
       await cart.refresh();
@@ -314,22 +309,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   title: 'Payment Method',
                   child: Column(
                     children: [
-                      _PaymentOption(
-                        value:      'Stripe',
-                        groupValue: _method,
-                        icon:       Icons.credit_card,
-                        label:      'Credit / Debit Card',
-                        subtitle:   'Secured by Stripe',
-                        onChanged:  (v) => setState(() => _method = v),
-                      ),
-                      const SizedBox(height: 8),
-                      _PaymentOption(
-                        value:      'PayPal',
-                        groupValue: _method,
-                        icon:       Icons.account_balance_wallet_outlined,
-                        label:      'PayPal',
-                        subtitle:   'Simulated payment',
-                        onChanged:  (v) => setState(() => _method = v),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
+                          border: Border.all(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.credit_card, size: 20, color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Credit / Debit Card',
+                                      style: TextStyle(fontWeight: FontWeight.w600)),
+                                  Text('Secured by Stripe',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -562,90 +574,6 @@ class _Tag extends StatelessWidget {
       ),
       child: Text(label,
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
-    );
-  }
-}
-
-// ── Payment option card ───────────────────────────────────────────────────────
-
-class _PaymentOption extends StatelessWidget {
-  final String value;
-  final String groupValue;
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final ValueChanged<String> onChanged;
-
-  const _PaymentOption({
-    required this.value,
-    required this.groupValue,
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme    = Theme.of(context);
-    final selected = value == groupValue;
-
-    return GestureDetector(
-      onTap: () => onChanged(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-              : Colors.grey.shade50,
-          border: Border.all(
-            color: selected ? theme.colorScheme.primary : Colors.grey.shade300,
-            width: selected ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: selected
-                    ? theme.colorScheme.primary
-                    : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon,
-                  size: 20,
-                  color: selected ? Colors.white : Colors.grey.shade600),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: selected
-                              ? theme.colorScheme.primary
-                              : Colors.black87)),
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade500)),
-                ],
-              ),
-            ),
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: selected ? theme.colorScheme.primary : Colors.grey.shade400,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
