@@ -18,16 +18,31 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final _nameCtrl    = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _phoneCtrl   = TextEditingController();
+  // The 16 Malaysian states + federal territories (must match the backend list).
+  static const _states = [
+    'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang',
+    'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor',
+    'Terengganu', 'Kuala Lumpur', 'Labuan', 'Putrajaya',
+  ];
+
+  final _nameCtrl     = TextEditingController();
+  final _line1Ctrl    = TextEditingController();
+  final _line2Ctrl    = TextEditingController();
+  final _postcodeCtrl = TextEditingController();
+  final _cityCtrl     = TextEditingController();
+  final _phoneCtrl    = TextEditingController();
+  String? _state;
+
   bool _loadingAddr   = true;
   bool _placing       = false;
   bool _nameTouched   = false;
   bool _phoneTouched  = false;
   bool _addrTouched   = false;
   String? _nameError;
-  String? _addrError;
+  String? _line1Error;
+  String? _postcodeError;
+  String? _cityError;
+  String? _stateError;
   String? _phoneError;
 
   bool get _needsPhone => context.read<AuthProvider>().user?.phoneNumber == null;
@@ -49,12 +64,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return null;
   }
 
-  String? _validateAddress(String value) {
+  String? _validateLine1(String value) {
     final v = value.trim();
-    if (v.isEmpty) return 'A delivery address is required.';
-    if (v.length < 10) return 'Please enter a complete delivery address.';
-    if (v.length > 255) return 'Address is too long (max 255 characters).';
+    if (v.isEmpty) return 'Address line 1 is required.';
+    if (v.length > 255) return 'Address is too long.';
     return null;
+  }
+
+  String? _validatePostcode(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return 'Postcode is required.';
+    if (!RegExp(r'^\d{5}$').hasMatch(v)) return 'Postcode must be 5 digits.';
+    return null;
+  }
+
+  String? _validateCity(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return 'City is required.';
+    if (v.length > 100) return 'City name is too long.';
+    return null;
+  }
+
+  // Run every address validator and update the per-field error state.
+  // Returns true when all parts are valid.
+  bool _runAddressValidation() {
+    setState(() {
+      _line1Error    = _validateLine1(_line1Ctrl.text);
+      _postcodeError = _validatePostcode(_postcodeCtrl.text);
+      _cityError     = _validateCity(_cityCtrl.text);
+      _stateError    = _state == null ? 'Please select a state.' : null;
+    });
+    return _line1Error == null &&
+        _postcodeError == null &&
+        _cityError == null &&
+        _stateError == null;
   }
 
   @override
@@ -70,16 +113,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _addressCtrl.dispose();
+    _line1Ctrl.dispose();
+    _line2Ctrl.dispose();
+    _postcodeCtrl.dispose();
+    _cityCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _prefillAddress() async {
     try {
-      final saved = await context.read<OrderService>().savedShippingAddress();
-      if (mounted && saved != null && _addressCtrl.text.isEmpty) {
-        _addressCtrl.text = saved;
+      final saved = await context.read<OrderService>().savedAddress();
+      if (mounted && saved.isNotEmpty && _line1Ctrl.text.isEmpty) {
+        _line1Ctrl.text    = saved['addressLine1'] ?? '';
+        _line2Ctrl.text    = saved['addressLine2'] ?? '';
+        _postcodeCtrl.text = saved['postcode'] ?? '';
+        _cityCtrl.text     = saved['city'] ?? '';
+        final s = saved['state'] ?? '';
+        if (_states.contains(s)) _state = s;
       }
     } catch (_) {
       // non-fatal
@@ -95,15 +146,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _addrTouched  = true;
       _phoneTouched = true;
       _nameError    = _validateName(_nameCtrl.text);
-      _addrError    = _validateAddress(_addressCtrl.text);
       if (_needsPhone) _phoneError = _validatePhone(_phoneCtrl.text);
     });
+    final addressOk = _runAddressValidation();
 
     if (_nameError != null) return;
-    if (_addrError != null) return;
+    if (!addressOk) return;
     if (_needsPhone && _phoneError != null) return;
-
-    final address = _addressCtrl.text.trim();
 
     if (_needsPhone) {
       final phone = _phoneCtrl.text.trim();
@@ -117,14 +166,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
 
-    setState(() {
-      _addrError = null;
-      _placing   = true;
-    });
+    setState(() => _placing = true);
     final orders = context.read<OrderService>();
     final cart   = context.read<CartProvider>();
     try {
-      final created = await orders.checkout(address);
+      final created = await orders.checkout(
+        addressLine1: _line1Ctrl.text.trim(),
+        addressLine2: _line2Ctrl.text.trim(),
+        postcode:     _postcodeCtrl.text.trim(),
+        city:         _cityCtrl.text.trim(),
+        state:        _state!,
+      );
 
       final pi = await orders.createPaymentIntent(created.orderId);
       Stripe.publishableKey = pi['publishableKey'] as String? ?? '';
@@ -169,6 +221,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() => _placing = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
+  }
+
+  // Shared builder for the structured address text fields.
+  Widget _addrField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    required String? error,
+    required ValueChanged<String> onChanged,
+    TextInputType? keyboardType,
+    int? maxLength,
+  }) {
+    return TextField(
+      controller:   controller,
+      keyboardType: keyboardType,
+      maxLength:    maxLength,
+      decoration: InputDecoration(
+        hintText:   hint,
+        border:     const OutlineInputBorder(),
+        errorText:  error,
+        prefixIcon: Icon(icon),
+        filled:     true,
+        fillColor:  Colors.white,
+        counterText: '',
+        isDense:    true,
+      ),
+      onChanged: onChanged,
+    );
   }
 
   @override
@@ -257,30 +337,89 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         label: 'Delivery Address',
                       ),
                       const SizedBox(height: 8),
-                      _loadingAddr
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 14),
-                              child: LinearProgressIndicator())
-                          : TextField(
-                              controller: _addressCtrl,
-                              minLines:   3,
-                              maxLines:   4,
-                              decoration: InputDecoration(
-                                hintText: 'Street, city, postcode, state',
-                                border:   const OutlineInputBorder(),
-                                errorText: _addrError,
-                                filled:    true,
-                                fillColor: Colors.white,
-                                prefixIcon: const Padding(
-                                  padding: EdgeInsets.only(bottom: 40),
-                                  child: Icon(Icons.edit_location_alt_outlined),
-                                ),
+                      if (_loadingAddr)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          child: LinearProgressIndicator())
+                      else ...[
+                        // Address line 1
+                        _addrField(
+                          controller: _line1Ctrl,
+                          hint: 'Address line 1 (unit, street)',
+                          icon: Icons.home_outlined,
+                          error: _line1Error,
+                          onChanged: (v) {
+                            if (!_addrTouched) setState(() => _addrTouched = true);
+                            setState(() => _line1Error = _validateLine1(v));
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        // Address line 2 (optional)
+                        _addrField(
+                          controller: _line2Ctrl,
+                          hint: 'Address line 2 (optional)',
+                          icon: Icons.apartment_outlined,
+                          error: null,
+                          onChanged: (_) {},
+                        ),
+                        const SizedBox(height: 12),
+                        // Postcode + City on one row
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 130,
+                              child: _addrField(
+                                controller: _postcodeCtrl,
+                                hint: 'Postcode',
+                                icon: Icons.markunread_mailbox_outlined,
+                                error: _postcodeError,
+                                keyboardType: TextInputType.number,
+                                maxLength: 5,
+                                onChanged: (v) {
+                                  if (!_addrTouched) setState(() => _addrTouched = true);
+                                  setState(() => _postcodeError = _validatePostcode(v));
+                                },
                               ),
-                              onChanged: (v) {
-                                if (!_addrTouched) setState(() => _addrTouched = true);
-                                setState(() => _addrError = _validateAddress(v));
-                              },
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _addrField(
+                                controller: _cityCtrl,
+                                hint: 'City',
+                                icon: Icons.location_city_outlined,
+                                error: _cityError,
+                                onChanged: (v) {
+                                  if (!_addrTouched) setState(() => _addrTouched = true);
+                                  setState(() => _cityError = _validateCity(v));
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // State dropdown
+                        DropdownButtonFormField<String>(
+                          value: _state,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            hintText:   'Select state',
+                            border:     const OutlineInputBorder(),
+                            errorText:  _stateError,
+                            prefixIcon: const Icon(Icons.map_outlined),
+                            filled:     true,
+                            fillColor:  Colors.white,
+                          ),
+                          items: [
+                            for (final s in _states)
+                              DropdownMenuItem(value: s, child: Text(s)),
+                          ],
+                          onChanged: (v) => setState(() {
+                            _state = v;
+                            _stateError = v == null ? 'Please select a state.' : null;
+                          }),
+                        ),
+                      ],
                     ],
                   ),
                 ),

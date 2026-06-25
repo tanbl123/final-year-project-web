@@ -113,7 +113,12 @@ CREATE TABLE supplier (
 CREATE TABLE customer (
     customerId       VARCHAR(10)  NOT NULL,               -- CUS0001
     userId           VARCHAR(10)  NOT NULL,
-    shippingAddress  VARCHAR(255) NULL,
+    shippingAddress  VARCHAR(255) NULL,                   -- combined single-line address (display)
+    addressLine1     VARCHAR(255) NULL,                   -- structured parts (source of truth)
+    addressLine2     VARCHAR(255) NULL,
+    postcode         VARCHAR(10)  NULL,
+    city             VARCHAR(100) NULL,
+    state            VARCHAR(50)  NULL,
     PRIMARY KEY (customerId),
     UNIQUE KEY uq_customer_user (userId),
     CONSTRAINT fk_customer_user FOREIGN KEY (userId) REFERENCES `user`(userId)
@@ -277,7 +282,12 @@ CREATE TABLE `order` (
                               'OutForDelivery','Delivered','Completed','Cancelled')
                               NOT NULL DEFAULT 'Placed',
     orderTotalAmount     DECIMAL(10,2) NOT NULL,
-    orderDeliveryAddress VARCHAR(255)  NOT NULL,
+    orderDeliveryAddress VARCHAR(255)  NOT NULL,          -- combined single-line address (display)
+    deliveryLine1        VARCHAR(255)  NULL,              -- structured snapshot at order time
+    deliveryLine2        VARCHAR(255)  NULL,
+    deliveryPostcode     VARCHAR(10)   NULL,
+    deliveryCity         VARCHAR(100)  NULL,
+    deliveryState        VARCHAR(50)   NULL,
     PRIMARY KEY (orderId),
     KEY idx_order_customer (customerId),
     KEY idx_order_status (orderStatus),

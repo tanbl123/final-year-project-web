@@ -708,7 +708,9 @@ function handleMe(PDO $pdo, array $auth): void {
                                bankName, bankAccountName, bankAccountNumber
                           FROM supplier WHERE userId = :id');
   } elseif ($u['role'] === 'Customer') {
-    $p = $pdo->prepare('SELECT customerId, shippingAddress FROM customer WHERE userId = :id');
+    $p = $pdo->prepare('SELECT customerId, shippingAddress, addressLine1, addressLine2,
+                               postcode, city, state
+                          FROM customer WHERE userId = :id');
   } elseif ($u['role'] === 'DeliveryPersonnel') {
     $p = $pdo->prepare('SELECT deliveryPersonnelId, vehicleType, vehicleBrand, vehicleModel, vehiclePlate FROM delivery_personnel WHERE userId = :id');
   } else {

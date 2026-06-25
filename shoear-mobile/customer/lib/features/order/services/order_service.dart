@@ -6,21 +6,40 @@ class OrderService {
   final ApiClient api;
   OrderService(this.api);
 
-  /// The customer's saved shipping address (from their profile), used to
-  /// prefill the checkout address. Null when they haven't set one.
-  Future<String?> savedShippingAddress() async {
+  /// The customer's saved structured address (from their profile), used to
+  /// prefill the checkout form. Returns an empty map when none is set; keys:
+  /// addressLine1, addressLine2, postcode, city, state.
+  Future<Map<String, String>> savedAddress() async {
     final me = await api.get('/auth/me') as Map<String, dynamic>;
     final profile = me['profile'];
-    if (profile is Map && profile['shippingAddress'] is String) {
-      final s = (profile['shippingAddress'] as String).trim();
-      return s.isEmpty ? null : s;
-    }
-    return null;
+    if (profile is! Map) return {};
+    String pick(String k) => (profile[k] as String?)?.trim() ?? '';
+    return {
+      'addressLine1': pick('addressLine1'),
+      'addressLine2': pick('addressLine2'),
+      'postcode':     pick('postcode'),
+      'city':         pick('city'),
+      'state':        pick('state'),
+    };
   }
 
   /// POST /orders — turn the cart into an order (Placed) and clear the cart.
-  Future<CheckoutResult> checkout(String deliveryAddress) async => CheckoutResult.fromJson(
-        await api.post('/orders', {'deliveryAddress': deliveryAddress}) as Map<String, dynamic>,
+  /// Sends the structured Malaysian address; the backend builds the combined
+  /// display string and stores both.
+  Future<CheckoutResult> checkout({
+    required String addressLine1,
+    String addressLine2 = '',
+    required String postcode,
+    required String city,
+    required String state,
+  }) async => CheckoutResult.fromJson(
+        await api.post('/orders', {
+          'addressLine1': addressLine1,
+          'addressLine2': addressLine2,
+          'postcode':     postcode,
+          'city':         city,
+          'state':        state,
+        }) as Map<String, dynamic>,
       );
 
   /// POST /orders/{id}/payment-intent — start a Stripe payment; returns
