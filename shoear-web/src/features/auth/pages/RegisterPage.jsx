@@ -46,8 +46,8 @@ function validateForm(form) {
   // E.164: optional leading +, country code, up to 15 digits total
   if (form.phoneNumber.trim() === '') {
     errors.phoneNumber = 'Phone number is required.';
-  } else if (!/^\+?[1-9]\d{7,14}$/.test(form.phoneNumber.trim())) {
-    errors.phoneNumber = 'Enter a valid phone number in international format, e.g. +60123456789.';
+  } else if (!/^(0\d{8,10}|\+?60\d{8,10})$/.test(form.phoneNumber.trim())) {
+    errors.phoneNumber = 'Enter a valid Malaysian phone number, e.g. 0123456789.';
   }
 
   if (form.companyAddress.trim() === '') errors.companyAddress = 'Company address is required.';

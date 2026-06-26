@@ -85,9 +85,9 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
       || $businessRegNo === '' || $businessLicenseUrl === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'All fields are required.']);
   }
-  // E.164: optional leading +, country code, up to 15 digits total
-  if (!preg_match('/^\+?[1-9]\d{7,14}$/', $phoneNumber)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid phone number in international format, e.g. +60123456789.']);
+  // Malaysian phone: local (0XX...) or international (+60.../60...)
+  if (!preg_match('/^(0\d{8,10}|\+?60\d{8,10})$/', $phoneNumber)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Enter a valid Malaysian phone number, e.g. 0123456789.']);
   }
   // SSM number: new 12-digit format or old 6–8 digits + check letter
   if (!preg_match('/^(\d{12}|\d{6,8}-?[A-Za-z])$/', $businessRegNo)) {

@@ -60,8 +60,8 @@ function ResubmitApplicationPage() {
     if (f.companyName.trim() === '') e.companyName = 'Company name is required.';
     if (f.companyAddress.trim() === '') e.companyAddress = 'Company address is required.';
     if (f.phoneNumber.trim() === '') e.phoneNumber = 'Phone number is required.';
-    else if (!/^\+?[1-9]\d{7,14}$/.test(f.phoneNumber.trim())) {
-      e.phoneNumber = 'Enter a valid phone number in international format, e.g. +60123456789.';
+    else if (!/^(0\d{8,10}|\+?60\d{8,10})$/.test(f.phoneNumber.trim())) {
+      e.phoneNumber = 'Enter a valid Malaysian phone number, e.g. 0123456789.';
     }
     if (f.businessRegNo.trim() === '') {
       e.businessRegNo = 'Business registration number is required.';

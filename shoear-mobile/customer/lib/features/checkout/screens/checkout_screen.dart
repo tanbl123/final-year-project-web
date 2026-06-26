@@ -210,8 +210,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _validatePhone(String value) {
     final v = value.trim();
     if (v.isEmpty) return 'Phone number is required for delivery contact.';
-    if (!RegExp(r'^\+?[1-9]\d{7,14}$').hasMatch(v)) {
-      return 'Enter a valid phone number, e.g. +60123456789.';
+    // Malaysian phone: local (0XX-XXXXXXX, incl. landlines) or international
+    // (+60.../60...). Mobile and home numbers both start with 0 locally.
+    if (!RegExp(r'^(0\d{8,10}|\+?60\d{8,10})$').hasMatch(v)) {
+      return 'Enter a valid Malaysian phone number, e.g. 0123456789.';
     }
     return null;
   }
@@ -488,7 +490,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
                           ],
                           decoration: InputDecoration(
-                            hintText:  '+60123456789',
+                            hintText:  'e.g. 0123456789',
                             border:    const OutlineInputBorder(),
                             errorText: _phoneError,
                             prefixIcon: const Icon(Icons.phone_outlined),

@@ -113,7 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _validatePhone(String v) {
     final t = v.trim();
     if (t.isEmpty) return 'Phone number is required.';
-    if (!RegExp(r'^\+?[1-9]\d{7,14}$').hasMatch(t)) return 'Enter a valid phone number, e.g. +60123456789.';
+    if (!RegExp(r'^(0\d{8,10}|\+?60\d{8,10})$').hasMatch(t)) return 'Enter a valid Malaysian phone number, e.g. 0123456789.';
     return null;
   }
 
