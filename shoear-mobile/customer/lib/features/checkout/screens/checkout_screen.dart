@@ -527,10 +527,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ),
                         const SizedBox(height: 12),
-                        // Address line 2 (optional)
+                        // Address line 2 — unit/floor/building details (optional)
                         _addrField(
                           controller: _line2Ctrl,
-                          hint: 'Address line 2 (optional)',
+                          hint: 'Unit / Floor / Building (optional)',
                           icon: Icons.apartment_outlined,
                           error: null,
                           onChanged: (_) => setState(() {}),
