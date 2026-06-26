@@ -23,6 +23,10 @@ build/
 /windows/
 /web/
 
+# Local run script holding the Google Places API key (never commit the key).
+# Copy run.sh.example -> run.sh and paste your key in run.sh.
+run.sh
+
 # Misc
 *.log
 .DS_Store

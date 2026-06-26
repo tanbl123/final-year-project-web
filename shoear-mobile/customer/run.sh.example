@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Run the customer app with Google Places address autocomplete enabled.
+#
+# Setup (once):
+#   1. cp run.sh.example run.sh
+#   2. open run.sh and replace YOUR_KEY_HERE with your real Google Places API key
+#   3. run it:  bash run.sh
+#
+# run.sh is gitignored, so your key never gets committed. Plain `flutter run`
+# (without the key) still works — autocomplete just stays off and the app falls
+# back to the offline postcode -> city/state lookup.
+
+flutter run --dart-define=GOOGLE_PLACES_API_KEY=YOUR_KEY_HERE
