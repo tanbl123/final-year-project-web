@@ -71,6 +71,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// the customer to type it in. Cleared once they enter a postcode.
   bool _postcodePrompt = false;
 
+  /// City/state from the last Google-picked address, kept so a later typed
+  /// postcode can be cross-checked against it. Null when no address was picked.
+  String? _pickedCity;
+  String? _pickedState;
+
+  /// Set when a typed postcode resolves to a different state than the picked
+  /// address (contradictory input) — shows a warning. Null when consistent.
+  String? _addrMismatch;
+
   bool get _needsPhone => context.read<AuthProvider>().user?.phoneNumber == null;
 
   /// Debounced address search as the customer types line 1. No-op (and no
@@ -127,6 +136,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _addrAutoFilled = true;
         // Some places (areas/POIs) have no single postcode — prompt for it.
         _postcodePrompt = addr.postcode.isEmpty;
+        // Remember the picked location so a later typed postcode can be
+        // checked against it.
+        _pickedCity = addr.city.isNotEmpty ? addr.city : null;
+        _pickedState =
+            (addr.state.isNotEmpty && _states.contains(addr.state))
+                ? addr.state
+                : null;
+        _addrMismatch = null;
       }
       _addrTouched = true;
       _postcodeMatched = false;
@@ -143,6 +160,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() {
       _postcodeError = _validatePostcode(value);
       _postcodeMatched = false;
+      _addrMismatch = null; // re-evaluated below once it resolves
       if (code.isNotEmpty) _postcodePrompt = false; // they're entering it now
       // Drop any previously auto-filled city/state so a stale value from an
       // earlier postcode doesn't linger when the postcode changes. A city the
@@ -159,6 +177,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Only auto-fill if this is still the current postcode (user may type on).
     if (_postcodeCtrl.text.trim() != code) return;
     setState(() {
+      // If the customer earlier picked a Google address in a different state,
+      // the postcode contradicts it — warn them (postcode stays authoritative).
+      if (_pickedState != null && loc.state != _pickedState) {
+        _addrMismatch =
+            'Postcode $code is in ${loc.state}, but the address you picked is '
+            'in $_pickedState. Please check your postcode.';
+      } else {
+        _addrMismatch = null;
+      }
       _cityCtrl.text = loc.city;
       _cityError = null;
       if (_states.contains(loc.state)) {
@@ -500,6 +527,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             _line1Ctrl.clear();
                             _suggestions = const [];
                             _line1Error = _validateLine1('');
+                            _pickedCity = null;
+                            _pickedState = null;
+                            _addrMismatch = null;
                           }),
                         ),
                         // Google Places suggestions
@@ -561,6 +591,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ],
                           ),
                         ],
+                        if (_addrMismatch != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.warning_amber_rounded,
+                                  size: 14, color: Colors.red.shade600),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _addrMismatch!,
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.red.shade700),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         // City (auto-filled from postcode, still editable)
                         _addrField(
@@ -573,9 +621,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             setState(() {
                               _cityError = _validateCity(v);
                               // Customer is editing the city by hand — stop
-                              // treating it as auto-filled so it won't be wiped.
+                              // treating it as auto-filled so it won't be wiped,
+                              // and drop the picked-address cross-check.
                               _addrAutoFilled = false;
                               _postcodeMatched = false;
+                              _pickedCity = null;
+                              _pickedState = null;
+                              _addrMismatch = null;
                             });
                           },
                         ),
@@ -601,6 +653,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             _stateError = v == null ? 'Please select a state.' : null;
                             _postcodeMatched = false;
                             _addrAutoFilled = false;
+                            _pickedCity = null;
+                            _pickedState = null;
+                            _addrMismatch = null;
                           }),
                         ),
                         if (_postcodeMatched) ...[
