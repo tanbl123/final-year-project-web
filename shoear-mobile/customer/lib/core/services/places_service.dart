@@ -163,6 +163,32 @@ class PlacesService {
     }
   }
 
+  /// The premise portion of a suggestion's full [description] — i.e. everything
+  /// before the trailing city / state / postcode / "Malaysia". This keeps parts
+  /// like the taman/neighbourhood ("Taman Stulang") that Google often leaves
+  /// out of the structured address components. [city] is the resolved locality
+  /// (from Place Details) used to recognise the city token.
+  String premiseFromDescription(String description, String city) {
+    final tokens = description
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+    while (tokens.isNotEmpty) {
+      final last = tokens.last;
+      final isPostcode = RegExp(r'^\d{5}$').hasMatch(last);
+      final isCountry = last.toLowerCase() == 'malaysia';
+      final isCity = city.isNotEmpty && last.toLowerCase() == city.toLowerCase();
+      final isState = _normaliseState(last).isNotEmpty;
+      if (isPostcode || isCountry || isCity || isState) {
+        tokens.removeLast();
+      } else {
+        break; // reached the premise — stop trimming
+      }
+    }
+    return tokens.join(', ');
+  }
+
   /// Maps Google's state name (e.g. "Penang", "Federal Territory of Kuala
   /// Lumpur") to the app's dropdown value. Returns '' if unrecognised, leaving
   /// the state for the customer to pick manually.

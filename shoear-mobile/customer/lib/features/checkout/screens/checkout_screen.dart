@@ -111,13 +111,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _placeSessionToken = null; // session closed by the details call
     if (!mounted) return;
     setState(() {
-      // Address line 1 = street/premise only (never the city/state/postcode —
-      // those go in the dedicated fields below to avoid duplication).
-      final street = (addr != null && addr.line1.isNotEmpty)
-          ? addr.line1
-          : (s.mainText.isNotEmpty
-              ? s.mainText
-              : s.description.split(',').first.trim());
+      // Address line 1 = the premise only (street + taman), never the
+      // city/state/postcode — those go in the dedicated fields below. Build it
+      // from the suggestion text (keeps the taman, which Google often omits
+      // from address components), with sensible fallbacks.
+      String street = PlacesService.instance
+          .premiseFromDescription(s.description, addr?.city ?? '');
+      if (street.isEmpty) {
+        street = (addr != null && addr.line1.isNotEmpty)
+            ? addr.line1
+            : (s.mainText.isNotEmpty
+                ? s.mainText
+                : s.description.split(',').first.trim());
+      }
       _line1Ctrl.text = street;
       _line1Error = _validateLine1(_line1Ctrl.text);
       if (addr != null) {
