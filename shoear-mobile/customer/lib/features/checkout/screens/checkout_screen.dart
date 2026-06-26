@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 
@@ -355,15 +356,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     int? maxLength,
     VoidCallback? onClear,
     FocusNode? focusNode,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     // Show the clear (X) button only when a clear handler is given and the
     // field has text.
     final showClear = onClear != null && controller.text.isNotEmpty;
     return TextField(
-      controller:   controller,
-      focusNode:    focusNode,
-      keyboardType: keyboardType,
-      maxLength:    maxLength,
+      controller:      controller,
+      focusNode:       focusNode,
+      keyboardType:    keyboardType,
+      maxLength:       maxLength,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         hintText:   hint,
         border:     const OutlineInputBorder(),
@@ -531,6 +534,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           error: _postcodeError,
                           keyboardType: TextInputType.number,
                           maxLength: 5,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           focusNode: _postcodeFocus,
                           onChanged: _onPostcodeChanged,
                         ),
