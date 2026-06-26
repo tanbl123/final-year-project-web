@@ -121,7 +121,7 @@ class PlacesService {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final comps = (data['addressComponents'] as List?) ?? const [];
 
-      String streetNumber = '', route = '', city = '', sublocality = '',
+      String streetNumber = '', route = '', taman = '', locality = '',
           state = '', postcode = '';
       for (final c in comps) {
         final m = c as Map<String, dynamic>;
@@ -131,19 +131,27 @@ class PlacesService {
           streetNumber = longText;
         } else if (types.contains('route')) {
           route = longText;
+        } else if (taman.isEmpty &&
+            (types.contains('sublocality') ||
+                types.contains('sublocality_level_1') ||
+                types.contains('neighborhood'))) {
+          taman = longText; // e.g. "Taman Stulang"
         } else if (types.contains('locality')) {
-          city = longText;
-        } else if (types.contains('sublocality')) {
-          sublocality = longText;
+          locality = longText;
         } else if (types.contains('administrative_area_level_1')) {
           state = longText;
         } else if (types.contains('postal_code')) {
           postcode = longText;
         }
       }
-      if (city.isEmpty) city = sublocality;
-      final line1 =
+      // City is the locality; if Google didn't give one, fall back to the taman.
+      final city = locality.isNotEmpty ? locality : taman;
+      // Line 1 = street + taman (but never repeat whatever became the city).
+      final street =
           [streetNumber, route].where((s) => s.isNotEmpty).join(' ');
+      final line1 = [street, taman]
+          .where((s) => s.isNotEmpty && s != city)
+          .join(', ');
       return PlaceAddress(
         line1: line1,
         city: city,
