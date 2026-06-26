@@ -11,3 +11,20 @@
 //
 // Default below assumes the Android emulator — change it to match your setup.
 const String apiBaseUrl = 'http://10.0.2.2/shoear/api/v1';
+
+// ── Google Places (delivery address autocomplete) ───────────────────────────
+//
+// The API key is supplied at BUILD TIME, never committed to source control:
+//
+//   flutter run   --dart-define=GOOGLE_PLACES_API_KEY=AIzaSy...
+//   flutter build --dart-define=GOOGLE_PLACES_API_KEY=AIzaSy...
+//
+// When the key is empty (the default), address autocomplete stays OFF and
+// checkout falls back to manual entry + the offline postcode -> city/state
+// lookup. So the app works fully with no key; the key only ADDS autocomplete.
+const String googlePlacesApiKey =
+    String.fromEnvironment('GOOGLE_PLACES_API_KEY', defaultValue: '');
+
+/// True when a Google Places API key was provided at build time.
+bool get googlePlacesEnabled => googlePlacesApiKey.isNotEmpty;
+

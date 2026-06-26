@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,7 @@ import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/features/cart/models/cart.dart';
 import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/services/postcode_service.dart';
+import 'package:customer/core/services/places_service.dart';
 import 'package:customer/features/checkout/screens/receipt_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -54,7 +57,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// without ever wiping a city the customer entered manually.
   bool _addrAutoFilled = false;
 
+  // ── Google Places autocomplete (only active when an API key is configured) ─
+  List<PlaceSuggestion> _suggestions = const [];
+  Timer? _debounce;
+  String? _placeSessionToken;
+  bool get _placesOn => PlacesService.instance.enabled;
+
   bool get _needsPhone => context.read<AuthProvider>().user?.phoneNumber == null;
+
+  /// Debounced address search as the customer types line 1. No-op (and no
+  /// network call) when Places is disabled — line 1 stays a plain text field.
+  void _onLine1Changed(String value) {
+    if (!_placesOn) return;
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q.length < 3) {
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
+      return;
+    }
+    _placeSessionToken ??= PlacesService.instance.newSessionToken();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final results =
+          await PlacesService.instance.autocomplete(q, _placeSessionToken!);
+      if (!mounted) return;
+      setState(() => _suggestions = results);
+    });
+  }
+
+  /// Customer tapped a suggestion: fetch its structured address and fill line 1,
+  /// city, postcode, and state. Falls back to the suggestion text on any miss.
+  Future<void> _selectSuggestion(PlaceSuggestion s) async {
+    final token =
+        _placeSessionToken ?? PlacesService.instance.newSessionToken();
+    setState(() => _suggestions = const []);
+    final addr = await PlacesService.instance.details(s.placeId, token);
+    _placeSessionToken = null; // session closed by the details call
+    if (!mounted) return;
+    setState(() {
+      _line1Ctrl.text =
+          (addr != null && addr.line1.isNotEmpty) ? addr.line1 : s.description;
+      _line1Error = _validateLine1(_line1Ctrl.text);
+      if (addr != null) {
+        if (addr.city.isNotEmpty) {
+          _cityCtrl.text = addr.city;
+          _cityError = null;
+        }
+        if (addr.postcode.isNotEmpty) {
+          _postcodeCtrl.text = addr.postcode;
+          _postcodeError = null;
+        }
+        if (addr.state.isNotEmpty && _states.contains(addr.state)) {
+          _state = addr.state;
+          _stateError = null;
+        }
+        _addrAutoFilled = true;
+      }
+      _addrTouched = true;
+      _postcodeMatched = false;
+    });
+  }
 
   /// Look up the postcode and pre-fill city + state. Silent on miss — the
   /// customer just types the city manually (graceful fallback, never blocks).
@@ -155,6 +216,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _nameCtrl.dispose();
     _line1Ctrl.dispose();
     _line2Ctrl.dispose();
@@ -385,17 +447,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           padding: EdgeInsets.symmetric(vertical: 14),
                           child: LinearProgressIndicator())
                       else ...[
-                        // Address line 1
+                        // Address line 1 (with Google Places search when on)
                         _addrField(
                           controller: _line1Ctrl,
-                          hint: 'Address line 1 (unit, street)',
+                          hint: _placesOn
+                              ? 'Start typing your address…'
+                              : 'Address line 1 (unit, street)',
                           icon: Icons.home_outlined,
                           error: _line1Error,
                           onChanged: (v) {
                             if (!_addrTouched) setState(() => _addrTouched = true);
                             setState(() => _line1Error = _validateLine1(v));
+                            _onLine1Changed(v);
                           },
                         ),
+                        // Google Places suggestions
+                        if (_suggestions.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                for (final s in _suggestions)
+                                  ListTile(
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    leading: Icon(Icons.location_on_outlined,
+                                        size: 18,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary),
+                                    title: Text(s.description,
+                                        style: const TextStyle(fontSize: 13)),
+                                    onTap: () => _selectSuggestion(s),
+                                  ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(height: 12),
                         // Address line 2 (optional)
                         _addrField(
