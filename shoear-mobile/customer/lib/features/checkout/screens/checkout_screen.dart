@@ -31,7 +31,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   final _nameCtrl     = TextEditingController();
   final _line1Ctrl    = TextEditingController();
-  final _line2Ctrl    = TextEditingController();
   final _postcodeCtrl = TextEditingController();
   final _cityCtrl     = TextEditingController();
   final _phoneCtrl    = TextEditingController();
@@ -238,7 +237,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _debounce?.cancel();
     _nameCtrl.dispose();
     _line1Ctrl.dispose();
-    _line2Ctrl.dispose();
     _postcodeCtrl.dispose();
     _cityCtrl.dispose();
     _phoneCtrl.dispose();
@@ -251,7 +249,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final saved = await context.read<OrderService>().savedAddress();
       if (mounted && saved.isNotEmpty && _line1Ctrl.text.isEmpty) {
         _line1Ctrl.text    = saved['addressLine1'] ?? '';
-        _line2Ctrl.text    = saved['addressLine2'] ?? '';
         _postcodeCtrl.text = saved['postcode'] ?? '';
         _cityCtrl.text     = saved['city'] ?? '';
         final s = saved['state'] ?? '';
@@ -297,7 +294,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final created = await orders.checkout(
         addressLine1: _line1Ctrl.text.trim(),
-        addressLine2: _line2Ctrl.text.trim(),
         postcode:     _postcodeCtrl.text.trim(),
         city:         _cityCtrl.text.trim(),
         state:        _state!,
@@ -526,16 +522,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ],
                             ),
                           ),
-                        const SizedBox(height: 12),
-                        // Address line 2 — unit/floor/building details (optional)
-                        _addrField(
-                          controller: _line2Ctrl,
-                          hint: 'Unit / Floor / Building (optional)',
-                          icon: Icons.apartment_outlined,
-                          error: null,
-                          onChanged: (_) => setState(() {}),
-                          onClear: () => setState(() => _line2Ctrl.clear()),
-                        ),
                         const SizedBox(height: 12),
                         // Postcode (full width so the error text has room)
                         _addrField(
