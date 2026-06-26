@@ -8,8 +8,13 @@ import 'package:customer/config.dart';
 /// A single address suggestion shown under the address field.
 class PlaceSuggestion {
   final String placeId;
-  final String description;
-  const PlaceSuggestion({required this.placeId, required this.description});
+  final String description; // full text incl. city/state (for the list row)
+  final String mainText; // just the premise/street part (for address line 1)
+  const PlaceSuggestion({
+    required this.placeId,
+    required this.description,
+    this.mainText = '',
+  });
 }
 
 /// A resolved, structured address from a Place Details lookup. Any field may be
@@ -86,8 +91,14 @@ class PlacesService {
         final id = pp['placeId'] as String? ?? '';
         final text =
             (pp['text'] as Map<String, dynamic>?)?['text'] as String? ?? '';
+        // structuredFormat.mainText is just the premise/street (no city/state).
+        final sf = pp['structuredFormat'] as Map<String, dynamic>?;
+        final mainText =
+            (sf?['mainText'] as Map<String, dynamic>?)?['text'] as String? ??
+                '';
         if (id.isNotEmpty && text.isNotEmpty) {
-          out.add(PlaceSuggestion(placeId: id, description: text));
+          out.add(PlaceSuggestion(
+              placeId: id, description: text, mainText: mainText));
         }
       }
       return out;

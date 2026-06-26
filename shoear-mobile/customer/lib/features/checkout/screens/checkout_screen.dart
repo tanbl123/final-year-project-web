@@ -94,8 +94,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _placeSessionToken = null; // session closed by the details call
     if (!mounted) return;
     setState(() {
-      _line1Ctrl.text =
-          (addr != null && addr.line1.isNotEmpty) ? addr.line1 : s.description;
+      // Address line 1 = street/premise only (never the city/state/postcode —
+      // those go in the dedicated fields below to avoid duplication).
+      final street = (addr != null && addr.line1.isNotEmpty)
+          ? addr.line1
+          : (s.mainText.isNotEmpty
+              ? s.mainText
+              : s.description.split(',').first.trim());
+      _line1Ctrl.text = street;
       _line1Error = _validateLine1(_line1Ctrl.text);
       if (addr != null) {
         if (addr.city.isNotEmpty) {
@@ -337,7 +343,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required ValueChanged<String> onChanged,
     TextInputType? keyboardType,
     int? maxLength,
+    VoidCallback? onClear,
   }) {
+    // Show the clear (X) button only when a clear handler is given and the
+    // field has text.
+    final showClear = onClear != null && controller.text.isNotEmpty;
     return TextField(
       controller:   controller,
       keyboardType: keyboardType,
@@ -347,6 +357,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         border:     const OutlineInputBorder(),
         errorText:  error,
         prefixIcon: Icon(icon),
+        suffixIcon: showClear
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                tooltip: 'Clear',
+                onPressed: onClear,
+              )
+            : null,
         filled:     true,
         fillColor:  Colors.white,
         counterText: '',
@@ -460,6 +477,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             setState(() => _line1Error = _validateLine1(v));
                             _onLine1Changed(v);
                           },
+                          onClear: () => setState(() {
+                            _line1Ctrl.clear();
+                            _suggestions = const [];
+                            _line1Error = _validateLine1('');
+                          }),
                         ),
                         // Google Places suggestions
                         if (_suggestions.isNotEmpty)
@@ -495,7 +517,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           hint: 'Address line 2 (optional)',
                           icon: Icons.apartment_outlined,
                           error: null,
-                          onChanged: (_) {},
+                          onChanged: (_) => setState(() {}),
+                          onClear: () => setState(() => _line2Ctrl.clear()),
                         ),
                         const SizedBox(height: 12),
                         // Postcode (full width so the error text has room)
