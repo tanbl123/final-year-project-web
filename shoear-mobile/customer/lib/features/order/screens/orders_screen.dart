@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/services/order_service.dart';
+import 'package:customer/features/order/services/order_payment.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
@@ -31,11 +32,35 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   Future<List<CustomerOrderSummary>>? _future;
   bool _wasLoggedIn = false;
+  String? _payingId; // order currently being paid (shows a spinner)
 
   Future<void> _refresh() async {
     final next = context.read<OrderService>().listOrders();
     setState(() => _future = next);
     await next;
+  }
+
+  /// Resume payment for an unpaid order (Shopee's "Pay Now"). Reuses the same
+  /// Stripe flow as checkout; the server re-checks the order and stock first.
+  Future<void> _payOrder(CustomerOrderSummary order) async {
+    final orders = context.read<OrderService>();
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _payingId = order.orderId);
+    try {
+      final result = await payOrderWithStripe(orders, order.orderId);
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(result == PayResult.paid
+            ? 'Payment successful.'
+            : 'Payment cancelled — your order is still awaiting payment.'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _payingId = null);
+      await _refresh(); // reflect Paid / Cancelled / still-Placed
+    }
   }
 
   @override
@@ -101,12 +126,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
               padding: const EdgeInsets.all(12),
               itemCount: orders.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) => _OrderCard(order: orders[i], onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orders[i].orderId)),
-                );
-                _refresh(); // status may have changed while viewing
-              }),
+              itemBuilder: (context, i) => _OrderCard(
+                order: orders[i],
+                paying: _payingId == orders[i].orderId,
+                onPay: () => _payOrder(orders[i]),
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orders[i].orderId)),
+                  );
+                  _refresh(); // status may have changed while viewing
+                },
+              ),
             ),
           );
         },
@@ -117,40 +147,101 @@ class _OrdersScreenState extends State<OrdersScreen> {
 class _OrderCard extends StatelessWidget {
   final CustomerOrderSummary order;
   final VoidCallback onTap;
-  const _OrderCard({required this.order, required this.onTap});
+  final VoidCallback onPay;
+  final bool paying;
+  const _OrderCard({
+    required this.order,
+    required this.onTap,
+    required this.onPay,
+    this.paying = false,
+  });
+
+  // "3:45 PM" style time from a payBy datetime string.
+  String? _payByLabel() {
+    if (order.payBy == null) return null;
+    final dt = DateTime.tryParse(order.payBy!);
+    if (dt == null) return null;
+    final h12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour < 12 ? 'AM' : 'PM';
+    final mm = dt.minute.toString().padLeft(2, '0');
+    return '$h12:$mm $ampm';
+  }
 
   @override
   Widget build(BuildContext context) {
     final dt = order.orderDate == null ? null : DateTime.tryParse(order.orderDate!)?.toLocal();
     final dateStr = dt == null ? '' : '${dt.day}/${dt.month}/${dt.year}';
+    final payBy = _payByLabel();
     return Card(
-      child: ListTile(
-        onTap: onTap,
-        title: Row(
-          children: [
-            Text(order.orderId, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            Text('RM ${order.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text('$dateStr · ${order.itemCount} item(s)', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            onTap: onTap,
+            title: Row(
               children: [
-                _Chip(label: prettyStatus(order.orderStatus), color: kOrderStatusColors[order.orderStatus] ?? Colors.grey),
-                if (order.deliveryStatus != null)
-                  _Chip(label: 'Parcel: ${prettyStatus(order.deliveryStatus!)}', color: Colors.teal, outlined: true),
+                Text(order.orderId, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text('RM ${order.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
-          ],
-        ),
-        trailing: const Icon(Icons.chevron_right),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text('$dateStr · ${order.itemCount} item(s)', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _Chip(
+                      label: order.awaitingPayment ? 'To Pay' : prettyStatus(order.orderStatus),
+                      color: order.awaitingPayment
+                          ? Colors.orange.shade700
+                          : (kOrderStatusColors[order.orderStatus] ?? Colors.grey),
+                    ),
+                    if (order.deliveryStatus != null)
+                      _Chip(label: 'Parcel: ${prettyStatus(order.deliveryStatus!)}', color: Colors.teal, outlined: true),
+                  ],
+                ),
+              ],
+            ),
+            trailing: const Icon(Icons.chevron_right),
+          ),
+          // ── Pay-now bar for unpaid orders ──────────────────────────────
+          if (order.awaitingPayment)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      payBy == null
+                          ? 'Awaiting payment'
+                          : 'Pay before $payBy or it will be cancelled',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: paying ? null : onPay,
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                    ),
+                    child: paying
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Pay now'),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

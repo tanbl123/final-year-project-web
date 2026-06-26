@@ -3,6 +3,28 @@
 // every query is scoped to the caller: a supplier only ever sees THEIR own line
 // items and their own subtotal for an order — never another supplier's.
 
+// How long a 'Placed' (unpaid) order may wait for payment before it is
+// auto-cancelled (Shopee's "Pay within …" model). Stock is never decremented
+// for unpaid orders, so cancelling is purely a status change.
+const ORDER_PAYMENT_WINDOW_MINUTES = 60;
+
+// Cancel any 'Placed' orders left unpaid past the payment window. Pass a
+// customerId to limit the sweep to one customer, or null to sweep all. Called
+// lazily before listing orders and before any payment attempt, so no cron is
+// strictly required (a scheduled run is still nice for housekeeping).
+function cancelExpiredUnpaidOrders(PDO $pdo, ?string $customerId = null): void {
+  $sql = "UPDATE `order` o
+             SET o.orderStatus = 'Cancelled'
+           WHERE o.orderStatus = 'Placed'
+             AND o.orderDate < (NOW() - INTERVAL " . ORDER_PAYMENT_WINDOW_MINUTES . " MINUTE)
+             AND NOT EXISTS (
+                   SELECT 1 FROM payment p
+                    WHERE p.orderId = o.orderId AND p.paymentStatus = 'Successful')";
+  if ($customerId !== null) $sql .= " AND o.customerId = :cid";
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($customerId !== null ? ['cid' => $customerId] : []);
+}
+
 // GET /supplier/orders  — orders that contain at least one of this supplier's
 // products. Optional ?status= filter. Returns one summary row per order with
 // the supplier's item count and subtotal (their share only).
@@ -413,10 +435,14 @@ function handleCheckout(PDO $pdo, array $auth): void {
 // GET /orders — the customer's own orders (newest first).
 function handleListCustomerOrders(PDO $pdo, array $auth): void {
   $customerId = requireCustomerId($pdo, $auth);
+  cancelExpiredUnpaidOrders($pdo, $customerId); // tidy stale unpaid orders first
   $stmt = $pdo->prepare(
     "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount,
             (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount,
             pay.paymentStatus,
+            CASE WHEN o.orderStatus = 'Placed'
+                 THEN DATE_ADD(o.orderDate, INTERVAL " . ORDER_PAYMENT_WINDOW_MINUTES . " MINUTE)
+                 ELSE NULL END AS payBy,
             (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId
                ORDER BY FIELD(d.deliveryStatus,'Pending','Assigned','PickedUp','OutForDelivery','Delivered','Failed')
                LIMIT 1) AS deliveryStatus

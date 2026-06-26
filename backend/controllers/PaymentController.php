@@ -20,15 +20,39 @@ function handleCreatePaymentIntent(PDO $pdo, array $config, array $auth, string 
     sendJson(503, false, null, ['code' => 'STRIPE_NOT_CONFIGURED', 'message' => 'Card payment is not configured on the server.']);
   }
 
+  cancelExpiredUnpaidOrders($pdo, $customerId); // expire stale orders first
+
   $o = $pdo->prepare("SELECT orderStatus, orderTotalAmount FROM `order` WHERE orderId = :oid AND customerId = :cid");
   $o->execute(['oid' => $orderId, 'cid' => $customerId]);
   $order = $o->fetch();
   if (!$order) {
     sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
   }
+  if ($order['orderStatus'] === 'Cancelled') {
+    sendJson(409, false, null, ['code' => 'ORDER_EXPIRED', 'message' => 'This order expired and was cancelled. Please order again.']);
+  }
   if ($order['orderStatus'] !== 'Placed') {
     sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This order is not awaiting payment.']);
   }
+
+  // Pre-payment stock check: confirm every line is still in stock BEFORE we
+  // charge the card, so a long-unpaid order can't take payment for a sold-out
+  // item. (handlePayOrder still re-checks atomically as the final guard.)
+  $stk = $pdo->prepare(
+    "SELECT oi.orderQuantity AS qty, pv.stockQuantity AS stock, p.productName, oi.size
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+      WHERE oi.orderId = :oid"
+  );
+  $stk->execute(['oid' => $orderId]);
+  foreach ($stk->fetchAll() as $ln) {
+    if ((int) $ln['qty'] > (int) $ln['stock']) {
+      sendJson(409, false, null, ['code' => 'OUT_OF_STOCK',
+        'message' => "\"{$ln['productName']}\" (size {$ln['size']}) is out of stock. Please order again."]);
+    }
+  }
+
   $amount = (float) $order['orderTotalAmount'];
   $secret = $config['stripe_secret'];
 

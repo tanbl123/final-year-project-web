@@ -376,13 +376,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => ReceiptScreen(receipt: receipt)),
       );
-    } on StripeException catch (e) {
+    } on StripeException catch (_) {
+      // The order was already created (status Placed) and the cart cleared, so
+      // sync the local cart and point the customer to My Orders to pay later.
+      await cart.refresh();
       if (!mounted) return;
       setState(() => _placing = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.error.localizedMessage ?? 'Payment cancelled.')),
+        const SnackBar(content: Text(
+            'Payment cancelled. Your order is awaiting payment — finish it in My Orders.')),
       );
     } catch (e) {
+      await cart.refresh(); // keep the local cart in sync with the server
       if (!mounted) return;
       setState(() => _placing = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));

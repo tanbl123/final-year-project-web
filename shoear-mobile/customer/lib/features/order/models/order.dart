@@ -85,6 +85,7 @@ class CustomerOrderSummary {
   final int itemCount;
   final String? paymentStatus;
   final String? deliveryStatus; // rolled up across parcels
+  final String? payBy; // deadline to pay a 'Placed' order before auto-cancel
 
   CustomerOrderSummary({
     required this.orderId,
@@ -94,7 +95,11 @@ class CustomerOrderSummary {
     required this.itemCount,
     this.paymentStatus,
     this.deliveryStatus,
+    this.payBy,
   });
+
+  /// An order still awaiting payment (created but not yet paid).
+  bool get awaitingPayment => orderStatus == 'Placed';
 
   factory CustomerOrderSummary.fromJson(Map<String, dynamic> j) => CustomerOrderSummary(
         orderId: j['orderId'] as String,
@@ -104,6 +109,7 @@ class CustomerOrderSummary {
         itemCount: (j['itemCount'] as num?)?.toInt() ?? 0,
         paymentStatus: j['paymentStatus'] as String?,
         deliveryStatus: j['deliveryStatus'] as String?,
+        payBy: j['payBy'] as String?,
       );
 }
 
