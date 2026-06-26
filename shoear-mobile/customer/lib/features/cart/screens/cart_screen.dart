@@ -5,6 +5,7 @@ import 'package:customer/features/cart/models/cart.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/core/widgets/product_image.dart';
+import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/checkout/screens/checkout_screen.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 
@@ -29,10 +30,7 @@ class _CartScreenState extends State<CartScreen> {
     try {
       await action();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      if (mounted) context.showSnack(e.toString());
     }
   }
 

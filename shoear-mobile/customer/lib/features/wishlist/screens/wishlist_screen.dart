@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/wishlist/state/wishlist_provider.dart';
 import 'package:customer/core/widgets/product_image.dart';
+import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 import 'package:customer/features/catalog/screens/product_detail_screen.dart';
 
@@ -115,7 +116,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                                   await context.read<WishlistProvider>().remove(it.productId);
                                 } catch (e) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                    context.showSnack(e.toString());
                                   }
                                 }
                               },

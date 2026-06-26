@@ -9,6 +9,7 @@ import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/features/wishlist/state/wishlist_provider.dart';
 import 'package:customer/core/widgets/product_image.dart';
+import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -47,19 +48,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
     if (_selectedVariantId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a size.')));
+      context.showSnack('Please select a size.');
       return;
     }
     setState(() => _adding = true);
     try {
       await context.read<CartProvider>().add(_selectedVariantId!);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Added "${p.name}" to your cart.')),
-      );
+      context.showSnack('Added "${p.name}" to your cart.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      context.showSnack(e.toString());
     } finally {
       if (mounted) setState(() => _adding = false);
     }
@@ -73,7 +72,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       await context.read<WishlistProvider>().toggle(widget.productId);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) context.showSnack(e.toString());
     }
   }
 
@@ -217,10 +216,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: OutlinedButton.icon(
-                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('AR try-on is coming in the next update.')),
-                          ),
+                          onPressed: () => context.showSnack('AR try-on is coming in the next update.'),
                           icon: const Icon(Icons.view_in_ar),
                           label: const Text('AR Try-On'),
                           style: OutlinedButton.styleFrom(
@@ -488,10 +484,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         await reviews.update(existing.reviewId, rating, comment);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review saved.')));
+      context.showSnack('Review saved.');
       _reloadReviews();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) context.showSnack(e.toString());
     }
   }
 
@@ -515,10 +511,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       await context.read<ReviewService>().delete(reviewId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review deleted.')));
+      context.showSnack('Review deleted.');
       _reloadReviews();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) context.showSnack(e.toString());
     }
   }
 
