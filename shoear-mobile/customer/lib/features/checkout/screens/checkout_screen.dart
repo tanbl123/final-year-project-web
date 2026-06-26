@@ -127,28 +127,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _line1Ctrl.text = street;
       _line1Error = _validateLine1(_line1Ctrl.text);
       if (addr != null) {
-        if (addr.city.isNotEmpty) {
-          _cityCtrl.text = addr.city;
-          _cityError = null;
-        }
-        if (addr.postcode.isNotEmpty) {
-          _postcodeCtrl.text = addr.postcode;
-          _postcodeError = null;
-        }
-        if (addr.state.isNotEmpty && _states.contains(addr.state)) {
-          _state = addr.state;
-          _stateError = null;
-        }
+        // Always overwrite all three fields for the newly picked address —
+        // assigning even when a piece is missing clears stale values from a
+        // previously picked address (e.g. an area with no postcode).
+        final validState =
+            addr.state.isNotEmpty && _states.contains(addr.state);
+        _cityCtrl.text = addr.city;
+        _cityError = null;
+        _postcodeCtrl.text = addr.postcode;
+        _postcodeError = null;
+        _state = validState ? addr.state : null;
+        _stateError = null;
         _addrAutoFilled = true;
         // Some places (areas/POIs) have no single postcode — prompt for it.
         _postcodePrompt = addr.postcode.isEmpty;
         // Remember the picked location so a later typed postcode can be
         // checked against it.
         _pickedCity = addr.city.isNotEmpty ? addr.city : null;
-        _pickedState =
-            (addr.state.isNotEmpty && _states.contains(addr.state))
-                ? addr.state
-                : null;
+        _pickedState = validState ? addr.state : null;
         _addrMismatch = null;
       }
       _addrTouched = true;
