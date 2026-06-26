@@ -338,6 +338,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: pi['clientSecret'] as String,
           merchantDisplayName: 'ShoeAR',
+          // Brand the sheet with the app's indigo + rounded corners.
+          appearance: const PaymentSheetAppearance(
+            colors: PaymentSheetAppearanceColors(
+              primary: Color(0xFF4F46E5),
+            ),
+            shapes: PaymentSheetShape(borderRadius: 12),
+          ),
+          // We already collect the delivery address, so don't ask Stripe for a
+          // billing address (removes the confusing "United States / ZIP" box).
+          billingDetailsCollectionConfiguration:
+              const BillingDetailsCollectionConfiguration(
+            address: AddressCollectionMode.never,
+          ),
         ),
       );
       await Stripe.instance.presentPaymentSheet();
