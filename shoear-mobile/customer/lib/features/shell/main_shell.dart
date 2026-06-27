@@ -8,6 +8,19 @@ import 'package:customer/features/order/screens/orders_screen.dart';
 import 'package:customer/features/profile/screens/profile_screen.dart';
 import 'package:customer/features/wishlist/screens/wishlist_screen.dart';
 
+/// Bottom-nav tab indices, and a shared notifier so other screens (e.g. the
+/// receipt's "Continue shopping" / "View order") can switch the active tab
+/// after popping back to the shell.
+class MainTab {
+  static const home = 0;
+  static const wishlist = 1;
+  static const cart = 2;
+  static const orders = 3;
+  static const profile = 4;
+}
+
+final ValueNotifier<int> mainShellTab = ValueNotifier<int>(MainTab.home);
+
 /// Root scaffold with a bottom navigation bar — the customer's primary
 /// destinations. Tabs are kept alive in an IndexedStack so each preserves its
 /// scroll position and state when switching. (Detail pages — product, checkout,
@@ -20,8 +33,6 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _index = 0;
-
   static const _tabs = [
     CatalogScreen(),
     WishlistScreen(),
@@ -33,11 +44,13 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final cartCount = context.watch<CartProvider>().count;
-    return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
+    return ValueListenableBuilder<int>(
+      valueListenable: mainShellTab,
+      builder: (context, index, _) => Scaffold(
+      body: IndexedStack(index: index, children: _tabs),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        selectedIndex: index,
+        onDestinationSelected: (i) => mainShellTab.value = i,
         destinations: [
           const NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Home'),
           const NavigationDestination(icon: Icon(Icons.favorite_border), selectedIcon: Icon(Icons.favorite), label: 'Wishlist'),
@@ -49,6 +62,7 @@ class _MainShellState extends State<MainShell> {
           const NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Orders'),
           const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
+      ),
       ),
     );
   }

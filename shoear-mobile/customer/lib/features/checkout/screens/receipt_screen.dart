@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
+import 'package:customer/features/shell/main_shell.dart';
 
 /// Order confirmation + receipt, shown after a successful payment.
 class ReceiptScreen extends StatelessWidget {
@@ -168,11 +169,15 @@ class ReceiptScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
+                  onPressed: () {
+                    // Land on the Orders tab, then open this order's detail.
+                    final nav = Navigator.of(context);
+                    mainShellTab.value = MainTab.orders;
+                    nav.popUntil((route) => route.isFirst);
+                    nav.push(MaterialPageRoute(
                         builder: (_) =>
-                            OrderDetailScreen(orderId: receipt.orderId)),
-                  ),
+                            OrderDetailScreen(orderId: receipt.orderId)));
+                  },
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
@@ -182,8 +187,12 @@ class ReceiptScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 FilledButton(
-                  onPressed: () =>
-                      Navigator.of(context).popUntil((route) => route.isFirst),
+                  onPressed: () {
+                    // Back to Home so the customer can keep shopping (not the
+                    // now-empty Cart tab they came from).
+                    mainShellTab.value = MainTab.home;
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(52),
                     shape: RoundedRectangleBorder(
