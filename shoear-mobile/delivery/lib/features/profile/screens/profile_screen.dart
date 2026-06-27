@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:delivery/core/widgets/profile_avatar.dart';
+import 'package:delivery/core/utils/snackbar.dart';
 import 'package:delivery/features/auth/services/account_service.dart';
 import 'package:delivery/features/auth/state/auth_provider.dart';
 import 'package:delivery/features/auth/screens/change_password_screen.dart';
@@ -104,7 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (mounted) _reload();
     if (saved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
+      context.showSnack('Profile updated.');
     }
   }
 
@@ -113,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
     );
     if (ok == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed.')));
+      context.showSnack('Password changed.');
     }
   }
 }

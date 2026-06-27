@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'package:delivery/core/widgets/profile_avatar.dart';
+import 'package:delivery/core/utils/snackbar.dart';
 import 'package:delivery/features/auth/services/account_service.dart';
 import 'package:delivery/features/auth/state/auth_provider.dart';
 import 'package:delivery/features/auth/widgets/vehicle_picker.dart';
@@ -176,7 +177,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() => _avatarUrl = url);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) context.showSnack(e.toString());
     } finally {
       if (mounted) setState(() => _avatarBusy = false);
     }

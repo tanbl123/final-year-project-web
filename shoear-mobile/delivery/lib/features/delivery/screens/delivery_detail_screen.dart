@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import 'package:delivery/core/utils/snackbar.dart';
 import 'package:delivery/features/delivery/models/delivery.dart';
 import 'package:delivery/features/delivery/services/delivery_service.dart';
 import 'package:delivery/features/delivery/screens/report_issue_screen.dart';
@@ -42,8 +43,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
   void _reload() => setState(() => _future = _load());
 
-  void _toast(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  void _toast(String msg) => context.showSnack(msg);
 
   Future<void> _setStatus(String status) async {
     setState(() => _busy = true);

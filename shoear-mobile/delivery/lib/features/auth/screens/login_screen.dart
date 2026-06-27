@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:delivery/core/utils/snackbar.dart';
 import 'package:delivery/features/auth/state/auth_provider.dart';
 import 'package:delivery/features/auth/screens/register_screen.dart';
 import 'package:delivery/features/auth/screens/forgot_password_screen.dart';
@@ -47,9 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
       MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
     );
     if (reset == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Your password has been reset — please log in.')),
-      );
+      context.showSnack('Your password has been reset — please log in.');
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:delivery/core/utils/snackbar.dart';
 import 'package:delivery/features/auth/state/auth_provider.dart';
 import 'package:delivery/features/auth/widgets/vehicle_picker.dart';
 
@@ -205,7 +206,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       // Pending account — no auto-login. Pop back and tell them to wait.
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      context.showSnackBarNow(
         SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
       );
     } catch (e) {

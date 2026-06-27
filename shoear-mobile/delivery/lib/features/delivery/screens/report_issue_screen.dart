@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import 'package:delivery/core/utils/snackbar.dart';
 import 'package:delivery/features/delivery/services/delivery_service.dart';
 
 /// Courier reports a problem with a delivery: pick a structured reason, add an
@@ -74,7 +75,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _submitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        context.showSnack(e.toString());
       }
     }
   }
