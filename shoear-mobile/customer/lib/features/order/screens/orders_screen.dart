@@ -67,6 +67,29 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  // Status tabs, Shopee-style. Filtering is done over the single fetched list.
+  static const _tabs = ['All', 'To Pay', 'Paid', 'Completed', 'Cancelled'];
+
+  List<CustomerOrderSummary> _filter(List<CustomerOrderSummary> all, int tab) {
+    switch (tab) {
+      case 1: // To Pay — created but not yet paid
+        return all.where((o) => o.orderStatus == 'Placed').toList();
+      case 2: // Paid / in progress
+        return all
+            .where((o) => const ['Paid', 'Processing', 'Shipped', 'OutForDelivery']
+                .contains(o.orderStatus))
+            .toList();
+      case 3: // Completed
+        return all
+            .where((o) => const ['Delivered', 'Completed'].contains(o.orderStatus))
+            .toList();
+      case 4: // Cancelled
+        return all.where((o) => o.orderStatus == 'Cancelled').toList();
+      default: // All
+        return all;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loggedIn = context.watch<AuthProvider>().isLoggedIn;
@@ -74,9 +97,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _wasLoggedIn = loggedIn;
       _future = null; // reload on login / drop on logout
     }
-    return Scaffold(
-      appBar: AppBar(title: const Text('My Orders')),
-      body: !loggedIn ? _signInPrompt(context) : _ordersBody(context),
+    return DefaultTabController(
+      length: _tabs.length,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('My Orders'),
+          bottom: loggedIn
+              ? TabBar(
+                  isScrollable: true,
+                  tabs: [for (final t in _tabs) Tab(text: t)],
+                )
+              : null,
+        ),
+        body: !loggedIn ? _signInPrompt(context) : _ordersBody(context),
+      ),
     );
   }
 
@@ -102,49 +136,57 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget _ordersBody(BuildContext context) {
     _future ??= context.read<OrderService>().listOrders();
     return FutureBuilder<List<CustomerOrderSummary>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return _ErrorView(message: snap.error.toString(), onRetry: _refresh);
-          }
-          final orders = snap.data ?? [];
-          if (orders.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView(
-                children: [
-                  const SizedBox(height: 120),
-                  Icon(Icons.receipt_long, size: 56, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  const Center(child: Text('You have no orders yet.')),
-                ],
-              ),
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: orders.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) => _OrderCard(
-                order: orders[i],
-                paying: _payingId == orders[i].orderId,
-                onPay: () => _payOrder(orders[i]),
-                onTap: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orders[i].orderId)),
-                  );
-                  _refresh(); // status may have changed while viewing
-                },
-              ),
-            ),
-          );
-        },
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return _ErrorView(message: snap.error.toString(), onRetry: _refresh);
+        }
+        final orders = snap.data ?? [];
+        return TabBarView(
+          children: [
+            for (int t = 0; t < _tabs.length; t++) _list(_filter(orders, t)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _list(List<CustomerOrderSummary> orders) {
+    if (orders.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          children: [
+            const SizedBox(height: 120),
+            Icon(Icons.receipt_long, size: 56, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Center(child: Text('No orders here.')),
+          ],
+        ),
       );
+    }
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: orders.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, i) => _OrderCard(
+          order: orders[i],
+          paying: _payingId == orders[i].orderId,
+          onPay: () => _payOrder(orders[i]),
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orders[i].orderId)),
+            );
+            _refresh(); // status may have changed while viewing
+          },
+        ),
+      ),
+    );
   }
 }
 
