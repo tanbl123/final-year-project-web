@@ -8,6 +8,25 @@
 // for unpaid orders, so cancelling is purely a status change.
 const ORDER_PAYMENT_WINDOW_MINUTES = 60;
 
+// How many days after delivery a customer may request a refund.
+const REFUND_WINDOW_DAYS = 7;
+
+// Order is awaiting payment and not yet handed to fulfilment.
+function _orderHasActiveRefund(PDO $pdo, string $orderId): bool {
+  $s = $pdo->prepare("SELECT 1 FROM refund WHERE orderId = :oid
+                       AND refundStatus IN ('Pending','Approved','Completed') LIMIT 1");
+  $s->execute(['oid' => $orderId]);
+  return (bool) $s->fetch();
+}
+
+// Most recent delivery completion for an order, or null if not delivered.
+function _orderDeliveredAt(PDO $pdo, string $orderId): ?string {
+  $s = $pdo->prepare("SELECT MAX(deliveryDate) FROM delivery WHERE orderId = :oid");
+  $s->execute(['oid' => $orderId]);
+  $v = $s->fetchColumn();
+  return $v ?: null;
+}
+
 // Cancel any 'Placed' orders left unpaid past the payment window. Pass a
 // customerId to limit the sweep to one customer, or null to sweep all. Called
 // lazily before listing orders and before any payment attempt, so no cron is
@@ -539,5 +558,59 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
   unset($x);
   $order['refunds'] = $refunds;
 
+  // ── Action eligibility (so the app shows the right button) ──────────────
+  $hasActiveRefund = _orderHasActiveRefund($pdo, $orderId);
+  $status = $order['orderStatus'];
+  // Cancel: pre-fulfilment paid orders (nothing shipped yet), no refund yet.
+  $order['canCancel'] = in_array($status, ['Paid', 'Processing'], true) && !$hasActiveRefund;
+  // Refund: delivered/completed, within the window, no active refund.
+  $canRefund = false;
+  if (in_array($status, ['Delivered', 'Completed'], true) && !$hasActiveRefund) {
+    $ref = _orderDeliveredAt($pdo, $orderId) ?? $order['orderDate'];
+    $canRefund = time() <= strtotime($ref) + REFUND_WINDOW_DAYS * 86400;
+  }
+  $order['canRefund'] = $canRefund;
+  $order['refundWindowDays'] = REFUND_WINDOW_DAYS;
+
   sendJson(200, true, $order);
+}
+
+// POST /orders/{orderId}/cancel — customer cancels a paid order that hasn't
+// shipped yet (Paid/Processing). Full refund: the payment is marked Refunded
+// (which removes the supplier's earnings + platform commission) and stock is
+// restored since nothing was shipped.
+function handleCancelOrder(PDO $pdo, array $auth, string $orderId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $o = $pdo->prepare("SELECT orderStatus FROM `order` WHERE orderId = :oid AND customerId = :cid");
+  $o->execute(['oid' => $orderId, 'cid' => $customerId]);
+  $order = $o->fetch();
+  if (!$order) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
+  }
+  if (!in_array($order['orderStatus'], ['Paid', 'Processing'], true)) {
+    sendJson(409, false, null, ['code' => 'NOT_CANCELLABLE',
+      'message' => 'This order can no longer be cancelled. If it has been delivered, request a refund instead.']);
+  }
+  if (_orderHasActiveRefund($pdo, $orderId)) {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'A refund is already in progress for this order.']);
+  }
+  try {
+    $pdo->beginTransaction();
+    // restore stock for each line (items never shipped)
+    $items = $pdo->prepare('SELECT productVariantId, orderQuantity FROM order_item WHERE orderId = :oid');
+    $items->execute(['oid' => $orderId]);
+    $inc = $pdo->prepare('UPDATE product_variant SET stockQuantity = stockQuantity + :q WHERE productVariantId = :v');
+    foreach ($items->fetchAll() as $ln) {
+      $inc->execute(['q' => (int) $ln['orderQuantity'], 'v' => $ln['productVariantId']]);
+    }
+    $pdo->prepare("UPDATE `order` SET orderStatus = 'Cancelled' WHERE orderId = :oid")
+        ->execute(['oid' => $orderId]);
+    $pdo->prepare("UPDATE payment SET paymentStatus = 'Refunded' WHERE orderId = :oid")
+        ->execute(['oid' => $orderId]);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+    sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not cancel the order.']);
+  }
+  sendJson(200, true, ['orderId' => $orderId, 'status' => 'Cancelled']);
 }

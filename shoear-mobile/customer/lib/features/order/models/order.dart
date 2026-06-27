@@ -225,6 +225,10 @@ class CustomerOrder {
   final List<OrderItem> items;
   final List<ParcelDelivery> deliveries;
   final List<OrderRefund> refunds;
+  /// Server-computed action eligibility (refund policy lives on the backend).
+  final bool canCancel;
+  final bool canRefund;
+  final int refundWindowDays;
 
   CustomerOrder({
     required this.orderId,
@@ -238,6 +242,9 @@ class CustomerOrder {
     required this.items,
     required this.deliveries,
     required this.refunds,
+    this.canCancel = false,
+    this.canRefund = false,
+    this.refundWindowDays = 7,
   });
 
   factory CustomerOrder.fromJson(Map<String, dynamic> j) => CustomerOrder(
@@ -258,6 +265,9 @@ class CustomerOrder {
         refunds: ((j['refunds'] as List?) ?? [])
             .map((e) => OrderRefund.fromJson(e as Map<String, dynamic>))
             .toList(),
+        canCancel: j['canCancel'] as bool? ?? false,
+        canRefund: j['canRefund'] as bool? ?? false,
+        refundWindowDays: (j['refundWindowDays'] as num?)?.toInt() ?? 7,
       );
 }
 

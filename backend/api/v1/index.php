@@ -186,6 +186,12 @@ if ($method === 'POST' && preg_match('#^/orders/([^/]+)/refund$#', $path, $m)) {
   handleCreateRefund($pdo, $auth, $m[1]);
 }
 
+if ($method === 'POST' && preg_match('#^/orders/([^/]+)/cancel$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCancelOrder($pdo, $auth, $m[1]);
+}
+
 if ($method === 'GET' && $path === '/refunds') {
   $auth = requireAuth($secret);
   $pdo  = getPDO();

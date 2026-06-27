@@ -41,6 +41,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   CustomerOrder? _order;
   Object? _error;
   bool _paying = false;
+  bool _cancelling = false;
   Timer? _poll; // scoped polling while an active delivery is on screen
 
   // Order is post-payment and not yet finished → worth polling while watched.
@@ -98,12 +99,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  static const _refundableStatuses = {'Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed'};
-  static const _activeRefundStatuses = {'Pending', 'Approved', 'Completed'};
-
-  bool _canRequestRefund(CustomerOrder o) =>
-      _refundableStatuses.contains(o.orderStatus) &&
-      !o.refunds.any((r) => _activeRefundStatuses.contains(r.refundStatus));
+  Future<void> _cancelOrder() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        content: const Text(
+            "The order hasn't shipped yet, so you'll be refunded in full. This can't be undone."),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Keep order')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade400),
+            child: const Text('Cancel order'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _cancelling = true);
+    try {
+      await context.read<OrderService>().cancelOrder(widget.orderId);
+      if (!mounted) return;
+      context.showSnack('Order cancelled — you will be refunded in full.');
+      bumpRefresh();
+    } catch (e) {
+      if (mounted) context.showSnack(e.toString());
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+      await _refresh();
+    }
+  }
 
   Future<void> _payNow() async {
     setState(() => _paying = true);
@@ -178,9 +204,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? null
           : awaiting
               ? _payBar(context, order)
-              : _canRequestRefund(order)
-                  ? _refundBar(context)
-                  : null,
+              : order.canCancel
+                  ? _cancelBar(context)
+                  : order.canRefund
+                      ? _refundBar(context)
+                      : null,
+    );
+  }
+
+  Widget _cancelBar(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 12,
+                offset: const Offset(0, -3)),
+          ],
+        ),
+        child: OutlinedButton.icon(
+          onPressed: _cancelling ? null : _cancelOrder,
+          icon: _cancelling
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(Icons.cancel_outlined, size: 18, color: Colors.red.shade400),
+          label: Text('Cancel order',
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red.shade400)),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            side: BorderSide(color: Colors.red.shade200),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ),
     );
   }
 

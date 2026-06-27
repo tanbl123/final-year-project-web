@@ -77,6 +77,12 @@ class OrderService {
         await api.get('/orders/$orderId') as Map<String, dynamic>,
       );
 
+  /// POST /orders/{id}/cancel — cancel a paid order that hasn't shipped yet
+  /// (full refund). Throws if the order can no longer be cancelled.
+  Future<void> cancelOrder(String orderId) async {
+    await api.post('/orders/$orderId/cancel', {});
+  }
+
   /// POST /uploads/refund-proof — upload a supporting photo for a refund,
   /// returns its stored URL (sent back as refundProof).
   Future<String> uploadRefundProof(File photo) async {

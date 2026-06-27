@@ -150,15 +150,25 @@ function handleCreateRefund(PDO $pdo, array $auth, string $orderId): void {
   }
   if (mb_strlen($reason) > 255) { $reason = mb_substr($reason, 0, 255); }
 
-  $o = $pdo->prepare("SELECT orderStatus, orderTotalAmount FROM `order` WHERE orderId = :oid AND customerId = :cid");
+  $o = $pdo->prepare("SELECT orderStatus, orderTotalAmount, orderDate FROM `order` WHERE orderId = :oid AND customerId = :cid");
   $o->execute(['oid' => $orderId, 'cid' => $customerId]);
   $order = $o->fetch();
   if (!$order) {
     sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
   }
-  $paid = ['Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed'];
-  if (!in_array($order['orderStatus'], $paid, true)) {
-    sendJson(409, false, null, ['code' => 'NOT_REFUNDABLE', 'message' => 'Only a paid order can be refunded.']);
+  // Policy: a refund can only be requested AFTER the order is delivered, and
+  // within the refund window. (Before delivery the customer cancels instead.)
+  if (!in_array($order['orderStatus'], ['Delivered', 'Completed'], true)) {
+    sendJson(409, false, null, ['code' => 'NOT_REFUNDABLE',
+      'message' => 'You can request a refund only after the order is delivered. To cancel a paid order before it ships, use Cancel order.']);
+  }
+  $delivered = $pdo->prepare("SELECT MAX(deliveryDate) FROM delivery WHERE orderId = :oid");
+  $delivered->execute(['oid' => $orderId]);
+  $ref = $delivered->fetchColumn() ?: $order['orderDate'];
+  $window = defined('REFUND_WINDOW_DAYS') ? REFUND_WINDOW_DAYS : 7;
+  if (time() > strtotime($ref) + $window * 86400) {
+    sendJson(409, false, null, ['code' => 'WINDOW_CLOSED',
+      'message' => "The $window-day refund window for this order has closed."]);
   }
   $orderTotal = (float) $order['orderTotalAmount'];
 
