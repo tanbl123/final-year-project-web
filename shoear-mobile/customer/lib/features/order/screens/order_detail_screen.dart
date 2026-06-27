@@ -142,9 +142,44 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     )
                   : RefreshIndicator(onRefresh: _refresh, child: _body(context, order!)),
-          bottomNavigationBar: awaiting ? _payBar(context, order!) : null,
+          bottomNavigationBar: order == null
+              ? null
+              : awaiting
+                  ? _payBar(context, order)
+                  : _canRequestRefund(order)
+                      ? _refundBar(context)
+                      : null,
         );
       },
+    );
+  }
+
+  Widget _refundBar(BuildContext context) {
+    final red = Colors.red.shade400;
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 12,
+                offset: const Offset(0, -3)),
+          ],
+        ),
+        child: OutlinedButton.icon(
+          onPressed: _requestRefund,
+          icon: Icon(Icons.assignment_return_outlined, size: 18, color: red),
+          label: Text('Request a refund',
+              style: TextStyle(fontWeight: FontWeight.w600, color: red)),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            side: BorderSide(color: Colors.red.shade200),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ),
     );
   }
 
@@ -276,18 +311,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ],
 
-        if (_canRequestRefund(o)) ...[
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _requestRefund,
-            icon: const Icon(Icons.assignment_return_outlined),
-            label: const Text('Request a refund'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ],
       ],
     );
   }
