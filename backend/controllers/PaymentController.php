@@ -39,7 +39,7 @@ function handleCreatePaymentIntent(PDO $pdo, array $config, array $auth, string 
   // charge the card, so a long-unpaid order can't take payment for a sold-out
   // item. (handlePayOrder still re-checks atomically as the final guard.)
   $stk = $pdo->prepare(
-    "SELECT oi.orderQuantity AS qty, pv.stockQuantity AS stock, p.productName, oi.size
+    "SELECT oi.orderQuantity AS qty, pv.stockQuantity AS stock, p.productName, oi.orderSize AS size
        FROM order_item oi
        JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
        JOIN product p          ON p.productId = pv.productId
