@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Result of POST /orders (checkout) — the order is created (Placed) and the
 /// cart is cleared server-side; payment is the next step.
 class CheckoutResult {
@@ -174,8 +176,31 @@ class OrderRefund {
   final String refundStatus;
   final double refundAmount;
   final String? requestDate;
+  final List<String> proofUrls; // supporting evidence photos
 
-  OrderRefund({required this.refundId, required this.refundReason, required this.refundStatus, required this.refundAmount, this.requestDate});
+  OrderRefund({
+    required this.refundId,
+    required this.refundReason,
+    required this.refundStatus,
+    required this.refundAmount,
+    this.requestDate,
+    this.proofUrls = const [],
+  });
+
+  // refundProof is a single URL (legacy) or a JSON array of URLs.
+  static List<String> _parseProof(dynamic raw) {
+    final s = (raw as String?)?.trim() ?? '';
+    if (s.isEmpty) return const [];
+    if (s.startsWith('[')) {
+      try {
+        final list = jsonDecode(s);
+        if (list is List) {
+          return list.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        }
+      } catch (_) {/* fall through to single */}
+    }
+    return [s];
+  }
 
   factory OrderRefund.fromJson(Map<String, dynamic> j) => OrderRefund(
         refundId: j['refundId'] as String? ?? '',
@@ -183,6 +208,7 @@ class OrderRefund {
         refundStatus: j['refundStatus'] as String? ?? '',
         refundAmount: (j['refundAmount'] as num?)?.toDouble() ?? 0,
         requestDate: j['requestDate'] as String?,
+        proofUrls: _parseProof(j['refundProof']),
       );
 }
 

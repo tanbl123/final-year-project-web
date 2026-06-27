@@ -123,7 +123,7 @@ function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId): void {
   // refund requests on this order (per-order, so the supplier sees them here).
   // No customer PII beyond the name already shown above.
   $rf = $pdo->prepare(
-    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate
+    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate, refundProof
        FROM refund WHERE orderId = :oid ORDER BY requestDate DESC"
   );
   $rf->execute(['oid' => $orderId]);
@@ -250,7 +250,7 @@ function handleGetAdminOrder(PDO $pdo, string $orderId): void {
   $order['deliveries'] = $dl->fetchAll();
 
   $rf = $pdo->prepare(
-    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate
+    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate, refundProof
        FROM refund WHERE orderId = :oid ORDER BY requestDate DESC"
   );
   $rf->execute(['oid' => $orderId]);
@@ -530,7 +530,7 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
   $order['deliveries'] = $dl->fetchAll();
 
   $rf = $pdo->prepare(
-    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate
+    "SELECT refundId, refundReason, refundAmount, refundStatus, requestDate, refundProof
        FROM refund WHERE orderId = :oid ORDER BY requestDate DESC"
   );
   $rf->execute(['oid' => $orderId]);

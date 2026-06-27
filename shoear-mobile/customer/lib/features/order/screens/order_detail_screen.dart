@@ -11,6 +11,7 @@ import 'package:customer/features/order/services/order_payment.dart';
 import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/core/utils/refresh_bus.dart';
+import 'package:customer/features/order/screens/refund_detail_screen.dart';
 import 'package:customer/features/order/screens/orders_screen.dart' show kOrderStatusColors, prettyStatus;
 
 const Map<String, Color> _deliveryColors = {
@@ -325,14 +326,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 for (int i = 0; i < o.refunds.length; i++) ...[
                   if (i > 0) const Divider(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: Text(o.refunds[i].refundReason, maxLines: 2, overflow: TextOverflow.ellipsis)),
-                      const SizedBox(width: 8),
-                      Text('${o.refunds[i].refundStatus} · RM ${o.refunds[i].refundAmount.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
-                    ],
+                  InkWell(
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => RefundDetailScreen(refund: o.refunds[i]))),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(o.refunds[i].refundReason,
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 2),
+                                Text(
+                                    '${o.refunds[i].refundStatus} · RM ${o.refunds[i].refundAmount.toStringAsFixed(2)}',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ],
