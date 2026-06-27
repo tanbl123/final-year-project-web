@@ -78,6 +78,7 @@ function SupplierRefundsPage() {
                 <th className="text-end" style={{ width: 120 }}>Amount</th>
                 <th className="text-center" style={{ width: 120 }}>Status</th>
                 <th style={{ width: 120 }}>Requested</th>
+                <th className="text-center" style={{ width: 70 }}>Proof</th>
               </tr>
             </thead>
             <tbody>
@@ -94,6 +95,11 @@ function SupplierRefundsPage() {
                     <span className={`badge text-bg-${STATUS_COLORS[r.refundStatus] || 'secondary'}`}>{r.refundStatus}</span>
                   </td>
                   <td className="text-muted small">{new Date(r.requestDate).toLocaleDateString()}</td>
+                  <td className="text-center">
+                    {r.refundProof
+                      ? <a href={r.refundProof} target="_blank" rel="noreferrer">View</a>
+                      : <span className="text-muted">—</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>

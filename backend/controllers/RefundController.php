@@ -113,7 +113,7 @@ function handleListSupplierRefunds(PDO $pdo, array $auth): void {
 
   $sql =
     "SELECT r.refundId, r.orderId, r.refundReason, r.refundAmount,
-            r.refundStatus, r.requestDate
+            r.refundStatus, r.requestDate, r.refundProof
        FROM refund r
       WHERE " . implode(' AND ', $where) . "
       ORDER BY FIELD(r.refundStatus, 'Pending','Approved','Rejected','Completed'),

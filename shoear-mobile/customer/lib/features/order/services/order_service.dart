@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:customer/core/api/api_client.dart';
 import 'package:customer/features/order/models/order.dart';
 
@@ -75,9 +77,20 @@ class OrderService {
         await api.get('/orders/$orderId') as Map<String, dynamic>,
       );
 
-  /// POST /orders/{id}/refund — request a (full) refund. Throws on failure
-  /// (e.g. not a paid order, or a refund already in progress).
-  Future<void> requestRefund(String orderId, String reason) async {
-    await api.post('/orders/$orderId/refund', {'refundReason': reason});
+  /// POST /uploads/refund-proof — upload a supporting photo for a refund,
+  /// returns its stored URL (sent back as refundProof).
+  Future<String> uploadRefundProof(File photo) async {
+    final data = await api.uploadFile('/uploads/refund-proof', photo) as Map<String, dynamic>;
+    return data['url']?.toString() ?? '';
+  }
+
+  /// POST /orders/{id}/refund — request a (full) refund, optionally with a
+  /// proof image URL. Throws on failure (e.g. not a paid order, or a refund
+  /// already in progress).
+  Future<void> requestRefund(String orderId, String reason, {String? refundProof}) async {
+    await api.post('/orders/$orderId/refund', {
+      'refundReason': reason,
+      if (refundProof != null && refundProof.isNotEmpty) 'refundProof': refundProof,
+    });
   }
 }

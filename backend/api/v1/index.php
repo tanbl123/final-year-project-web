@@ -192,6 +192,12 @@ if ($method === 'GET' && $path === '/refunds') {
   handleListCustomerRefunds($pdo, $auth);
 }
 
+if ($method === 'POST' && $path === '/uploads/refund-proof') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRefundProofUpload($pdo, $auth);
+}
+
 // ── in-app notifications (the bell) + device push token (any logged-in user) ──
 if ($method === 'GET' && $path === '/notifications') {
   $auth = requireAuth($secret);

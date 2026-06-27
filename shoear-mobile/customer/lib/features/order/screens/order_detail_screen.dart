@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/services/order_service.dart';
@@ -120,15 +122,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _requestRefund() async {
-    // The dialog owns its TextEditingController and disposes it in its own
-    // State, so the controller is never disposed across an async gap.
-    final reason = await showDialog<String>(
+    // The dialog owns its controller/image and validates inline; it returns the
+    // reason + an optional proof photo only once valid.
+    final result = await showDialog<(String, File?)>(
       context: context,
       builder: (_) => const _RefundDialog(),
     );
-    if (reason == null) return; // cancelled (dialog validated the reason inline)
+    if (result == null) return; // cancelled
+    final (reason, proof) = result;
+    final orders = context.read<OrderService>();
     try {
-      await context.read<OrderService>().requestRefund(widget.orderId, reason);
+      String? proofUrl;
+      if (proof != null) proofUrl = await orders.uploadRefundProof(proof);
+      await orders.requestRefund(widget.orderId, reason, refundProof: proofUrl);
       if (!mounted) return;
       context.showSnack('Refund request submitted.');
       _refresh();
@@ -562,11 +568,21 @@ class _RefundDialog extends StatefulWidget {
 class _RefundDialogState extends State<_RefundDialog> {
   final _ctrl = TextEditingController();
   String? _error;
+  File? _proof; // optional supporting photo
 
   @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked != null) setState(() => _proof = File(picked.path));
   }
 
   void _submit() {
@@ -579,7 +595,7 @@ class _RefundDialogState extends State<_RefundDialog> {
       setState(() => _error = 'Please give a bit more detail (at least 5 characters).');
       return;
     }
-    Navigator.of(context).pop(reason);
+    Navigator.of(context).pop((reason, _proof));
   }
 
   @override
@@ -588,6 +604,7 @@ class _RefundDialogState extends State<_RefundDialog> {
       title: const Text('Request a refund'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Tell us why you want a refund. An admin will review your request.'),
           const SizedBox(height: 12),
@@ -606,6 +623,30 @@ class _RefundDialogState extends State<_RefundDialog> {
               if (_error != null) setState(() => _error = null);
             },
           ),
+          const SizedBox(height: 4),
+          // Optional supporting photo (per refund policy)
+          if (_proof == null)
+            OutlinedButton.icon(
+              onPressed: _pickPhoto,
+              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: const Text('Add a photo (optional)'),
+            )
+          else
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(_proof!, width: 48, height: 48, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('Photo attached', style: TextStyle(fontSize: 13))),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Remove photo',
+                  onPressed: () => setState(() => _proof = null),
+                ),
+              ],
+            ),
         ],
       ),
       actions: [

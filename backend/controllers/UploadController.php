@@ -17,6 +17,18 @@ function handleUpload(PDO $pdo, array $auth): void {
   sendJson(201, true, ['url' => $url]);
 }
 
+// POST /uploads/refund-proof  (multipart/form-data: file=<image>)
+// Customer-accessible: upload a supporting photo for a refund request. Returns
+// the stored image URL, which the client then sends as `refundProof`.
+function handleRefundProofUpload(PDO $pdo, array $auth): void {
+  requireCustomerId($pdo, $auth);
+  if (!isset($_FILES['file'])) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A "file" is required.']);
+  }
+  $url = storeUploadedFile($_FILES['file'], 'image');
+  sendJson(201, true, ['url' => $url]);
+}
+
 // POST /uploads/registration-doc  (multipart/form-data: file=<the file>)
 // PUBLIC: a supplier has no account/token yet while registering, so this
 // endpoint accepts a business document with no auth. It is locked to the
