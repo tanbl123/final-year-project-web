@@ -86,6 +86,9 @@ class CustomerOrderSummary {
   final String? paymentStatus;
   final String? deliveryStatus; // rolled up across parcels
   final String? payBy; // deadline to pay a 'Placed' order before auto-cancel
+  final String? previewName; // first item's product name (list preview)
+  final String? previewBrand; // first item's brand
+  final String? previewImage; // first item's image URL
 
   CustomerOrderSummary({
     required this.orderId,
@@ -96,6 +99,9 @@ class CustomerOrderSummary {
     this.paymentStatus,
     this.deliveryStatus,
     this.payBy,
+    this.previewName,
+    this.previewBrand,
+    this.previewImage,
   });
 
   /// An order still awaiting payment (created but not yet paid).
@@ -110,6 +116,9 @@ class CustomerOrderSummary {
         paymentStatus: j['paymentStatus'] as String?,
         deliveryStatus: j['deliveryStatus'] as String?,
         payBy: j['payBy'] as String?,
+        previewName: j['previewName'] as String?,
+        previewBrand: j['previewBrand'] as String?,
+        previewImage: (j['previewImage'] as String?)?.isNotEmpty == true ? j['previewImage'] as String : null,
       );
 }
 

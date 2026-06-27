@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/services/order_service.dart';
 import 'package:customer/features/order/services/order_payment.dart';
+import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
@@ -248,40 +249,64 @@ class _OrderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // header: icon + id/date + status
+                // top: order id (secondary) + status
                 Row(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: primary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.receipt_long_outlined,
-                          size: 20, color: primary),
+                    Expanded(
+                      child: Text(order.orderId,
+                          style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    _Chip(label: statusLabel, color: statusColor),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // product preview — shows WHAT was ordered at a glance
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                          width: 56,
+                          height: 56,
+                          child: ProductImage(url: order.previewImage)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(order.orderId,
+                          if ((order.previewBrand ?? '').isNotEmpty)
+                            Text(order.previewBrand!.toUpperCase(),
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: primary,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.8)),
+                          Text(
+                              order.previewName ??
+                                  '${order.itemCount} item${order.itemCount == 1 ? '' : 's'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 15)),
+                                  fontWeight: FontWeight.w600, fontSize: 14)),
                           const SizedBox(height: 2),
                           Text(
-                              '$dateStr · ${order.itemCount} item${order.itemCount == 1 ? '' : 's'}',
+                              order.itemCount > 1
+                                  ? '$dateStr · +${order.itemCount - 1} more item${order.itemCount - 1 == 1 ? '' : 's'}'
+                                  : '$dateStr · 1 item',
                               style: TextStyle(
                                   color: Colors.grey.shade600, fontSize: 12)),
                         ],
                       ),
                     ),
-                    _Chip(label: statusLabel, color: statusColor),
                   ],
                 ),
                 if (order.deliveryStatus != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   _Chip(
                       label: 'Parcel: ${prettyStatus(order.deliveryStatus!)}',
                       color: Colors.teal,

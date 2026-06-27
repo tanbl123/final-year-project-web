@@ -445,7 +445,22 @@ function handleListCustomerOrders(PDO $pdo, array $auth): void {
                  ELSE NULL END AS payBy,
             (SELECT d.deliveryStatus FROM delivery d WHERE d.orderId = o.orderId
                ORDER BY FIELD(d.deliveryStatus,'Pending','Assigned','PickedUp','OutForDelivery','Delivered','Failed')
-               LIMIT 1) AS deliveryStatus
+               LIMIT 1) AS deliveryStatus,
+            -- first item preview, so the list shows WHAT was ordered at a glance
+            (SELECT p.productName FROM order_item oi
+               JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+               JOIN product p ON p.productId = pv.productId
+              WHERE oi.orderId = o.orderId ORDER BY oi.orderItemId LIMIT 1) AS previewName,
+            (SELECT p.productBrand FROM order_item oi
+               JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+               JOIN product p ON p.productId = pv.productId
+              WHERE oi.orderId = o.orderId ORDER BY oi.orderItemId LIMIT 1) AS previewBrand,
+            (SELECT (SELECT pi.productImageUrl FROM product_image pi
+                       WHERE pi.productId = p.productId ORDER BY pi.productImageId LIMIT 1)
+               FROM order_item oi
+               JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+               JOIN product p ON p.productId = pv.productId
+              WHERE oi.orderId = o.orderId ORDER BY oi.orderItemId LIMIT 1) AS previewImage
        FROM `order` o
        LEFT JOIN payment pay ON pay.orderId = o.orderId
       WHERE o.customerId = :cid
