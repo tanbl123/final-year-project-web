@@ -35,6 +35,7 @@ import ProfilePage from './features/profile/ProfilePage';
 import PayoutsPage from './features/supplier/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
 import Sidebar from './components/Sidebar';
+import { runSweeps } from './features/admin/adminService';
 import { useState } from 'react';
 
 // Top bar + the active route's content. As a layout route it renders <Outlet/>,
@@ -47,6 +48,26 @@ function Layout() {
   function handleLogout() {
     logout();
     navigate('/login');
+  }
+
+  const [sweeping, setSweeping] = useState(false);
+  async function handleRunSweeps() {
+    setSweeping(true);
+    try {
+      const res = await runSweeps();
+      const s = res?.swept ?? {};
+      alert(
+        'Reminder sweeps run:\n' +
+        `• Payment reminders: ${s.paymentReminders ?? 0}\n` +
+        `• Abandoned-cart reminders: ${s.abandonedCarts ?? 0}\n` +
+        `• Review reminders: ${s.reviewReminders ?? 0}\n` +
+        `• Orders auto-cancelled: ${s.autoCancelled ?? 0}`
+      );
+    } catch (e) {
+      alert('Could not run sweeps: ' + (e?.message ?? 'unknown error'));
+    } finally {
+      setSweeping(false);
+    }
   }
 
   // login / register pages are full-screen on their own (no app shell)
@@ -65,6 +86,16 @@ function Layout() {
             ☰
           </button>
           <div className="d-flex align-items-center gap-3">
+            {user.role === 'Admin' && (
+              <button
+                className="btn btn-outline-primary btn-sm"
+                onClick={handleRunSweeps}
+                disabled={sweeping}
+                title="Send any due payment/cart/review reminders now (a cron does this on a timer in production)"
+              >
+                {sweeping ? 'Running…' : '🔔 Run reminders'}
+              </button>
+            )}
             <Link to="/profile" className="d-inline-flex align-items-center text-decoration-none text-dark text-nowrap">
               <Avatar name={user.fullName} size={32} className="me-2" />
               <span>{user.fullName}</span>

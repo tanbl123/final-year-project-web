@@ -13,6 +13,7 @@ require __DIR__ . '/../../lib/mail.php';
 require __DIR__ . '/../../lib/delivery.php';
 require __DIR__ . '/../../lib/notifications.php';
 require __DIR__ . '/../../lib/push.php';
+require __DIR__ . '/../../lib/sweeps.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
 require __DIR__ . '/../../controllers/ProductController.php';
@@ -491,6 +492,16 @@ if ($path === '/admin/commission') {
 }
 
 // ── admin routes (require an Admin token) ──
+// run the time-based notification sweeps on demand (payment reminders,
+// abandoned-cart, review reminders, auto-cancel). A cron can hit this too.
+if ($method === 'POST' && $path === '/admin/run-sweeps') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  $result = runNotificationSweeps($pdo);
+  sendJson(200, true, ['swept' => $result]);
+}
+
 // sidebar work-queue badge counts (one cheap call, polled by the web app)
 if ($method === 'GET' && $path === '/admin/badge-counts') {
   $auth = requireAuth($secret);

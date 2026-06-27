@@ -203,6 +203,11 @@ function handleCreateRefund(PDO $pdo, array $auth, string $orderId): void {
     'reason' => $reason, 'amt' => $amount, 'proof' => $proof !== '' ? $proof : null,
   ]);
 
+  // confirm receipt of the request (admin reviews it next)
+  if (function_exists('notifyRefundRequested')) {
+    notifyRefundRequested($pdo, $customerId, $orderId);
+  }
+
   sendJson(201, true, ['refundId' => $id, 'orderId' => $orderId, 'refundAmount' => $amount, 'refundStatus' => 'Pending']);
 }
 

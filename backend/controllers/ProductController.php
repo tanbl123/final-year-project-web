@@ -321,6 +321,14 @@ function handleUpdateProduct(PDO $pdo, array $auth, string $id): void {
     $newStatus = 'Pending';
   }
 
+  // Pre-update snapshot, so we can fire wishlist nudges (price drop / back in
+  // stock) after the commit. New total stock = sum of the incoming variants.
+  $oldPrice = (float) $current['productPrice'];
+  $oldStockStmt = $pdo->prepare('SELECT COALESCE(SUM(stockQuantity),0) FROM product_variant WHERE productId = :id');
+  $oldStockStmt->execute(['id' => $id]);
+  $oldTotalStock = (int) $oldStockStmt->fetchColumn();
+  $newTotalStock = array_sum(array_column($cleanVariants, 'stock'));
+
   try {
     $pdo->beginTransaction();
 
@@ -402,6 +410,17 @@ function handleUpdateProduct(PDO $pdo, array $auth, string $id): void {
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
     sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not update the product.']);
+  }
+
+  // Wishlist nudges (best-effort, after commit) — only for a still-visible
+  // product, so we never ping shoppers about something they can't see.
+  if ($newStatus === 'Approved') {
+    if (function_exists('notifyWishlistPriceDrop')) {
+      notifyWishlistPriceDrop($pdo, $id, $oldPrice, (float) $price);
+    }
+    if ($oldTotalStock === 0 && $newTotalStock > 0 && function_exists('notifyWishlistBackInStock')) {
+      notifyWishlistBackInStock($pdo, $id);
+    }
   }
 
   sendJson(200, true, [
@@ -501,6 +520,18 @@ function handleUpdateInventory(PDO $pdo, array $auth): void {
     sendJson(403, false, null, ['code' => 'FORBIDDEN', 'message' => 'One or more sizes are not yours.']);
   }
 
+  // Pre-update total stock per affected product, so we can detect a 0→>0
+  // restock after the commit and nudge wishlisters.
+  $prodStmt = $pdo->prepare("SELECT DISTINCT productId FROM product_variant WHERE productVariantId IN ($placeholders)");
+  $prodStmt->execute($ids);
+  $productIds = $prodStmt->fetchAll(PDO::FETCH_COLUMN);
+  $totStmt = $pdo->prepare('SELECT COALESCE(SUM(stockQuantity),0) FROM product_variant WHERE productId = :pid');
+  $oldTotals = [];
+  foreach ($productIds as $pid) {
+    $totStmt->execute(['pid' => $pid]);
+    $oldTotals[$pid] = (int) $totStmt->fetchColumn();
+  }
+
   try {
     $pdo->beginTransaction();
     $upd = $pdo->prepare('UPDATE product_variant SET stockQuantity = :stock WHERE productVariantId = :vid');
@@ -511,6 +542,17 @@ function handleUpdateInventory(PDO $pdo, array $auth): void {
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
     sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not update stock.']);
+  }
+
+  // back-in-stock nudges (best-effort) for products that went 0 → in stock
+  if (function_exists('notifyWishlistBackInStock')) {
+    foreach ($productIds as $pid) {
+      $totStmt->execute(['pid' => $pid]);
+      $newTot = (int) $totStmt->fetchColumn();
+      if (($oldTotals[$pid] ?? 0) === 0 && $newTot > 0) {
+        notifyWishlistBackInStock($pdo, $pid);  // checks 'Approved' internally
+      }
+    }
   }
 
   sendJson(200, true, ['updated' => count($clean)]);

@@ -221,9 +221,11 @@ CREATE TABLE product_model (
 -- =====================================================================
 
 CREATE TABLE cart (
-    cartId         VARCHAR(10) NOT NULL,                  -- CRT0001
-    customerId     VARCHAR(10) NOT NULL,
-    cartCreatedAt  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cartId             VARCHAR(10) NOT NULL,              -- CRT0001
+    customerId         VARCHAR(10) NOT NULL,
+    cartCreatedAt      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cartUpdatedAt      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- last add/change; drives abandoned-cart sweep
+    cartReminderSentAt DATETIME    NULL,                  -- last abandoned-cart reminder (re-armed when cartUpdatedAt moves)
     PRIMARY KEY (cartId),
     UNIQUE KEY uq_cart_customer (customerId),             -- one active cart per customer
     CONSTRAINT fk_cart_customer FOREIGN KEY (customerId) REFERENCES customer(customerId)

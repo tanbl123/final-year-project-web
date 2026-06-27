@@ -6,6 +6,13 @@ export function getBadgeCounts() {
   return apiGet('/admin/badge-counts', getToken());
 }
 
+// Run the time-based notification sweeps on demand (payment reminders,
+// abandoned-cart, review reminders, auto-cancel). Returns { swept: {...} }.
+// In production a cron hits this; the button is for live demos.
+export function runSweeps() {
+  return apiPost('/admin/run-sweeps', {}, getToken());
+}
+
 // Suppliers awaiting approval.
 export function getPendingSuppliers() {
   return apiGet('/admin/suppliers/pending', getToken());

@@ -98,3 +98,87 @@ function notifyRefundStatusChange(PDO $pdo, string $customerId, string $orderId,
   [$title, $body] = $copy[$status];
   notifyCustomerById($pdo, $customerId, 'refund', $title, $body, $orderId);
 }
+
+// Confirm to the buyer that we received their refund REQUEST (the Pending step,
+// before the admin has reviewed it). Approved/Rejected/Completed are handled by
+// notifyRefundStatusChange above.
+function notifyRefundRequested(PDO $pdo, string $customerId, string $orderId): void {
+  notifyCustomerById($pdo, $customerId, 'refund', 'Refund request received',
+    "We've received your refund request for order $orderId and will review it shortly.", $orderId);
+}
+
+// An unpaid order was auto-cancelled because payment didn't arrive in time.
+// (Distinct, clearer copy than a manual cancellation.)
+function notifyOrderAutoCancelled(PDO $pdo, string $orderId): void {
+  notifyOrderCustomer($pdo, $orderId, 'order', 'Order cancelled',
+    "We didn't receive payment for order $orderId in time, so it was cancelled and the items were released.");
+}
+
+// Remind the buyer to pay a still-unpaid order before it auto-cancels.
+function notifyPaymentReminder(PDO $pdo, string $orderId, int $minutesLeft): void {
+  $when = $minutesLeft > 1 ? "in about $minutesLeft minutes" : 'soon';
+  notifyOrderCustomer($pdo, $orderId, 'payment', 'Complete your payment',
+    "Your order $orderId is still awaiting payment and will be cancelled $when. Tap to pay now.");
+}
+
+// After delivery, nudge the buyer to review what they bought. Deep-links to the
+// order (where each item can be rated).
+function notifyReviewReminderForOrder(PDO $pdo, string $orderId): void {
+  notifyOrderCustomer($pdo, $orderId, 'review', 'How were your shoes?',
+    "Your order $orderId has arrived — tap to rate your purchase and help other shoppers.");
+}
+
+// ── wishlist re-engagement (price drop / back in stock) ──────────────────────
+
+// Every customer userId who has this product on their wishlist.
+function wishlistUserIds(PDO $pdo, string $productId): array {
+  try {
+    $stmt = $pdo->prepare(
+      "SELECT DISTINCT c.userId
+         FROM wishlist_item wi
+         JOIN wishlist w ON w.wishlistId = wi.wishlistId
+         JOIN customer c ON c.customerId = w.customerId
+        WHERE wi.productId = :pid AND c.userId IS NOT NULL"
+    );
+    $stmt->execute(['pid' => $productId]);
+    return array_column($stmt->fetchAll(), 'userId');
+  } catch (Throwable $e) {
+    return [];
+  }
+}
+
+// Is the product visible to shoppers (so a wishlist nudge makes sense)?
+function productNameIfApproved(PDO $pdo, string $productId): ?string {
+  try {
+    $stmt = $pdo->prepare("SELECT productName FROM product WHERE productId = :pid AND productStatus = 'Approved'");
+    $stmt->execute(['pid' => $productId]);
+    $name = $stmt->fetchColumn();
+    return $name === false ? null : (string) $name;
+  } catch (Throwable $e) {
+    return null;
+  }
+}
+
+// Notify wishlisters when the price actually DROPS on an approved product.
+function notifyWishlistPriceDrop(PDO $pdo, string $productId, float $oldPrice, float $newPrice): void {
+  if ($newPrice >= $oldPrice) { return; }
+  $name = productNameIfApproved($pdo, $productId);
+  if ($name === null) { return; }
+  $title = 'Price drop on your wishlist';
+  $body  = "$name is now RM " . number_format($newPrice, 2) . ' (was RM ' . number_format($oldPrice, 2) . ').';
+  foreach (wishlistUserIds($pdo, $productId) as $uid) {
+    createNotification($pdo, (string) $uid, 'wishlist', $title, $body);
+  }
+}
+
+// Notify wishlisters when an approved product goes from out-of-stock to in-stock.
+// The caller decides the 0→>0 transition; this just fans out the message.
+function notifyWishlistBackInStock(PDO $pdo, string $productId): void {
+  $name = productNameIfApproved($pdo, $productId);
+  if ($name === null) { return; }
+  $title = 'Back in stock';
+  $body  = "$name on your wishlist is available again.";
+  foreach (wishlistUserIds($pdo, $productId) as $uid) {
+    createNotification($pdo, (string) $uid, 'wishlist', $title, $body);
+  }
+}

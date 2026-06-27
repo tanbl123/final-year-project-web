@@ -105,7 +105,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   IconData _iconFor(String type) => switch (type) {
         'order' => Icons.local_shipping_outlined,
+        'delivery' => Icons.local_shipping_outlined,
         'refund' => Icons.assignment_return_outlined,
+        'payment' => Icons.payment_outlined,
+        'review' => Icons.rate_review_outlined,
+        'wishlist' => Icons.favorite_border,
+        'cart' => Icons.shopping_cart_outlined,
         _ => Icons.notifications_outlined,
       };
 

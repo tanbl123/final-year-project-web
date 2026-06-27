@@ -31,17 +31,33 @@ function _orderDeliveredAt(PDO $pdo, string $orderId): ?string {
 // customerId to limit the sweep to one customer, or null to sweep all. Called
 // lazily before listing orders and before any payment attempt, so no cron is
 // strictly required (a scheduled run is still nice for housekeeping).
-function cancelExpiredUnpaidOrders(PDO $pdo, ?string $customerId = null): void {
-  $sql = "UPDATE `order` o
-             SET o.orderStatus = 'Cancelled'
-           WHERE o.orderStatus = 'Placed'
-             AND o.orderDate < (NOW() - INTERVAL " . ORDER_PAYMENT_WINDOW_MINUTES . " MINUTE)
-             AND NOT EXISTS (
-                   SELECT 1 FROM payment p
-                    WHERE p.orderId = o.orderId AND p.paymentStatus = 'Successful')";
-  if ($customerId !== null) $sql .= " AND o.customerId = :cid";
-  $stmt = $pdo->prepare($sql);
-  $stmt->execute($customerId !== null ? ['cid' => $customerId] : []);
+function cancelExpiredUnpaidOrders(PDO $pdo, ?string $customerId = null): int {
+  // Find the expired unpaid orders first, so we can notify each buyer after
+  // cancelling (a bulk UPDATE alone can't tell us which orders it touched).
+  $find = "SELECT o.orderId FROM `order` o
+            WHERE o.orderStatus = 'Placed'
+              AND o.orderDate < (NOW() - INTERVAL " . ORDER_PAYMENT_WINDOW_MINUTES . " MINUTE)
+              AND NOT EXISTS (
+                    SELECT 1 FROM payment p
+                     WHERE p.orderId = o.orderId AND p.paymentStatus = 'Successful')";
+  if ($customerId !== null) $find .= " AND o.customerId = :cid";
+  $sel = $pdo->prepare($find);
+  $sel->execute($customerId !== null ? ['cid' => $customerId] : []);
+  $orderIds = $sel->fetchAll(PDO::FETCH_COLUMN);
+  if (!$orderIds) { return 0; }
+
+  $upd = $pdo->prepare("UPDATE `order` SET orderStatus = 'Cancelled' WHERE orderId = :oid AND orderStatus = 'Placed'");
+  $cancelled = 0;
+  foreach ($orderIds as $oid) {
+    $upd->execute(['oid' => $oid]);
+    if ($upd->rowCount() > 0) {
+      $cancelled++;
+      if (function_exists('notifyOrderAutoCancelled')) {
+        notifyOrderAutoCancelled($pdo, $oid);
+      }
+    }
+  }
+  return $cancelled;
 }
 
 // GET /supplier/orders  — orders that contain at least one of this supplier's
@@ -620,6 +636,10 @@ function handleCancelOrder(PDO $pdo, array $auth, string $orderId): void {
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
     sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not cancel the order.']);
+  }
+  // tell the buyer their cancellation went through (best-effort, after commit)
+  if (function_exists('notifyOrderStatusChange')) {
+    notifyOrderStatusChange($pdo, $orderId, 'Cancelled');
   }
   sendJson(200, true, ['orderId' => $orderId, 'status' => 'Cancelled']);
 }

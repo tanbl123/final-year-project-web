@@ -15,6 +15,15 @@ function getOrCreateCartId(PDO $pdo, string $customerId): string {
   return $id;
 }
 
+// Stamp the cart's last-activity time. Drives the abandoned-cart sweep (and
+// re-arms a previously-sent reminder, since the sweep only skips carts reminded
+// since their last change).
+function touchCart(PDO $pdo, string $cartId): void {
+  try {
+    $pdo->prepare('UPDATE cart SET cartUpdatedAt = NOW() WHERE cartId = :id')->execute(['id' => $cartId]);
+  } catch (Throwable $e) {/* column may not exist yet on un-migrated DBs */}
+}
+
 // Build the cart response: its items (with live price/subtotal) + the total.
 function cartPayload(PDO $pdo, string $cartId): array {
   $stmt = $pdo->prepare(
@@ -113,6 +122,7 @@ function handleAddCartItem(PDO $pdo, array $auth): void {
     )->execute(['id' => $cid, 'cart' => $cartId, 'vid' => $variantId, 'q' => $newQty, 's' => $subtotal]);
   }
 
+  touchCart($pdo, $cartId);
   sendJson(200, true, cartPayload($pdo, $cartId));
 }
 
@@ -146,7 +156,9 @@ function handleUpdateCartItem(PDO $pdo, array $auth, string $cartItemId): void {
   $pdo->prepare('UPDATE cart_item SET cartItemQuantity = :q, cartItemSubtotal = :s WHERE cartItemId = :id')
       ->execute(['q' => $qty, 's' => $subtotal, 'id' => $cartItemId]);
 
-  sendJson(200, true, cartPayload($pdo, getOrCreateCartId($pdo, $customerId)));
+  $cartId = getOrCreateCartId($pdo, $customerId);
+  touchCart($pdo, $cartId);
+  sendJson(200, true, cartPayload($pdo, $cartId));
 }
 
 // DELETE /cart/items/{cartItemId}
@@ -161,5 +173,7 @@ function handleRemoveCartItem(PDO $pdo, array $auth, string $cartItemId): void {
   if ($del->rowCount() === 0) {
     sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Cart item not found.']);
   }
-  sendJson(200, true, cartPayload($pdo, getOrCreateCartId($pdo, $customerId)));
+  $cartId = getOrCreateCartId($pdo, $customerId);
+  touchCart($pdo, $cartId);
+  sendJson(200, true, cartPayload($pdo, $cartId));
 }
