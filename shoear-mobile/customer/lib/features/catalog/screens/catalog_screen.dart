@@ -14,6 +14,8 @@ import 'package:customer/features/auth/screens/login_screen.dart';
 import 'package:customer/features/catalog/screens/product_detail_screen.dart';
 import 'package:customer/features/notification/state/notification_provider.dart';
 import 'package:customer/features/notification/screens/notifications_screen.dart';
+import 'package:customer/features/cart/state/cart_provider.dart';
+import 'package:customer/features/shell/main_shell.dart';
 
 /// Home screen: a searchable grid of approved products. Browsable as a guest;
 /// an account menu in the app bar handles sign in / sign out.
@@ -93,7 +95,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('👟 ShoeAR'),
-        actions: [_notificationsAction(context), _filterAction(context), _accountAction(context)],
+        actions: [_cartAction(context), _notificationsAction(context), _filterAction(context), _accountAction(context)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -157,6 +159,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  // cart with an item-count badge; tapping switches to the Cart tab. Cart is
+  // the highest-intent action, so it gets a shortcut in the app bar too (as in
+  // Shopee/Lazada), in addition to the bottom-nav tab.
+  Widget _cartAction(BuildContext context) {
+    final count = context.watch<CartProvider>().count;
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text(count > 99 ? '99+' : '$count'),
+      child: IconButton(
+        icon: const Icon(Icons.shopping_cart_outlined),
+        tooltip: 'Cart',
+        onPressed: () => mainShellTab.value = MainTab.cart,
       ),
     );
   }
