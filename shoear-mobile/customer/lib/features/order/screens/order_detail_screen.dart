@@ -124,9 +124,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _requestRefund() async {
     // The dialog owns its controller/image and validates inline; it returns the
     // reason + an optional proof photo only once valid.
-    final result = await showDialog<(String, List<File>)>(
+    final result = await showModalBottomSheet<(String, List<File>)>(
       context: context,
-      builder: (_) => const _RefundDialog(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => const _RefundSheet(),
     );
     if (result == null) return; // cancelled
     final (reason, proofs) = result;
@@ -559,15 +564,15 @@ class _ParcelBlock extends StatelessWidget {
   }
 }
 
-// ── Self-contained refund dialog (owns + disposes its own controller) ───────
-class _RefundDialog extends StatefulWidget {
-  const _RefundDialog();
+// ── Refund request bottom sheet (Shopee/Lazada-style evidence form) ─────────
+class _RefundSheet extends StatefulWidget {
+  const _RefundSheet();
 
   @override
-  State<_RefundDialog> createState() => _RefundDialogState();
+  State<_RefundSheet> createState() => _RefundSheetState();
 }
 
-class _RefundDialogState extends State<_RefundDialog> {
+class _RefundSheetState extends State<_RefundSheet> {
   static const _maxPhotos = 5;
   final _ctrl = TextEditingController();
   String? _error;
@@ -581,7 +586,6 @@ class _RefundDialogState extends State<_RefundDialog> {
 
   Future<void> _pickPhoto() async {
     if (_proofs.length >= _maxPhotos) return;
-    // Let the customer take a photo on the spot or choose from the gallery.
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -626,79 +630,150 @@ class _RefundDialogState extends State<_RefundDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Request a refund'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Tell us why you want a refund. An admin will review your request.'),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _ctrl,
-            autofocus: true,
-            minLines: 2,
-            maxLines: 4,
-            maxLength: 255,
-            decoration: InputDecoration(
-              hintText: 'Reason',
-              border: const OutlineInputBorder(),
-              errorText: _error, // inline error, not a snackbar
-            ),
-            onChanged: (_) {
-              if (_error != null) setState(() => _error = null);
-            },
-          ),
-          const SizedBox(height: 4),
-          // Optional supporting photos (per refund policy) — up to _maxPhotos.
-          if (_proofs.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (int i = 0; i < _proofs.length; i++)
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(_proofs[i], width: 56, height: 56, fit: BoxFit.cover),
-                        ),
-                        Positioned(
-                          top: -8,
-                          right: -8,
-                          child: IconButton(
-                            iconSize: 18,
-                            visualDensity: VisualDensity.compact,
-                            icon: const CircleAvatar(
-                              radius: 9,
-                              backgroundColor: Colors.black54,
-                              child: Icon(Icons.close, size: 12, color: Colors.white),
-                            ),
-                            onPressed: () => setState(() => _proofs.removeAt(i)),
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+    final primary = Theme.of(context).colorScheme.primary;
+    return Padding(
+      // lift above the keyboard
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // grab handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
               ),
             ),
-          if (_proofs.length < _maxPhotos)
-            OutlinedButton.icon(
-              onPressed: _pickPhoto,
-              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-              label: Text(_proofs.isEmpty
-                  ? 'Add a photo (optional)'
-                  : 'Add another (${_proofs.length}/$_maxPhotos)'),
+            const Text('Request a refund',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Tell us why, and add photos as evidence. An admin will review it.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+            const SizedBox(height: 18),
+
+            // ── Reason ──────────────────────────────────────────────────
+            const Text('Reason', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 5,
+              maxLength: 255,
+              decoration: InputDecoration(
+                hintText: 'e.g. The shoe size doesn’t fit / item is defective…',
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                errorText: _error,
+              ),
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
             ),
-        ],
+            const SizedBox(height: 6),
+
+            // ── Photos ──────────────────────────────────────────────────
+            Row(
+              children: [
+                const Text('Photos', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(width: 6),
+                Text('(optional · ${_proofs.length}/$_maxPhotos)',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (int i = 0; i < _proofs.length; i++)
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(_proofs[i], width: 72, height: 72, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        top: -8,
+                        right: -8,
+                        child: IconButton(
+                          iconSize: 18,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => setState(() => _proofs.removeAt(i)),
+                          icon: const CircleAvatar(
+                            radius: 10,
+                            backgroundColor: Colors.black54,
+                            child: Icon(Icons.close, size: 13, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                // add tile
+                if (_proofs.length < _maxPhotos)
+                  InkWell(
+                    onTap: _pickPhoto,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
+                        color: Colors.grey.shade50,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_a_photo_outlined, size: 22, color: Colors.grey.shade600),
+                          const SizedBox(height: 4),
+                          Text('Add', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 22),
+
+            // ── Actions ─────────────────────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      backgroundColor: primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Submit request', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        FilledButton(onPressed: _submit, child: const Text('Submit')),
-      ],
     );
   }
 }
