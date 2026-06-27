@@ -126,6 +126,7 @@ class CustomerOrderSummary {
 
 /// A line item on an order (detail view).
 class OrderItem {
+  final String productId;
   final String productName;
   final String brand;
   final String size;
@@ -133,10 +134,12 @@ class OrderItem {
   final double unitPrice;
   final double subtotal;
   final String? imageUrl;
+  final bool reviewed; // has this customer already reviewed this product?
 
-  OrderItem({required this.productName, required this.brand, required this.size, required this.qty, required this.unitPrice, required this.subtotal, this.imageUrl});
+  OrderItem({required this.productId, required this.productName, required this.brand, required this.size, required this.qty, required this.unitPrice, required this.subtotal, this.imageUrl, this.reviewed = false});
 
   factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
+        productId: j['productId'] as String? ?? '',
         productName: j['productName'] as String? ?? '',
         brand: j['brand'] as String? ?? '',
         size: j['size']?.toString() ?? '',
@@ -144,6 +147,7 @@ class OrderItem {
         unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,
         subtotal: (j['subtotal'] as num?)?.toDouble() ?? 0,
         imageUrl: (j['imageUrl'] as String?)?.isNotEmpty == true ? j['imageUrl'] as String : null,
+        reviewed: j['reviewed'] == true,
       );
 }
 
@@ -228,6 +232,7 @@ class CustomerOrder {
   /// Server-computed action eligibility (refund policy lives on the backend).
   final bool canCancel;
   final bool canRefund;
+  final bool canReview;
   final int refundWindowDays;
 
   CustomerOrder({
@@ -244,6 +249,7 @@ class CustomerOrder {
     required this.refunds,
     this.canCancel = false,
     this.canRefund = false,
+    this.canReview = false,
     this.refundWindowDays = 7,
   });
 
@@ -267,6 +273,7 @@ class CustomerOrder {
             .toList(),
         canCancel: j['canCancel'] as bool? ?? false,
         canRefund: j['canRefund'] as bool? ?? false,
+        canReview: j['canReview'] as bool? ?? false,
         refundWindowDays: (j['refundWindowDays'] as num?)?.toInt() ?? 7,
       );
 }

@@ -534,19 +534,22 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
             oi.orderSize AS size, oi.orderQuantity AS qty,
             oi.orderUnitPrice AS unitPrice, oi.orderSubtotal AS subtotal,
             (SELECT pi.productImageUrl FROM product_image pi
-              WHERE pi.productId = p.productId ORDER BY pi.productImageId LIMIT 1) AS imageUrl
+              WHERE pi.productId = p.productId ORDER BY pi.productImageId LIMIT 1) AS imageUrl,
+            EXISTS (SELECT 1 FROM review r
+                     WHERE r.productId = p.productId AND r.customerId = :cid) AS reviewed
        FROM order_item oi
        JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
        JOIN product p          ON p.productId = pv.productId
       WHERE oi.orderId = :oid
       ORDER BY oi.orderItemId"
   );
-  $it->execute(['oid' => $orderId]);
+  $it->execute(['oid' => $orderId, 'cid' => $customerId]);
   $items = $it->fetchAll();
   foreach ($items as &$x) {
     $x['qty']       = (int) $x['qty'];
     $x['unitPrice'] = (float) $x['unitPrice'];
     $x['subtotal']  = (float) $x['subtotal'];
+    $x['reviewed']  = (bool) $x['reviewed'];
   }
   unset($x);
   $order['items'] = $items;
@@ -596,6 +599,14 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
   }
   $order['canRefund'] = $canRefund;
   $order['refundWindowDays'] = REFUND_WINDOW_DAYS;
+
+  // Review: a customer may rate items on any purchased (paid+) order — same rule
+  // the review endpoint enforces. The per-item 'reviewed' flag drives Rate vs Rated.
+  $order['canReview'] = in_array(
+    $order['orderStatus'],
+    ['Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed'],
+    true
+  );
 
   sendJson(200, true, $order);
 }

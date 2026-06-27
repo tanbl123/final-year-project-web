@@ -13,6 +13,8 @@ import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/core/utils/refresh_bus.dart';
 import 'package:customer/features/order/screens/refund_detail_screen.dart';
 import 'package:customer/features/order/screens/orders_screen.dart' show kOrderStatusColors, prettyStatus;
+import 'package:customer/features/review/services/review_service.dart';
+import 'package:customer/features/review/widgets/review_sheet.dart';
 
 const Map<String, Color> _deliveryColors = {
   'Pending': Colors.orange,
@@ -145,6 +147,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     } finally {
       if (mounted) setState(() => _paying = false);
       await _refresh();
+    }
+  }
+
+  Future<void> _rateItem(OrderItem item) async {
+    final result = await showModalBottomSheet<ReviewResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReviewSheet(productName: item.productName),
+    );
+    if (result == null) return; // dismissed
+    try {
+      await context.read<ReviewService>().create(item.productId, result.rating, result.comment);
+      if (!mounted) return;
+      context.showSnack('Thanks for your review!');
+      bumpRefresh();    // product rating changed elsewhere (catalog/product page)
+      await _refresh(); // reflect the "Rated" state on this order
+    } catch (e) {
+      if (mounted) context.showSnack(e.toString());
     }
   }
 
@@ -334,7 +354,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               for (int i = 0; i < o.items.length; i++) ...[
                 if (i > 0) const Divider(height: 18),
-                _ItemRow(item: o.items[i], primary: primary),
+                _ItemRow(
+                  item: o.items[i],
+                  primary: primary,
+                  canReview: o.canReview,
+                  onRate: () => _rateItem(o.items[i]),
+                ),
               ],
               const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
               Row(
@@ -550,31 +575,66 @@ class _Card extends StatelessWidget {
 class _ItemRow extends StatelessWidget {
   final OrderItem item;
   final Color primary;
-  const _ItemRow({required this.item, required this.primary});
+  final bool canReview;       // order is purchased → items can be rated
+  final VoidCallback? onRate;
+  const _ItemRow({required this.item, required this.primary, this.canReview = false, this.onRate});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(width: 52, height: 52, child: ProductImage(url: item.imageUrl)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(width: 52, height: 52, child: ProductImage(url: item.imageUrl)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.brand.toUpperCase(),
+                      style: TextStyle(fontSize: 10, color: primary, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+                  Text(item.productName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  Text('Size ${item.size} · Qty ${item.qty}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text('RM ${item.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(item.brand.toUpperCase(),
-                  style: TextStyle(fontSize: 10, color: primary, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
-              Text(item.productName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text('Size ${item.size} · Qty ${item.qty}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-            ],
+        // Rate this item (Shopee-style) once the order is purchased.
+        if (canReview) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: item.reviewed
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
+                      const SizedBox(width: 4),
+                      Text('Rated',
+                          style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                    ],
+                  )
+                : OutlinedButton.icon(
+                    onPressed: onRate,
+                    icon: const Icon(Icons.star_outline_rounded, size: 18),
+                    label: const Text('Rate'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primary,
+                      side: BorderSide(color: primary),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text('RM ${item.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ],
     );
   }

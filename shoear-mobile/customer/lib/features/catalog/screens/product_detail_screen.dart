@@ -5,6 +5,7 @@ import 'package:customer/features/catalog/models/product.dart';
 import 'package:customer/features/review/models/review.dart';
 import 'package:customer/features/catalog/services/catalog_service.dart';
 import 'package:customer/features/review/services/review_service.dart';
+import 'package:customer/features/review/widgets/review_sheet.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/features/wishlist/state/wishlist_provider.dart';
@@ -465,10 +466,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _openReviewEditor({MyReview? existing}) async {
-    final result = await showModalBottomSheet<_ReviewResult>(
+    final result = await showModalBottomSheet<ReviewResult>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ReviewSheet(existing: existing),
+      builder: (_) => ReviewSheet(
+        initialRating: existing?.ratingScore ?? 5,
+        initialComment: existing?.reviewComment ?? '',
+        editing: existing != null,
+      ),
     );
     if (result != null) {
       await _submitReview(existing, result.rating, result.comment);
@@ -704,87 +709,6 @@ class _ReviewTile extends StatelessWidget {
           ],
           const SizedBox(height: 4),
           const Divider(height: 1),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReviewResult {
-  final int rating;
-  final String comment;
-  _ReviewResult(this.rating, this.comment);
-}
-
-class _ReviewSheet extends StatefulWidget {
-  final MyReview? existing;
-  const _ReviewSheet({this.existing});
-
-  @override
-  State<_ReviewSheet> createState() => _ReviewSheetState();
-}
-
-class _ReviewSheetState extends State<_ReviewSheet> {
-  late int _rating = widget.existing?.ratingScore ?? 5;
-  late final TextEditingController _comment =
-      TextEditingController(text: widget.existing?.reviewComment ?? '');
-
-  @override
-  void dispose() {
-    _comment.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: 16 + MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.existing == null ? 'Write a review' : 'Edit your review',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (int i = 1; i <= 5; i++)
-                IconButton(
-                  onPressed: () => setState(() => _rating = i),
-                  icon: Icon(
-                    i <= _rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                    color: Colors.amber.shade700,
-                    size: 36,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _comment,
-            minLines: 2,
-            maxLines: 5,
-            maxLength: 1000,
-            decoration: const InputDecoration(
-              hintText: 'Share your thoughts (optional)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_ReviewResult(_rating, _comment.text.trim())),
-              child: const Text('Submit'),
-            ),
-          ),
         ],
       ),
     );
