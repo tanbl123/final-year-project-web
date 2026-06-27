@@ -1,6 +1,7 @@
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter/material.dart';
 
+import 'package:customer/core/utils/refresh_bus.dart';
 import 'package:customer/features/order/services/order_service.dart';
 
 /// Outcome of running the Stripe payment sheet for an order.
@@ -43,5 +44,6 @@ Future<PayResult> payOrderWithStripe(OrderService orders, String orderId) async 
 
   await orders.pay(orderId, 'Stripe',
       paymentIntentId: pi['paymentIntentId'] as String?);
+  bumpRefresh(); // order paid → let the orders list re-fetch
   return PayResult.paid;
 }

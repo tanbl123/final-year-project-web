@@ -10,6 +10,7 @@ import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/order/services/order_service.dart';
 import 'package:customer/features/order/services/order_payment.dart';
 import 'package:customer/core/utils/snackbar.dart';
+import 'package:customer/core/utils/refresh_bus.dart';
 import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/features/cart/models/cart.dart';
 import 'package:customer/core/widgets/product_image.dart';
@@ -360,6 +361,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await Stripe.instance.presentPaymentSheet();
       await orders.pay(created.orderId, 'Stripe',
           paymentIntentId: pi['paymentIntentId'] as String?);
+      bumpRefresh(); // order paid → orders list re-fetches
 
       final receipt = await orders.getReceipt(created.orderId);
       await cart.refresh();

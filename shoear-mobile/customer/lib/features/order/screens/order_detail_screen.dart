@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -32,16 +34,24 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late Future<CustomerOrder> _future;
   bool _paying = false;
+  Timer? _poll; // scoped polling while an active delivery is on screen
+
+  // Order is post-payment and not yet finished → worth polling while watched.
+  static const _terminal = {'Delivered', 'Completed', 'Cancelled'};
+  bool _isActive(CustomerOrder o) =>
+      o.orderStatus != 'Placed' && !_terminal.contains(o.orderStatus);
 
   @override
   void initState() {
     super.initState();
     _future = context.read<OrderService>().getOrder(widget.orderId);
+    _future.then(_managePolling).catchError((_) {});
     appRefreshTick.addListener(_onRefreshSignal);
   }
 
   @override
   void dispose() {
+    _poll?.cancel();
     appRefreshTick.removeListener(_onRefreshSignal);
     super.dispose();
   }
@@ -54,7 +64,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _refresh() async {
     final next = context.read<OrderService>().getOrder(widget.orderId);
     setState(() => _future = next);
-    await next;
+    try {
+      _managePolling(await next);
+    } catch (_) {}
+  }
+
+  /// Start a 20s poll only while this order is an active (in-transit) delivery;
+  /// stop it once the order is delivered/completed/cancelled or unpaid.
+  void _managePolling(CustomerOrder o) {
+    if (!mounted) return;
+    if (_isActive(o)) {
+      _poll ??= Timer.periodic(const Duration(seconds: 20), (_) {
+        if (mounted && !_paying) _refresh();
+      });
+    } else {
+      _poll?.cancel();
+      _poll = null;
+    }
   }
 
   static const _refundableStatuses = {'Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed'};
