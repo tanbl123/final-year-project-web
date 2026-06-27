@@ -1,5 +1,11 @@
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete, getToken } from '../../api/client';
 
+// Sidebar work-queue badge counts (how many items in each queue need the admin
+// to act). One cheap call, polled by the sidebar. Returns { counts: {...} }.
+export function getBadgeCounts() {
+  return apiGet('/admin/badge-counts', getToken());
+}
+
 // Suppliers awaiting approval.
 export function getPendingSuppliers() {
   return apiGet('/admin/suppliers/pending', getToken());

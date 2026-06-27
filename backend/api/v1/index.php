@@ -491,6 +491,14 @@ if ($path === '/admin/commission') {
 }
 
 // ── admin routes (require an Admin token) ──
+// sidebar work-queue badge counts (one cheap call, polled by the web app)
+if ($method === 'GET' && $path === '/admin/badge-counts') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleAdminBadgeCounts($pdo);
+}
+
 if ($method === 'GET' && $path === '/admin/suppliers/pending') {
   $auth = requireAuth($secret);
   requireAdmin($auth);

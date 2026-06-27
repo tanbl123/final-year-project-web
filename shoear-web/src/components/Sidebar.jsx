@@ -1,27 +1,30 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { getBadgeCounts } from '../features/admin/adminService';
 
 // Grouped navigation per role. `end` marks links that should only be active on
 // an exact match (e.g. /admin, otherwise it'd light up for every /admin/* page).
+// `badge` names the work-queue count (from /admin/badge-counts) to show as a pill.
 const ADMIN_NAV = [
   { group: 'Main', items: [
-    { to: '/admin', label: 'Suppliers', icon: '🏪', end: true },
-    { to: '/admin/couriers', label: 'Couriers', icon: '🛵' },
-    { to: '/admin/changes', label: 'Changes', icon: '📝' },
+    { to: '/admin', label: 'Suppliers', icon: '🏪', end: true, badge: 'suppliers' },
+    { to: '/admin/couriers', label: 'Couriers', icon: '🛵', badge: 'couriers' },
+    { to: '/admin/changes', label: 'Changes', icon: '📝', badge: 'changes' },
     { to: '/admin/users', label: 'Users', icon: '👥' },
   ] },
   { group: 'Catalog', items: [
-    { to: '/admin/products', label: 'Products', icon: '👟' },
+    { to: '/admin/products', label: 'Products', icon: '👟', badge: 'products' },
     { to: '/admin/inventory', label: 'Inventory', icon: '📦' },
     { to: '/admin/categories', label: 'Categories', icon: '🏷️' },
   ] },
   { group: 'Operations', items: [
     { to: '/admin/orders', label: 'Orders', icon: '🧾' },
-    { to: '/admin/deliveries', label: 'Deliveries', icon: '🚚' },
-    { to: '/admin/delivery-issues', label: 'Issues', icon: '⚠️' },
+    { to: '/admin/deliveries', label: 'Deliveries', icon: '🚚', badge: 'deliveries' },
+    { to: '/admin/delivery-issues', label: 'Issues', icon: '⚠️', badge: 'issues' },
   ] },
   { group: 'Moderation', items: [
     { to: '/admin/reviews', label: 'Reviews', icon: '⭐' },
-    { to: '/admin/refunds', label: 'Refunds', icon: '💸' },
+    { to: '/admin/refunds', label: 'Refunds', icon: '💸', badge: 'refunds' },
   ] },
   { group: 'Finance', items: [
     { to: '/admin/commission', label: 'Commission', icon: '💰' },
@@ -53,9 +56,33 @@ function navFor(user) {
   return [];
 }
 
+// Poll the admin work-queue counts so sidebar badges stay roughly live without
+// a manual refresh. Returns {} for non-admins (and on error, so the nav still
+// renders — badges just won't show).
+function useBadgeCounts(isAdmin) {
+  const [counts, setCounts] = useState({});
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    const load = async () => {
+      try {
+        const res = await getBadgeCounts();
+        if (active) setCounts(res?.counts ?? {});
+      } catch {
+        /* keep the last counts; the nav still works without badges */
+      }
+    };
+    load();
+    const id = setInterval(load, 45000);
+    return () => { active = false; clearInterval(id); };
+  }, [isAdmin]);
+  return counts;
+}
+
 function Sidebar({ user, collapsed }) {
   const groups = navFor(user);
   const isAdmin = user.role === 'Admin';
+  const counts = useBadgeCounts(isAdmin);
 
   return (
     <aside className={'app-sidebar d-flex flex-column' + (collapsed ? ' collapsed' : '')}>
@@ -71,12 +98,20 @@ function Sidebar({ user, collapsed }) {
         {groups.map((g) => (
           <div key={g.group} className="mb-1">
             <div className="sidebar-group nav-label">{g.group}</div>
-            {g.items.map((it) => (
-              <NavLink key={it.to} to={it.to} end={it.end} className="sidebar-link" title={it.label}>
-                <span className="sidebar-icon">{it.icon}</span>
-                <span className="nav-label">{it.label}</span>
-              </NavLink>
-            ))}
+            {g.items.map((it) => {
+              const count = it.badge ? counts[it.badge] ?? 0 : 0;
+              return (
+                <NavLink key={it.to} to={it.to} end={it.end} className="sidebar-link" title={it.label}>
+                  <span className="sidebar-icon">{it.icon}</span>
+                  <span className="nav-label">{it.label}</span>
+                  {count > 0 && (
+                    <span className="sidebar-badge" title={`${count} need${count === 1 ? 's' : ''} attention`}>
+                      {count > 99 ? '99+' : count}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>
