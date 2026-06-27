@@ -156,9 +156,18 @@ function handleCreateRefund(PDO $pdo, array $auth, string $orderId): void {
   if (!$order) {
     sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Order not found.']);
   }
-  // Policy: a refund can only be requested AFTER the order is delivered, and
-  // within the refund window. (Before delivery the customer cancels instead.)
-  if (!in_array($order['orderStatus'], ['Delivered', 'Completed'], true)) {
+  // Policy: a refund can only be requested AFTER every parcel is delivered,
+  // and within the refund window. (Before delivery the customer cancels.)
+  // Fulfilment lives on the parcels, not orderStatus.
+  if ($order['orderStatus'] !== 'Paid') {
+    sendJson(409, false, null, ['code' => 'NOT_REFUNDABLE', 'message' => 'This order is not refundable.']);
+  }
+  $ds = $pdo->prepare("SELECT deliveryStatus FROM delivery WHERE orderId = :oid");
+  $ds->execute(['oid' => $orderId]);
+  $statuses = array_column($ds->fetchAll(), 'deliveryStatus');
+  $allDelivered = count($statuses) > 0
+      && count(array_filter($statuses, fn($s) => $s === 'Delivered')) === count($statuses);
+  if (!$allDelivered) {
     sendJson(409, false, null, ['code' => 'NOT_REFUNDABLE',
       'message' => 'You can request a refund only after the order is delivered. To cancel a paid order before it ships, use Cancel order.']);
   }

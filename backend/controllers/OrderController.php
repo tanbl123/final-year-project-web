@@ -558,14 +558,23 @@ function handleGetCustomerOrder(PDO $pdo, array $auth, string $orderId): void {
   unset($x);
   $order['refunds'] = $refunds;
 
-  // ── Action eligibility (so the app shows the right button) ──────────────
+  // ── Action eligibility ───────────────────────────────────────────────────
+  // Fulfilment is tracked on the parcels (deliveryStatus), not orderStatus
+  // (which stays 'Paid'). So derive cancel/refund eligibility from the parcels.
   $hasActiveRefund = _orderHasActiveRefund($pdo, $orderId);
-  $status = $order['orderStatus'];
-  // Cancel: pre-fulfilment paid orders (nothing shipped yet), no refund yet.
-  $order['canCancel'] = in_array($status, ['Paid', 'Processing'], true) && !$hasActiveRefund;
-  // Refund: delivered/completed, within the window, no active refund.
+  $paid = $order['orderStatus'] === 'Paid';
+  $dstat = array_column($order['deliveries'], 'deliveryStatus');
+  $shippedStates = ['PickedUp', 'OutForDelivery', 'Delivered'];
+  $anyShipped = count(array_intersect($dstat, $shippedStates)) > 0;
+  $allDelivered = count($dstat) > 0
+      && count(array_filter($dstat, fn($s) => $s === 'Delivered')) === count($dstat);
+
+  // Cancel: paid order, nothing shipped yet, no refund in progress.
+  $order['canCancel'] = $paid && !$anyShipped && !$hasActiveRefund;
+
+  // Refund: paid, every parcel delivered, within the window, no active refund.
   $canRefund = false;
-  if (in_array($status, ['Delivered', 'Completed'], true) && !$hasActiveRefund) {
+  if ($paid && $allDelivered && !$hasActiveRefund) {
     $ref = _orderDeliveredAt($pdo, $orderId) ?? $order['orderDate'];
     $canRefund = time() <= strtotime($ref) + REFUND_WINDOW_DAYS * 86400;
   }

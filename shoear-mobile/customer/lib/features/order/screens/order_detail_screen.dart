@@ -602,8 +602,21 @@ class _ParcelBlock extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        // delivery progress timeline (per parcel)
+        if (parcel.deliveryStatus == 'Failed')
+          Row(
+            children: [
+              Icon(Icons.error_outline, size: 16, color: Colors.red.shade600),
+              const SizedBox(width: 6),
+              Text('Delivery failed — we’ll be in touch.',
+                  style: TextStyle(fontSize: 12, color: Colors.red.shade700)),
+            ],
+          )
+        else
+          _DeliveryTimeline(status: parcel.deliveryStatus),
         if (parcel.estimatedDeliveryTime != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text('Est. delivery: ${_fmt(parcel.estimatedDeliveryTime!)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         ],
         if (showOtp) ...[
@@ -849,6 +862,81 @@ class _RefundSheetState extends State<_RefundSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Per-parcel delivery progress timeline ───────────────────────────────────
+class _DeliveryTimeline extends StatelessWidget {
+  final String status; // delivery status: Pending/Assigned/PickedUp/OutForDelivery/Delivered
+  const _DeliveryTimeline({required this.status});
+
+  static const _steps = ['Preparing', 'Shipped', 'Out for delivery', 'Delivered'];
+
+  int get _reached {
+    switch (status) {
+      case 'PickedUp':
+        return 1;
+      case 'OutForDelivery':
+        return 2;
+      case 'Delivered':
+        return 3;
+      default: // Pending / Assigned
+        return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    final reached = _reached;
+    return Column(
+      children: [
+        for (int i = 0; i < _steps.length; i++)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: i <= reached ? color : Colors.grey.shade300,
+                        shape: BoxShape.circle,
+                      ),
+                      child: i < reached
+                          ? const Icon(Icons.check, size: 10, color: Colors.white)
+                          : (i == reached
+                              ? const Icon(Icons.circle, size: 7, color: Colors.white)
+                              : null),
+                    ),
+                    if (i != _steps.length - 1)
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          color: i < reached ? color : Colors.grey.shade300,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                Padding(
+                  padding: EdgeInsets.only(bottom: i == _steps.length - 1 ? 0 : 12, top: 0),
+                  child: Text(
+                    _steps[i],
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: i <= reached ? FontWeight.w600 : FontWeight.normal,
+                      color: i <= reached ? Colors.black87 : Colors.grey,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
