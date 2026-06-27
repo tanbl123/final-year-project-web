@@ -118,29 +118,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        title: Text('Order ${widget.orderId}'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-      ),
-      body: FutureBuilder<CustomerOrder>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(snap.error.toString(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-              ),
-            );
-          }
-          return RefreshIndicator(onRefresh: _refresh, child: _body(context, snap.data!));
-        },
+    return FutureBuilder<CustomerOrder>(
+      future: _future,
+      builder: (context, snap) {
+        final order = snap.hasData ? snap.data : null;
+        final awaiting = order?.orderStatus == 'Placed';
+        return Scaffold(
+          backgroundColor: Colors.grey.shade100,
+          appBar: AppBar(
+            title: Text('Order ${widget.orderId}'),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+          ),
+          body: snap.connectionState == ConnectionState.waiting
+              ? const Center(child: CircularProgressIndicator())
+              : snap.hasError
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(snap.error.toString(),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.grey)),
+                      ),
+                    )
+                  : RefreshIndicator(onRefresh: _refresh, child: _body(context, order!)),
+          bottomNavigationBar: awaiting ? _payBar(context, order!) : null,
+        );
+      },
+    );
+  }
+
+  Widget _payBar(BuildContext context, CustomerOrder o) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 12,
+                offset: const Offset(0, -3)),
+          ],
+        ),
+        child: FilledButton.icon(
+          onPressed: _paying ? null : _payNow,
+          icon: _paying
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.lock_outline, size: 18),
+          label: Text(_paying ? 'Processing…' : 'Pay now  ·  RM ${o.total.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
       ),
     );
   }
@@ -153,23 +185,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       children: [
         _StatusBanner(order: o),
         const SizedBox(height: 12),
-
-        // Pay now for unpaid orders
-        if (awaiting) ...[
-          FilledButton.icon(
-            onPressed: _paying ? null : _payNow,
-            icon: _paying
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.lock_outline, size: 18),
-            label: Text(_paying ? 'Processing…' : 'Pay now  ·  RM ${o.total.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
 
         // Delivery tracking
         _Card(
