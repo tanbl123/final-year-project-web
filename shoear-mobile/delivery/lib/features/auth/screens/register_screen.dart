@@ -546,26 +546,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Text('Select the states you can deliver to. Orders are assigned '
                 'to couriers who cover the delivery area.', style: TextStyle(fontSize: 12)),
           ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final s in _states)
-                FilterChip(
-                  label: Text(s),
-                  selected: _coverageZones.contains(s),
-                  onSelected: (sel) => setState(() {
-                    if (sel) { _coverageZones.add(s); } else { _coverageZones.remove(s); }
-                    if (_coverageZones.isNotEmpty) _coverageError = null;
-                  }),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: InkWell(
+              onTap: _pickCoverageZones,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Delivery coverage areas',
+                  border: const OutlineInputBorder(),
+                  errorText: _coverageError,
+                  suffixIcon: const Icon(Icons.arrow_drop_down),
                 ),
-            ],
-          ),
-          if (_coverageError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(_coverageError!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+                child: Text(
+                  _coverageZones.isEmpty
+                      ? 'Select states'
+                      : (_states.where(_coverageZones.contains).join(', ')),
+                  style: TextStyle(
+                    color: _coverageZones.isEmpty
+                        ? Theme.of(context).hintColor
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
             ),
+          ),
           _sectionHeader('Identity & licence'),
           _photoTile(label: 'Profile photo', url: _avatarUrl, uploading: _upAvatar,
               error: _docsError != null && _avatarUrl == null, onPick: () => _pickPhoto('avatar')),
@@ -740,6 +744,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
       helpText: 'Select your licence expiry date',
     );
     if (picked != null) setState(() { _licenseExpiry = picked; _licenseExpiryError = _validateLicenseExpiry(); });
+  }
+
+  // Multi-select states the courier delivers to (checklist dialog).
+  Future<void> _pickCoverageZones() async {
+    final temp = Set<String>.from(_coverageZones);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Delivery coverage areas'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final s in _states)
+                  CheckboxListTile(
+                    value: temp.contains(s),
+                    title: Text(s),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (v) => setLocal(() { if (v == true) { temp.add(s); } else { temp.remove(s); } }),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, temp), child: const Text('Done')),
+          ],
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _coverageZones
+          ..clear()
+          ..addAll(result);
+        if (_coverageZones.isNotEmpty) _coverageError = null;
+      });
+    }
   }
 
   Widget _photoTile({
