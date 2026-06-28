@@ -7,6 +7,7 @@ import 'package:delivery/features/auth/services/account_service.dart';
 import 'package:delivery/features/auth/state/auth_provider.dart';
 import 'package:delivery/features/auth/screens/change_password_screen.dart';
 import 'package:delivery/features/profile/screens/edit_profile_screen.dart';
+import 'package:delivery/features/earnings/screens/earnings_screen.dart';
 
 /// The courier's profile: view/edit details, change password, sign out.
 class ProfileScreen extends StatefulWidget {
@@ -54,6 +55,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _row('Plate', profile['vehiclePlate']?.toString() ?? '—'),
               const SizedBox(height: 20),
               FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const EarningsScreen()),
+                ),
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('My earnings'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
                 onPressed: () => _openEdit(me, profile),
                 icon: const Icon(Icons.edit),
                 label: const Text('Edit profile'),

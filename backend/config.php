@@ -26,6 +26,11 @@ $config = [
   // Where Stripe sends the supplier back after hosted onboarding.
   'app_url' => getenv('APP_URL') ?: 'http://localhost:5173',
 
+  // Flat fee (MYR) a courier earns per completed (Delivered) parcel. Snapshotted
+  // onto each delivery when it's confirmed, so changing this never alters past
+  // earnings. Couriers are paid out their accrued balance via Stripe Connect.
+  'courier_fee_per_delivery' => (float) (getenv('COURIER_FEE_PER_DELIVERY') ?: 5.00),
+
   // SMTP — used to email supplier registration verification codes. Keep the
   // password OUT of git: set these in config.local.php (see the example file).
   // For Gmail: host smtp.gmail.com, port 587, secure 'tls', username your

@@ -29,6 +29,7 @@ const ADMIN_NAV = [
   ] },
   { group: 'Finance', items: [
     { to: '/admin/commission', label: 'Commission', icon: '💰' },
+    { to: '/admin/courier-payouts', label: 'Courier Pay', icon: '💸' },
   ] },
 ];
 

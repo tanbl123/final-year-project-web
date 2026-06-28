@@ -6,6 +6,7 @@ import 'package:delivery/features/auth/services/auth_service.dart';
 import 'package:delivery/features/auth/services/account_service.dart';
 import 'package:delivery/features/auth/state/auth_provider.dart';
 import 'package:delivery/features/delivery/services/delivery_service.dart';
+import 'package:delivery/features/earnings/services/earnings_service.dart';
 import 'package:delivery/features/notification/services/notification_service.dart';
 import 'package:delivery/features/notification/services/push_service.dart';
 import 'package:delivery/features/shell/main_shell.dart';
@@ -36,6 +37,7 @@ class CourierApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         Provider<DeliveryService>.value(value: DeliveryService(api)),
         Provider<AccountService>.value(value: AccountService(api)),
+        Provider<EarningsService>.value(value: EarningsService(api)),
         // registers FCM token on login, clears on logout
         ChangeNotifierProxyProvider<AuthProvider, PushService>(
           create: (_) => pushService,

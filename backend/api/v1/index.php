@@ -34,6 +34,7 @@ require __DIR__ . '/../../controllers/PaymentController.php';
 require __DIR__ . '/../../controllers/NotificationController.php';
 require __DIR__ . '/../../controllers/VehicleController.php';
 require __DIR__ . '/../../controllers/DashboardController.php';
+require __DIR__ . '/../../controllers/CourierPayoutController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -256,10 +257,27 @@ if ($method === 'PATCH' && preg_match('#^/deliveries/([^/]+)/status$#', $path, $
   handleUpdateDeliveryStatus($pdo, $auth, $m[1]);
 }
 
+// ── Courier earnings + payouts (delivery app) ──
+if ($method === 'GET' && $path === '/courier/earnings') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCourierEarnings($pdo, $config, $auth);
+}
+if ($method === 'POST' && $path === '/courier/stripe/onboard') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCourierStripeOnboard($pdo, $config, $auth);
+}
+if ($method === 'GET' && $path === '/courier/stripe/status') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleCourierStripeStatus($pdo, $config, $auth);
+}
+
 if ($method === 'POST' && preg_match('#^/deliveries/([^/]+)/verify-otp$#', $path, $m)) {
   $auth = requireAuth($secret);
   $pdo  = getPDO();
-  handleVerifyOtp($pdo, $auth, $m[1]);
+  handleVerifyOtp($pdo, $auth, $m[1], $config);
 }
 
 if ($method === 'POST' && preg_match('#^/deliveries/([^/]+)/proof$#', $path, $m)) {
@@ -691,6 +709,20 @@ if ($method === 'GET' && $path === '/admin/couriers') {
   requireAdmin($auth);
   $pdo  = getPDO();
   handleListCouriers($pdo);
+}
+
+// ── Admin courier payouts ──
+if ($method === 'GET' && $path === '/admin/courier-payouts') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleListCourierBalances($pdo);
+}
+if ($method === 'POST' && preg_match('#^/admin/couriers/([^/]+)/payout$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handlePayCourier($pdo, $config, $m[1]);
 }
 
 if ($method === 'POST' && preg_match('#^/admin/deliveries/([^/]+)/assign$#', $path, $m)) {

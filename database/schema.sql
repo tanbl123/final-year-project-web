@@ -141,6 +141,8 @@ CREATE TABLE delivery_personnel (
     dateOfBirth         DATE         NULL,                  -- for the 18+ eligibility check
     termsAcceptedAt     DATETIME     NULL,                  -- when PDPA/T&C consent was given
     coverageZones       VARCHAR(255) NOT NULL DEFAULT '',   -- comma-separated states the courier delivers to
+    stripeAccountId     VARCHAR(60)  NULL,                  -- Stripe Connect account (acct_...) for payouts
+    payoutsEnabled      TINYINT(1)   NOT NULL DEFAULT 0,    -- set once Stripe verifies payouts
     PRIMARY KEY (deliveryPersonnelId),
     UNIQUE KEY uq_delivery_user (userId),
     CONSTRAINT fk_delivery_user FOREIGN KEY (userId) REFERENCES `user`(userId)
@@ -364,11 +366,14 @@ CREATE TABLE delivery (
     estimatedDeliveryTime DATETIME   NULL,
     otpCode             VARCHAR(10)  NULL,                -- customer confirmation OTP (per parcel)
     proofOfDelivery     VARCHAR(255) NULL,                -- photo path / URL
+    courierFee          DECIMAL(10,2) NOT NULL DEFAULT 0, -- earned by the courier on delivery (snapshot)
+    courierPayoutId     VARCHAR(10)  NULL,                -- set once this delivery's fee is paid out
     PRIMARY KEY (deliveryId),
     UNIQUE KEY uq_delivery_order_supplier (orderId, supplierId),
     KEY idx_delivery_personnel (deliveryPersonnelId),
     KEY idx_delivery_supplier (supplierId),
     KEY idx_delivery_status (deliveryStatus),
+    KEY idx_delivery_courier_payout (courierPayoutId),
     CONSTRAINT fk_delivery_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
         ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_delivery_supplier FOREIGN KEY (supplierId) REFERENCES supplier(supplierId)
@@ -467,6 +472,25 @@ CREATE TABLE supplier_payout (
     CONSTRAINT fk_payout_order FOREIGN KEY (orderId) REFERENCES `order`(orderId)
         ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT chk_payout_amounts CHECK (grossAmount >= 0 AND commissionAmount >= 0 AND netAmount >= 0)
+) ENGINE=InnoDB;
+
+-- Courier earnings payout: the admin pays a courier the accrued per-delivery
+-- fees for all their as-yet-unpaid Delivered parcels in one Stripe transfer.
+-- Each covered delivery row is stamped with this payoutId.
+CREATE TABLE courier_payout (
+    payoutId            VARCHAR(10)   NOT NULL,            -- CPY0001
+    deliveryPersonnelId VARCHAR(10)   NOT NULL,
+    stripeTransferId    VARCHAR(60)   NULL,                -- tr_... returned by Stripe
+    amount              DECIMAL(10,2) NOT NULL,            -- total transferred to the courier
+    deliveryCount       INT           NOT NULL DEFAULT 0,  -- number of deliveries covered
+    currency            CHAR(3)       NOT NULL DEFAULT 'myr',
+    payoutStatus        ENUM('Pending','Paid','Failed') NOT NULL DEFAULT 'Pending',
+    created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (payoutId),
+    KEY idx_courier_payout_dp (deliveryPersonnelId),
+    CONSTRAINT fk_courier_payout_dp FOREIGN KEY (deliveryPersonnelId) REFERENCES delivery_personnel(deliveryPersonnelId)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT chk_courier_payout_amount CHECK (amount >= 0)
 ) ENGINE=InnoDB;
 
 -- Supplier business-detail change requests (post-approval re-verification).

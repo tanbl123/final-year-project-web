@@ -31,6 +31,7 @@ import AdminBusinessChangesPage from './features/admin/suppliers/AdminBusinessCh
 import AdminUsersPage from './features/admin/users/AdminUsersPage';
 import AdminCouriersPage from './features/admin/couriers/AdminCouriersPage';
 import AdminCommissionPage from './features/admin/commission/AdminCommissionPage';
+import AdminCourierPayoutsPage from './features/admin/payouts/AdminCourierPayoutsPage';
 import AdminDeliveriesPage from './features/admin/deliveries/AdminDeliveriesPage';
 import AdminDeliveryIssuesPage from './features/admin/deliveries/AdminDeliveryIssuesPage';
 import ProfilePage from './features/profile/ProfilePage';
@@ -185,6 +186,9 @@ const router = createBrowserRouter(
       } />
       <Route path="/admin/commission" element={
         <ProtectedRoute role="Admin"><AdminCommissionPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/courier-payouts" element={
+        <ProtectedRoute role="Admin"><AdminCourierPayoutsPage /></ProtectedRoute>
       } />
 
       {/* any signed-in user's own profile */}

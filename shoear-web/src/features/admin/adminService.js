@@ -55,6 +55,17 @@ export function rejectCourier(userId, { reason, terminal = false } = {}) {
   return apiPost(`/admin/couriers/${userId}/reject`, { reason, terminal }, getToken());
 }
 
+// ── courier payouts ──────────────────────────────────────────────────
+// Every active courier with their pending earnings balance + Stripe status.
+export function getCourierPayouts() {
+  return apiGet('/admin/courier-payouts', getToken());
+}
+
+// Pay a courier their whole pending balance via Stripe. Returns the payout.
+export function payCourier(deliveryPersonnelId) {
+  return apiPost(`/admin/couriers/${deliveryPersonnelId}/payout`, {}, getToken());
+}
+
 // Products awaiting approval.
 export function getPendingProducts() {
   return apiGet('/admin/products/pending', getToken());

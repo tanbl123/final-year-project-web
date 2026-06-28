@@ -262,7 +262,7 @@ function handleUpdateDeliveryStatus(PDO $pdo, array $auth, string $deliveryId): 
 
 // POST /deliveries/{deliveryId}/verify-otp — body: { otpCode }. On a match
 // (delivery must be OutForDelivery) → Delivered, order → Delivered.
-function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId): void {
+function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId, array $config = []): void {
   $courierId = requireDeliveryPersonnelId($pdo, $auth);
   $body = getJsonBody();
   $otp  = trim($body['otpCode'] ?? '');
@@ -275,10 +275,14 @@ function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId): void {
     sendJson(400, false, null, ['code' => 'BAD_OTP', 'message' => 'Incorrect OTP. Ask the customer for the code shown in their app.']);
   }
 
+  // The courier earns a flat fee per completed parcel — snapshot it now so a
+  // later config change never rewrites past earnings.
+  $fee = (float) ($config['courier_fee_per_delivery'] ?? 0);
+
   try {
     $pdo->beginTransaction();
-    $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW() WHERE deliveryId = :id")
-        ->execute(['id' => $deliveryId]);
+    $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW(), courierFee = :fee WHERE deliveryId = :id")
+        ->execute(['fee' => $fee, 'id' => $deliveryId]);
     // order becomes Delivered only once EVERY parcel is delivered
     recomputeOrderStatus($pdo, $del['orderId']);
     $pdo->commit();
