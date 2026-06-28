@@ -28,7 +28,14 @@ class CatalogScreen extends StatefulWidget {
 
 class _CatalogScreenState extends State<CatalogScreen> {
   final _searchCtrl = TextEditingController();
-  late Future<CatalogPage> _future;
+  final _scroll = ScrollController();
+  final List<ProductSummary> _items = [];
+  int _page = 1;        // last page loaded
+  int _total = 0;       // total matching products (from the API)
+  bool _loading = true; // first-page load
+  bool _loadingMore = false;
+  Object? _error;
+  bool get _hasMore => _items.length < _total;
   String _search = '';
   Timer? _debounce;   // debounces the live search so we don't hit the API on every keystroke
 
@@ -44,7 +51,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _scroll.addListener(_onScroll);
+    _fetchFirstPage();
     // categories for the filter dropdown (best-effort)
     context.read<CatalogService>().listCategories().then((cats) {
       if (mounted) setState(() => _categories = cats);
@@ -54,23 +62,65 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _scroll.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<CatalogPage> _load() => context.read<CatalogService>().listProducts(
+  Future<CatalogPage> _load(int page) => context.read<CatalogService>().listProducts(
         search: _search,
         categoryId: _categoryId,
         minPrice: _minPrice,
         maxPrice: _maxPrice,
         sort: _sort,
+        page: page,
       );
 
-  Future<void> _refresh() async {
-    final next = _load();
-    setState(() => _future = next);
-    await next;
+  // (Re)load from page 1 — on first open, refresh, search or filter change.
+  Future<void> _fetchFirstPage() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await _load(1);
+      if (!mounted) return;
+      setState(() {
+        _items..clear()..addAll(res.items);
+        _page = res.page;
+        _total = res.total;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e; _loading = false; });
+    }
   }
+
+  // Append the next page when the user nears the bottom.
+  Future<void> _loadMore() async {
+    if (_loadingMore || _loading || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final res = await _load(_page + 1);
+      if (!mounted) return;
+      setState(() {
+        _items.addAll(res.items);
+        _page = res.page;
+        _total = res.total;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false); // keep what we have; user can scroll again to retry
+    }
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _refresh() => _fetchFirstPage();
 
   // type-to-search: rebuild now (for the clear button), then reload after a pause
   void _onSearchChanged(String value) {
@@ -84,10 +134,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
     _debounce?.cancel();
     final q = value.trim();
     if (q == _search) return;
-    setState(() {
-      _search = q;
-      _future = _load();
-    });
+    _search = q;
+    _fetchFirstPage();
   }
 
   @override
@@ -126,39 +174,46 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: FutureBuilder<CatalogPage>(
-          future: _future,
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snap.hasError) {
-              return _ErrorView(message: snap.error.toString(), onRetry: _refresh);
-            }
-            final items = snap.data?.items ?? [];
-            if (items.isEmpty) {
-              return ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: Text('No products found.')),
-                ],
-              );
-            }
-            return GridView.builder(
+      body: _body(),
+    );
+  }
+
+  Widget _body() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) return _ErrorView(message: _error.toString(), onRetry: _fetchFirstPage);
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: CustomScrollView(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          if (_items.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No products found.'))),
+            )
+          else ...[
+            SliverPadding(
               padding: const EdgeInsets.all(12),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 220,
-                childAspectRatio: 0.62,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 220,
+                  childAspectRatio: 0.62,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _ProductCard(product: _items[i]),
+                  childCount: _items.length,
+                ),
               ),
-              itemCount: items.length,
-              itemBuilder: (context, i) => _ProductCard(product: items[i]),
-            );
-          },
-        ),
+            ),
+            if (_loadingMore)
+              const SliverToBoxAdapter(
+                child: Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: CircularProgressIndicator())),
+              ),
+          ],
+        ],
       ),
     );
   }
@@ -222,13 +277,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
       ),
     );
     if (result != null) {
-      setState(() {
-        _categoryId = result.categoryId;
-        _sort = result.sort;
-        _minPrice = result.minPrice;
-        _maxPrice = result.maxPrice;
-        _future = _load();
-      });
+      _categoryId = result.categoryId;
+      _sort = result.sort;
+      _minPrice = result.minPrice;
+      _maxPrice = result.maxPrice;
+      _fetchFirstPage();
     }
   }
 
