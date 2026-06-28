@@ -134,8 +134,12 @@ CREATE TABLE delivery_personnel (
     vehiclePlate        VARCHAR(20) NOT NULL DEFAULT '',
     licenseNumber       VARCHAR(50)  NOT NULL DEFAULT '',   -- driving licence no.
     licensePhotoUrl     VARCHAR(255) NULL,                  -- photo of the licence
+    licenseClass        VARCHAR(10)  NOT NULL DEFAULT '',   -- e.g. B2 (motorcycle), D (car)
+    licenseExpiry       DATE         NULL,                  -- licence expiry date
     icNumber            VARCHAR(20)  NOT NULL DEFAULT '',   -- IC / identity no.
     icPhotoUrl          VARCHAR(255) NULL,                  -- photo of the IC
+    dateOfBirth         DATE         NULL,                  -- for the 18+ eligibility check
+    termsAcceptedAt     DATETIME     NULL,                  -- when PDPA/T&C consent was given
     PRIMARY KEY (deliveryPersonnelId),
     UNIQUE KEY uq_delivery_user (userId),
     CONSTRAINT fk_delivery_user FOREIGN KEY (userId) REFERENCES `user`(userId)

@@ -5,6 +5,21 @@ import { usePagination } from '../../../hooks/usePagination';
 
 const PAGE_SIZE = 10;
 
+// Small date helpers for the KYC display (dates arrive as 'YYYY-MM-DD').
+function isExpired(dateStr) {
+  const d = new Date(dateStr);
+  return !Number.isNaN(d.getTime()) && d < new Date(new Date().toDateString());
+}
+function ageFrom(dateStr) {
+  const dob = new Date(dateStr);
+  if (Number.isNaN(dob.getTime())) return '?';
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}
+
 // Courier approval queue — delivery personnel who self-applied via the delivery
 // app start as Pending and appear here. Mirrors the supplier approval flow.
 function AdminCouriersPage() {
@@ -130,15 +145,29 @@ function AdminCouriersPage() {
                   <td className="small">
                     <div>
                       <span className="text-muted">Licence:</span> {c.licenseNumber || '—'}
+                      {c.licenseClass && <span className="ms-1 badge bg-light text-dark border">{c.licenseClass}</span>}
                       {c.licensePhotoUrl && (
                         <a href={c.licensePhotoUrl} target="_blank" rel="noreferrer" className="ms-1">view</a>
                       )}
                     </div>
+                    {c.licenseExpiry && (
+                      <div className={isExpired(c.licenseExpiry) ? 'text-danger' : 'text-muted'}>
+                        Expires {c.licenseExpiry}{isExpired(c.licenseExpiry) ? ' (expired)' : ''}
+                      </div>
+                    )}
                     <div>
                       <span className="text-muted">IC:</span> {c.icNumber || '—'}
                       {c.icPhotoUrl && (
                         <a href={c.icPhotoUrl} target="_blank" rel="noreferrer" className="ms-1">view</a>
                       )}
+                    </div>
+                    {c.dateOfBirth && (
+                      <div className="text-muted">DOB: {c.dateOfBirth} ({ageFrom(c.dateOfBirth)} yrs)</div>
+                    )}
+                    <div className="text-muted">
+                      {c.termsAcceptedAt
+                        ? <span className="text-success">✓ T&amp;C / PDPA agreed</span>
+                        : <span className="text-danger">T&amp;C not agreed</span>}
                     </div>
                   </td>
                   <td className="text-muted small">{new Date(c.created_at).toLocaleDateString()}</td>

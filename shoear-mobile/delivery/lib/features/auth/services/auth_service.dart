@@ -38,8 +38,12 @@ class AuthService {
     required String verificationCode,
     required String licenseNumber,
     required String licensePhotoUrl,
+    required String licenseClass,
+    required String licenseExpiry,   // YYYY-MM-DD
     required String icNumber,
     required String icPhotoUrl,
+    required String dateOfBirth,     // YYYY-MM-DD
+    required bool termsAccepted,
     required String avatarUrl,
   }) async {
     final data = await api.post('/auth/register/courier', {
@@ -54,8 +58,12 @@ class AuthService {
       'verificationCode': verificationCode,
       'licenseNumber': licenseNumber,
       'licensePhotoUrl': licensePhotoUrl,
+      'licenseClass': licenseClass,
+      'licenseExpiry': licenseExpiry,
       'icNumber': icNumber,
       'icPhotoUrl': icPhotoUrl,
+      'dateOfBirth': dateOfBirth,
+      'termsAccepted': termsAccepted,
       'avatarUrl': avatarUrl,
     });
     return (data as Map<String, dynamic>)['message']?.toString() ??

@@ -391,8 +391,12 @@ function handleRegisterCourier(PDO $pdo): void {
   // KYC: driving licence, IC, profile photo (uploaded via /uploads/registration-doc)
   $licenseNumber   = trim($body['licenseNumber'] ?? '');
   $licensePhotoUrl = trim($body['licensePhotoUrl'] ?? '');
+  $licenseClass    = trim($body['licenseClass'] ?? '');
+  $licenseExpiry   = trim($body['licenseExpiry'] ?? '');   // YYYY-MM-DD
   $icNumber        = trim($body['icNumber'] ?? '');
   $icPhotoUrl      = trim($body['icPhotoUrl'] ?? '');
+  $dateOfBirth     = trim($body['dateOfBirth'] ?? '');     // YYYY-MM-DD
+  $termsAccepted   = ($body['termsAccepted'] ?? false) === true;
   $avatarUrl       = trim($body['avatarUrl'] ?? '');
 
   if ($fullName === '' || $email === '' || $phoneNumber === '' ||
@@ -425,6 +429,35 @@ function handleRegisterCourier(PDO $pdo): void {
   // Malaysian NRIC is exactly 12 digits (entered without dashes).
   if (!preg_match('/^\d{12}$/', $icNumber)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'IC must be 12 digits (e.g. 901231145678).']);
+  }
+  // Driving licence class must be a recognised Malaysian class.
+  $allowedClasses = ['B', 'B1', 'B2', 'D', 'DA', 'E', 'E1', 'E2'];
+  if (!in_array($licenseClass, $allowedClasses, true)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please select a valid driving licence class.']);
+  }
+  // Licence expiry must be a real date that is still in the future.
+  $exp = DateTime::createFromFormat('Y-m-d', $licenseExpiry);
+  if (!$exp || $exp->format('Y-m-d') !== $licenseExpiry) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please provide a valid licence expiry date.']);
+  }
+  if ($exp <= new DateTime('today')) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Your driving licence has expired.']);
+  }
+  // Date of birth must be valid and the applicant at least 18 years old.
+  $dob = DateTime::createFromFormat('Y-m-d', $dateOfBirth);
+  if (!$dob || $dob->format('Y-m-d') !== $dateOfBirth) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please provide a valid date of birth.']);
+  }
+  $age = (new DateTime('today'))->diff($dob)->y;
+  if ($dob >= new DateTime('today') || $age < 18) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'You must be at least 18 years old to register as a courier.']);
+  }
+  if ($age > 100) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please provide a valid date of birth.']);
+  }
+  // PDPA / Terms consent is mandatory.
+  if (!$termsAccepted) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'You must agree to the Terms and the data-use (PDPA) notice.']);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
@@ -489,10 +522,11 @@ function handleRegisterCourier(PDO $pdo): void {
     )->execute(['id' => $userId, 'un' => $username, 'pw' => $hash, 'em' => $email, 'fn' => $fullName, 'ph' => $phoneNumber, 'av' => $avatarUrl !== '' ? $avatarUrl : null]);
 
     $deliveryPersonnelId = nextId($pdo, 'delivery_personnel', 'deliveryPersonnelId', 'DEL');
-    $pdo->prepare('INSERT INTO delivery_personnel (deliveryPersonnelId, userId, vehicleType, vehicleBrand, vehicleModel, vehiclePlate, licenseNumber, licensePhotoUrl, icNumber, icPhotoUrl)
-                   VALUES (:did, :uid, :vt, :vb, :vm, :vp, :ln, :lp, :ic, :ip)')
+    $pdo->prepare('INSERT INTO delivery_personnel (deliveryPersonnelId, userId, vehicleType, vehicleBrand, vehicleModel, vehiclePlate, licenseNumber, licensePhotoUrl, licenseClass, licenseExpiry, icNumber, icPhotoUrl, dateOfBirth, termsAcceptedAt)
+                   VALUES (:did, :uid, :vt, :vb, :vm, :vp, :ln, :lp, :lc, :le, :ic, :ip, :dob, NOW())')
         ->execute(['did' => $deliveryPersonnelId, 'uid' => $userId, 'vt' => $vehicleType, 'vb' => $vehicleBrand, 'vm' => $vehicleModel, 'vp' => $vehiclePlate,
-                   'ln' => $licenseNumber, 'lp' => $licensePhotoUrl, 'ic' => $icNumber, 'ip' => $icPhotoUrl]);
+                   'ln' => $licenseNumber, 'lp' => $licensePhotoUrl, 'lc' => $licenseClass, 'le' => $licenseExpiry,
+                   'ic' => $icNumber, 'ip' => $icPhotoUrl, 'dob' => $dateOfBirth]);
 
     $pdo->commit();
   } catch (Throwable $e) {

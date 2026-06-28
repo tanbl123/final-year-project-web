@@ -56,6 +56,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _licenseSameAsIc = true;
   String? _licenseNumberError, _icNumberError, _docsError;
 
+  // Extra KYC: licence class + expiry, date of birth (18+), PDPA/T&C consent.
+  String? _licenseClass;            // e.g. 'B2' (motorcycle), 'D' (car)
+  DateTime? _licenseExpiry;
+  DateTime? _dateOfBirth;
+  bool _termsAccepted = false;
+  String? _licenseClassError, _licenseExpiryError, _dobError, _termsError;
+
   final _fullNameFocus     = FocusNode();
   final _emailFocus        = FocusNode();
   final _phoneFocus        = FocusNode();
@@ -179,6 +186,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  String? _validateLicenseClass() => _licenseClass == null ? 'Please select your licence class.' : null;
+
+  String? _validateLicenseExpiry() {
+    if (_licenseExpiry == null) return 'Please set your licence expiry date.';
+    final today = DateTime.now();
+    if (!_licenseExpiry!.isAfter(DateTime(today.year, today.month, today.day))) {
+      return 'Your driving licence has expired.';
+    }
+    return null;
+  }
+
+  String? _validateDob() {
+    if (_dateOfBirth == null) return 'Please set your date of birth.';
+    final age = _ageFrom(_dateOfBirth!);
+    if (age < 18) return 'You must be at least 18 years old.';
+    if (age > 100) return 'Please enter a valid date of birth.';
+    return null;
+  }
+
+  int _ageFrom(DateTime dob) {
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) age--;
+    return age;
+  }
+
+  // Format a date as YYYY-MM-DD for the API (no intl dependency needed).
+  String _fmtDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   bool get _photosUploaded => _avatarUrl != null && _licensePhotoUrl != null && _icPhotoUrl != null;
 
   // Let the courier take a fresh photo (preferred for KYC) or pick an existing
@@ -243,12 +280,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // IC error is the only one to show; otherwise validate the typed licence.
       _licenseNumberError = _licenseSameAsIc ? null : _validateLicenseNo(_licenseNumber.text);
       _icNumberError      = _validateIcNo(_icNumber.text);
+      _licenseClassError  = _validateLicenseClass();
+      _licenseExpiryError = _validateLicenseExpiry();
+      _dobError           = _validateDob();
+      _termsError         = _termsAccepted ? null : 'Please agree to the Terms and PDPA notice.';
       _docsError = _photosUploaded ? null : 'Please add your profile photo, licence photo and IC photo.';
     });
     if (_fullNameError != null || _emailError != null || _phoneError != null ||
         _vehicleBrandError != null || _vehicleModelError != null ||
         _vehiclePlateError != null || _passwordError != null || _confirmError != null ||
-        _licenseNumberError != null || _icNumberError != null || _docsError != null) return;
+        _licenseNumberError != null || _icNumberError != null || _docsError != null ||
+        _licenseClassError != null || _licenseExpiryError != null || _dobError != null ||
+        _termsError != null) return;
 
     setState(() => _loading = true);
     try {
@@ -287,8 +330,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             verificationCode: code,
             licenseNumber:    _licenseSameAsIc ? _icNumber.text.trim() : _licenseNumber.text.trim(),
             licensePhotoUrl:  _licensePhotoUrl ?? '',
+            licenseClass:     _licenseClass ?? '',
+            licenseExpiry:    _licenseExpiry != null ? _fmtDate(_licenseExpiry!) : '',
             icNumber:         _icNumber.text.trim(),
             icPhotoUrl:       _icPhotoUrl ?? '',
+            dateOfBirth:      _dateOfBirth != null ? _fmtDate(_dateOfBirth!) : '',
+            termsAccepted:    _termsAccepted,
             avatarUrl:        _avatarUrl ?? '',
           );
       if (!mounted) return;
@@ -390,6 +437,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             error:    _phoneError,
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
             onChanged: (v) => setState(() => _phoneError = _validatePhone(v)),
+          ),
+          _dateField(
+            label: 'Date of birth',
+            value: _dateOfBirth,
+            error: _dobError,
+            onTap: _pickDateOfBirth,
           ),
           _sectionHeader('Account security'),
           Padding(
@@ -520,6 +573,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
             dense: true,
             title: const Text('Licence number is the same as my IC number'),
           ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: DropdownButtonFormField<String>(
+              value: _licenseClass,
+              decoration: InputDecoration(
+                labelText: 'Licence class',
+                border: const OutlineInputBorder(),
+                errorText: _licenseClassError,
+              ),
+              items: const [
+                DropdownMenuItem(value: 'B2', child: Text('B2 — Motorcycle (≤ 250cc)')),
+                DropdownMenuItem(value: 'B',  child: Text('B — Motorcycle (any cc)')),
+                DropdownMenuItem(value: 'D',  child: Text('D — Car')),
+                DropdownMenuItem(value: 'E',  child: Text('E — Lorry / van')),
+                DropdownMenuItem(value: 'E1', child: Text('E1 — Light lorry')),
+                DropdownMenuItem(value: 'E2', child: Text('E2 — Medium lorry')),
+              ],
+              onChanged: (v) => setState(() { _licenseClass = v; _licenseClassError = _validateLicenseClass(); }),
+            ),
+          ),
+          _dateField(
+            label: 'Licence expiry date',
+            value: _licenseExpiry,
+            error: _licenseExpiryError,
+            onTap: _pickLicenseExpiry,
+          ),
           _photoTile(label: 'Driving licence photo', url: _licensePhotoUrl, uploading: _upLicense,
               error: _docsError != null && _licensePhotoUrl == null, onPick: () => _pickPhoto('license')),
           if (_docsError != null)
@@ -527,7 +607,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(_docsError!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
             ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          // PDPA / Terms consent — legally expected in Malaysia, required to submit.
+          CheckboxListTile(
+            value: _termsAccepted,
+            onChanged: (checked) => setState(() {
+              _termsAccepted = checked ?? false;
+              if (_termsAccepted) _termsError = null;
+            }),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: const Text(
+              'I agree to the Terms of Service and consent to ShoeAR processing my '
+              'personal data for verification (PDPA).',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+          if (_termsError != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 4),
+              child: Text(_termsError!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+            ),
+          const SizedBox(height: 16),
           FilledButton(
             onPressed: _loading ? null : _sendCode,
             child: Padding(
@@ -546,6 +648,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
         padding: EdgeInsets.only(top: top, bottom: 10),
         child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
       );
+
+  // A tap-to-pick date field styled like the text fields (read-only display).
+  Widget _dateField({
+    required String label,
+    required DateTime? value,
+    required String? error,
+    required VoidCallback onTap,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: InkWell(
+          onTap: onTap,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              errorText: error,
+              suffixIcon: const Icon(Icons.calendar_today_outlined),
+            ),
+            child: Text(
+              value != null ? _fmtDate(value) : 'Select a date',
+              style: TextStyle(
+                color: value != null
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).hintColor,
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final eighteen = DateTime(now.year - 18, now.month, now.day); // youngest allowed
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? eighteen,
+      firstDate: DateTime(now.year - 80),
+      lastDate: eighteen,
+      helpText: 'Select your date of birth',
+    );
+    if (picked != null) setState(() { _dateOfBirth = picked; _dobError = _validateDob(); });
+  }
+
+  Future<void> _pickLicenseExpiry() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _licenseExpiry ?? now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 15),
+      helpText: 'Select your licence expiry date',
+    );
+    if (picked != null) setState(() { _licenseExpiry = picked; _licenseExpiryError = _validateLicenseExpiry(); });
+  }
 
   Widget _photoTile({
     required String label,
