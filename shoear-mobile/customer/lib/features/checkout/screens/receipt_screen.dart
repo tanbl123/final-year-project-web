@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
+import 'package:customer/features/order/services/receipt_pdf.dart';
 import 'package:customer/features/shell/main_shell.dart';
 
 /// Order confirmation + receipt. Shown once after a successful payment
@@ -88,6 +89,31 @@ class ReceiptScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
+
+            // Save / share / print this receipt — the OS sheet covers saving to
+            // Files, emailing it, and printing, all from one button.
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  try {
+                    await shareReceiptPdf(receipt);
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                        ..removeCurrentSnackBar()
+                        ..showSnackBar(const SnackBar(content: Text('Could not generate the receipt.')));
+                    }
+                  }
+                },
+                icon: const Icon(Icons.ios_share),
+                label: const Text('Download / Share receipt'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
 
               // ── Items ──────────────────────────────────────────────────
               _Card(
