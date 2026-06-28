@@ -4,10 +4,13 @@ import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
 import 'package:customer/features/shell/main_shell.dart';
 
-/// Order confirmation + receipt, shown after a successful payment.
+/// Order confirmation + receipt. Shown once after a successful payment
+/// (`confirmation: true`, the terminal success screen) and also re-openable
+/// later from the order detail as a plain receipt (`confirmation: false`).
 class ReceiptScreen extends StatelessWidget {
   final Receipt receipt;
-  const ReceiptScreen({super.key, required this.receipt});
+  final bool confirmation; // true = post-payment success; false = re-viewing
+  const ReceiptScreen({super.key, required this.receipt, this.confirmation = true});
 
   @override
   Widget build(BuildContext context) {
@@ -15,15 +18,20 @@ class ReceiptScreen extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     final itemCount = receipt.items.fold<int>(0, (s, i) => s + i.qty);
 
-    return PopScope(
-      canPop: false, // terminal screen — use the buttons, not the back gesture
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade100,
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-            children: [
-              // ── Success hero ───────────────────────────────────────────
+    final scaffold = Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      // Re-view mode gets a normal app bar + back button; the success screen is
+      // chromeless and exits via its action buttons instead.
+      appBar: confirmation
+          ? null
+          : AppBar(title: Text('Receipt · ${receipt.orderId}'), backgroundColor: Colors.white, elevation: 0),
+      body: SafeArea(
+        top: !confirmation ? false : true,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+          children: [
+            // ── Header ─────────────────────────────────────────────────
+            if (confirmation) ...[
               Center(
                 child: Container(
                   width: 84,
@@ -68,6 +76,18 @@ class ReceiptScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+            ] else ...[
+              // Re-view: a small "Paid" badge instead of the big success hero.
+              Row(
+                children: [
+                  Icon(Icons.verified_outlined, size: 18, color: Colors.green.shade600),
+                  const SizedBox(width: 6),
+                  Text('Paid',
+                      style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
 
               // ── Items ──────────────────────────────────────────────────
               _Card(
@@ -152,8 +172,8 @@ class ReceiptScreen extends StatelessWidget {
           ),
         ),
 
-        // ── Actions ───────────────────────────────────────────────────────
-        bottomNavigationBar: SafeArea(
+        // ── Actions (success screen only; re-view exits via the app bar) ──
+        bottomNavigationBar: !confirmation ? null : SafeArea(
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             decoration: BoxDecoration(
@@ -206,8 +226,11 @@ class ReceiptScreen extends StatelessWidget {
             ),
           ),
         ),
-      ),
     );
+
+    // The success screen blocks the back gesture (use its buttons); the
+    // re-view receipt behaves like any normal pushed screen.
+    return confirmation ? PopScope(canPop: false, child: scaffold) : scaffold;
   }
 
   Widget _kv(String k, String v, {bool mono = false}) => Padding(

@@ -15,6 +15,7 @@ import 'package:customer/features/order/screens/refund_detail_screen.dart';
 import 'package:customer/features/order/screens/orders_screen.dart' show kOrderStatusColors, prettyStatus;
 import 'package:customer/features/review/services/review_service.dart';
 import 'package:customer/features/review/widgets/review_sheet.dart';
+import 'package:customer/features/checkout/screens/receipt_screen.dart';
 
 const Map<String, Color> _deliveryColors = {
   'Pending': Colors.orange,
@@ -147,6 +148,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     } finally {
       if (mounted) setState(() => _paying = false);
       await _refresh();
+    }
+  }
+
+  Future<void> _viewReceipt() async {
+    try {
+      final receipt = await context.read<OrderService>().getReceipt(widget.orderId);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ReceiptScreen(receipt: receipt, confirmation: false)),
+      );
+    } catch (e) {
+      if (mounted) context.showSnack(e.toString());
     }
   }
 
@@ -380,10 +393,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           icon: Icons.payment_outlined,
           title: 'Payment',
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _kv('Method', o.paymentMethod ?? '—'),
               _kv('Status', o.paymentStatus ?? (awaiting ? 'Unpaid' : '—')),
               if (o.paymentDate != null) _kv('Date', _fmtDate(o.paymentDate)),
+              if (o.paymentStatus == 'Successful') ...[
+                const SizedBox(height: 6),
+                const Divider(height: 1),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _viewReceipt,
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('View receipt'),
+                    style: TextButton.styleFrom(
+                        foregroundColor: primary, padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
