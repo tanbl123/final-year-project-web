@@ -153,6 +153,7 @@ function AdminCourierPayoutsPage() {
                                   <th>Date</th>
                                   <th className="text-end">Amount</th>
                                   <th className="text-end">Deliveries</th>
+                                  <th>Type</th>
                                   <th>Status</th>
                                   <th>Stripe transfer</th>
                                 </tr>
@@ -163,6 +164,7 @@ function AdminCourierPayoutsPage() {
                                     <td className="small">{new Date(p.created_at).toLocaleString()}</td>
                                     <td className="text-end">{fmt(p.amount)}</td>
                                     <td className="text-end">{p.deliveryCount}</td>
+                                    <td><span className="badge bg-light text-dark border">{p.isAuto ? 'Auto' : 'Manual'}</span></td>
                                     <td>{statusBadge(p.payoutStatus)}</td>
                                     <td className="small text-muted">{p.stripeTransferId || '—'}</td>
                                   </tr>

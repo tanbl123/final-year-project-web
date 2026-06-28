@@ -532,6 +532,7 @@ if ($method === 'POST' && $path === '/admin/run-sweeps') {
   requireAdmin($auth);
   $pdo  = getPDO();
   $result = runNotificationSweeps($pdo);
+  $result['courierPayouts'] = sweepCourierPayouts($pdo, $config);  // automatic monthly payout (gated)
   sendJson(200, true, ['swept' => $result]);
 }
 

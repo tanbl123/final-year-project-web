@@ -52,7 +52,7 @@ function handleCourierEarnings(PDO $pdo, array $config, array $auth): void {
   $lifetime = (float) $paidStmt->fetchColumn();
 
   $hist = $pdo->prepare(
-    "SELECT payoutId, amount, deliveryCount, currency, payoutStatus, created_at
+    "SELECT payoutId, amount, deliveryCount, currency, payoutStatus, isAuto, created_at
        FROM courier_payout WHERE deliveryPersonnelId = :dp
       ORDER BY created_at DESC, payoutId DESC"
   );
@@ -171,7 +171,7 @@ function handleListCourierBalances(PDO $pdo): void {
 // GET /admin/couriers/{deliveryPersonnelId}/payouts — that courier's payout history.
 function handleCourierPayoutHistory(PDO $pdo, string $courierId): void {
   $stmt = $pdo->prepare(
-    "SELECT payoutId, amount, deliveryCount, currency, payoutStatus, stripeTransferId, created_at
+    "SELECT payoutId, amount, deliveryCount, currency, payoutStatus, isAuto, stripeTransferId, created_at
        FROM courier_payout WHERE deliveryPersonnelId = :dp
       ORDER BY created_at DESC, payoutId DESC"
   );
@@ -204,17 +204,35 @@ function handlePayCourier(PDO $pdo, array $config, string $courierId): void {
     sendJson(409, false, null, ['code' => 'NOT_CONNECTED',
       'message' => 'This courier has not finished connecting their payout account.']);
   }
-
-  $bal = courierBalance($pdo, $courierId);
-  if ($bal['balance'] <= 0) {
+  if (courierBalance($pdo, $courierId)['balance'] <= 0) {
     sendJson(409, false, null, ['code' => 'NOTHING_DUE', 'message' => 'This courier has no pending balance.']);
+  }
+
+  try {
+    $res = payOutCourierBalance($pdo, $config, $courier, false);  // false = manual
+  } catch (Throwable $e) {
+    sendJson(502, false, null, ['code' => 'STRIPE_ERROR', 'message' => $e->getMessage()]);
+  }
+  sendJson(201, true, $res);
+}
+
+// Core payout: transfer a courier's whole pending balance in one Stripe
+// transfer, record it (isAuto marks an automatic monthly run vs a manual one),
+// and stamp the covered deliveries. Returns the payout result, or throws a
+// RuntimeException (with a user-facing message) on a Stripe/DB failure. The
+// caller is responsible for the connected/balance pre-checks.
+function payOutCourierBalance(PDO $pdo, array $config, array $courier, bool $isAuto): array {
+  $courierId = $courier['deliveryPersonnelId'];
+  $bal       = courierBalance($pdo, $courierId);
+  if ($bal['balance'] <= 0) {
+    throw new RuntimeException('This courier has no pending balance.');
   }
 
   $payoutId = nextId($pdo, 'courier_payout', 'payoutId', 'CPY');
   $cents    = (int) round($bal['balance'] * 100);
+  $auto     = $isAuto ? 1 : 0;
 
   $transferId = null;
-  $status     = 'Failed';
   try {
     $transfer = stripeApi($config['stripe_secret'], 'POST', '/v1/transfers', [
       'amount'         => $cents,
@@ -223,24 +241,22 @@ function handlePayCourier(PDO $pdo, array $config, string $courierId): void {
       'transfer_group' => $payoutId,
     ]);
     $transferId = $transfer['id'] ?? null;
-    $status     = 'Paid';
   } catch (Throwable $e) {
     // record the failed attempt so it's auditable, then surface the error
     $pdo->prepare(
-      "INSERT INTO courier_payout (payoutId, deliveryPersonnelId, stripeTransferId, amount, deliveryCount, currency, payoutStatus)
-       VALUES (:id, :dp, NULL, :amt, :cnt, 'myr', 'Failed')"
-    )->execute(['id' => $payoutId, 'dp' => $courierId, 'amt' => $bal['balance'], 'cnt' => $bal['deliveries']]);
-    sendJson(502, false, null, ['code' => 'STRIPE_ERROR', 'message' => $e->getMessage()]);
+      "INSERT INTO courier_payout (payoutId, deliveryPersonnelId, stripeTransferId, amount, deliveryCount, currency, payoutStatus, isAuto)
+       VALUES (:id, :dp, NULL, :amt, :cnt, 'myr', 'Failed', :au)"
+    )->execute(['id' => $payoutId, 'dp' => $courierId, 'amt' => $bal['balance'], 'cnt' => $bal['deliveries'], 'au' => $auto]);
+    throw new RuntimeException($e->getMessage());
   }
 
   try {
     $pdo->beginTransaction();
     $pdo->prepare(
-      "INSERT INTO courier_payout (payoutId, deliveryPersonnelId, stripeTransferId, amount, deliveryCount, currency, payoutStatus)
-       VALUES (:id, :dp, :tr, :amt, :cnt, 'myr', :st)"
+      "INSERT INTO courier_payout (payoutId, deliveryPersonnelId, stripeTransferId, amount, deliveryCount, currency, payoutStatus, isAuto)
+       VALUES (:id, :dp, :tr, :amt, :cnt, 'myr', 'Paid', :au)"
     )->execute(['id' => $payoutId, 'dp' => $courierId, 'tr' => $transferId,
-                'amt' => $bal['balance'], 'cnt' => $bal['deliveries'], 'st' => $status]);
-    // stamp exactly the deliveries that made up this balance
+                'amt' => $bal['balance'], 'cnt' => $bal['deliveries'], 'au' => $auto]);
     $pdo->prepare(
       "UPDATE delivery SET courierPayoutId = :pid
         WHERE deliveryPersonnelId = :dp AND deliveryStatus = 'Delivered' AND courierPayoutId IS NULL"
@@ -248,15 +264,54 @@ function handlePayCourier(PDO $pdo, array $config, string $courierId): void {
     $pdo->commit();
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
-    sendJson(500, false, null, ['code' => 'DB_ERROR',
-      'message' => 'The transfer succeeded but recording it failed. Note transfer ' . $transferId . ' and contact support.']);
+    throw new RuntimeException('Transfer ' . $transferId . ' succeeded but recording it failed.');
   }
 
-  sendJson(201, true, [
-    'payoutId'      => $payoutId,
-    'amount'        => $bal['balance'],
-    'deliveryCount' => $bal['deliveries'],
+  return [
+    'payoutId'         => $payoutId,
+    'amount'           => $bal['balance'],
+    'deliveryCount'    => $bal['deliveries'],
     'stripeTransferId' => $transferId,
-    'payoutStatus'  => $status,
-  ]);
+    'payoutStatus'     => 'Paid',
+  ];
+}
+
+// Automatic monthly payout sweep — pays every connected courier their pending
+// balance, at most ONCE per calendar month (so it's safe to call as often as
+// the cron / "run sweeps" fires). Couriers who haven't connected Stripe keep
+// accruing until they do. Returns a summary.
+function sweepCourierPayouts(PDO $pdo, array $config): array {
+  if (($config['courier_auto_payout'] ?? true) !== true) {
+    return ['ran' => false, 'reason' => 'disabled'];
+  }
+  if (!stripeConfigured($config)) {
+    return ['ran' => false, 'reason' => 'stripe_not_configured'];
+  }
+  // already run this calendar month? then do nothing.
+  $already = $pdo->query(
+    "SELECT COUNT(*) FROM courier_payout
+      WHERE isAuto = 1 AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
+  )->fetchColumn();
+  if ((int) $already > 0) {
+    return ['ran' => false, 'reason' => 'already_ran_this_month'];
+  }
+
+  $rows = $pdo->query(
+    "SELECT dp.deliveryPersonnelId, dp.stripeAccountId, dp.payoutsEnabled, u.fullName
+       FROM delivery_personnel dp JOIN `user` u ON u.userId = dp.userId AND u.status = 'Active'
+      WHERE dp.payoutsEnabled = 1 AND dp.stripeAccountId IS NOT NULL"
+  )->fetchAll();
+
+  $paid = 0; $failed = 0; $total = 0.0;
+  foreach ($rows as $c) {
+    if (courierBalance($pdo, $c['deliveryPersonnelId'])['balance'] <= 0) continue;
+    try {
+      $res = payOutCourierBalance($pdo, $config, $c, true);  // true = automatic
+      $paid++;
+      $total += $res['amount'];
+    } catch (Throwable $e) {
+      $failed++;   // recorded as a Failed payout row; keep going for the rest
+    }
+  }
+  return ['ran' => true, 'paid' => $paid, 'failed' => $failed, 'total' => round($total, 2)];
 }

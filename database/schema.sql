@@ -485,6 +485,7 @@ CREATE TABLE courier_payout (
     deliveryCount       INT           NOT NULL DEFAULT 0,  -- number of deliveries covered
     currency            CHAR(3)       NOT NULL DEFAULT 'myr',
     payoutStatus        ENUM('Pending','Paid','Failed') NOT NULL DEFAULT 'Pending',
+    isAuto              TINYINT(1)    NOT NULL DEFAULT 0,  -- 1 = automatic monthly run, 0 = manual
     created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (payoutId),
     KEY idx_courier_payout_dp (deliveryPersonnelId),

@@ -31,6 +31,11 @@ $config = [
   // earnings. Couriers are paid out their accrued balance via Stripe Connect.
   'courier_fee_per_delivery' => (float) (getenv('COURIER_FEE_PER_DELIVERY') ?: 5.00),
 
+  // Automatically pay every connected courier their pending balance once per
+  // calendar month (so the admin can never forget). Manual payouts still work
+  // any time. Set COURIER_AUTO_PAYOUT=0 to disable and rely on manual only.
+  'courier_auto_payout' => getenv('COURIER_AUTO_PAYOUT') !== '0',
+
   // SMTP — used to email supplier registration verification codes. Keep the
   // password OUT of git: set these in config.local.php (see the example file).
   // For Gmail: host smtp.gmail.com, port 587, secure 'tls', username your

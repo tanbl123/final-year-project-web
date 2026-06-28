@@ -59,12 +59,18 @@ function Layout() {
     try {
       const res = await runSweeps();
       const s = res?.swept ?? {};
+      const cp = s.courierPayouts ?? {};
+      const payoutLine = cp.ran
+        ? `• Courier monthly payout: paid ${cp.paid ?? 0} (RM ${Number(cp.total ?? 0).toFixed(2)})` +
+          (cp.failed ? `, ${cp.failed} failed` : '')
+        : `• Courier monthly payout: skipped (${cp.reason ?? 'n/a'})`;
       alert(
         'Reminder sweeps run:\n' +
         `• Payment reminders: ${s.paymentReminders ?? 0}\n` +
         `• Abandoned-cart reminders: ${s.abandonedCarts ?? 0}\n` +
         `• Review reminders: ${s.reviewReminders ?? 0}\n` +
-        `• Orders auto-cancelled: ${s.autoCancelled ?? 0}`
+        `• Orders auto-cancelled: ${s.autoCancelled ?? 0}\n` +
+        payoutLine
       );
     } catch (e) {
       alert('Could not run sweeps: ' + (e?.message ?? 'unknown error'));

@@ -182,12 +182,13 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final status = p['payoutStatus']?.toString() ?? '';
     final count = (p['deliveryCount'] as int?) ?? 0;
     final date = p['created_at']?.toString() ?? '';
+    final isAuto = (p['isAuto'] == 1 || p['isAuto'] == true);
     final color = status == 'Paid' ? Colors.green : status == 'Failed' ? Colors.red : Colors.orange;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(Icons.payments_outlined, color: color),
       title: Text(_rm(amount), style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('$count delivery(s) · ${date.split(' ').first}'),
+      subtitle: Text('$count delivery(s) · ${date.split(' ').first} · ${isAuto ? 'Auto' : 'Manual'}'),
       trailing: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
     );
   }
