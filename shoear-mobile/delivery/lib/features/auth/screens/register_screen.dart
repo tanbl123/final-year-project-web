@@ -51,7 +51,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _picker = ImagePicker();
   String? _avatarUrl, _licensePhotoUrl, _icPhotoUrl;
   bool _upAvatar = false, _upLicense = false, _upIc = false;
-  bool _licenseSameAsIc = false;   // local couriers: licence no. == IC no.
+  // Malaysian/PR licence no. is the IC no., so default to "same as IC" (the
+  // courier can untick it for the rare case where they differ).
+  bool _licenseSameAsIc = true;
   String? _licenseNumberError, _icNumberError, _docsError;
 
   final _fullNameFocus     = FocusNode();
