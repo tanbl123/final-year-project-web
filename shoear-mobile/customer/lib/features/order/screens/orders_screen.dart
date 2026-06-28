@@ -11,6 +11,7 @@ import 'package:customer/core/utils/refresh_bus.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
+import 'package:customer/features/checkout/screens/receipt_screen.dart';
 
 const Map<String, Color> kOrderStatusColors = {
   'Placed': Colors.blueGrey,
@@ -171,19 +172,29 @@ class _OrderTabListState extends State<_OrderTabList> with AutomaticKeepAliveCli
     try {
       final result = await payOrderWithStripe(orders, order.orderId);
       if (!mounted) return;
-      messenger
-        ..removeCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(result == PayResult.paid
-              ? 'Payment successful.'
-              : 'Payment cancelled — your order is still awaiting payment.'),
-        ));
+      if (result == PayResult.paid) {
+        // Show the same success/receipt screen as a checkout payment.
+        try {
+          final receipt = await orders.getReceipt(order.orderId);
+          if (!mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ReceiptScreen(receipt: receipt)),
+          );
+        } catch (_) {
+          messenger..removeCurrentSnackBar()..showSnackBar(const SnackBar(content: Text('Payment successful.')));
+        }
+      } else {
+        messenger..removeCurrentSnackBar()..showSnackBar(const SnackBar(
+            content: Text('Payment cancelled — your order is still awaiting payment.')));
+      }
     } catch (e) {
       if (!mounted) return;
       messenger..removeCurrentSnackBar()..showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
-      if (mounted) setState(() => _payingId = null);
-      await _fetchFirst();
+      if (mounted) {
+        setState(() => _payingId = null);
+        await _fetchFirst();
+      }
     }
   }
 

@@ -135,19 +135,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _payNow() async {
+    final orders = context.read<OrderService>();
     setState(() => _paying = true);
     try {
-      final result =
-          await payOrderWithStripe(context.read<OrderService>(), widget.orderId);
+      final result = await payOrderWithStripe(orders, widget.orderId);
       if (!mounted) return;
-      context.showSnack(result == PayResult.paid
-          ? 'Payment successful.'
-          : 'Payment cancelled — your order is still awaiting payment.');
+      if (result == PayResult.paid) {
+        // Same success/receipt screen as paying at checkout.
+        try {
+          final receipt = await orders.getReceipt(widget.orderId);
+          if (!mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ReceiptScreen(receipt: receipt)),
+          );
+        } catch (_) {
+          if (mounted) context.showSnack('Payment successful.');
+        }
+      } else {
+        context.showSnack('Payment cancelled — your order is still awaiting payment.');
+      }
     } catch (e) {
       if (mounted) context.showSnack(e.toString());
     } finally {
-      if (mounted) setState(() => _paying = false);
-      await _refresh();
+      // The receipt's "Continue shopping" may have popped this screen, so guard.
+      if (mounted) {
+        setState(() => _paying = false);
+        await _refresh();
+      }
     }
   }
 
