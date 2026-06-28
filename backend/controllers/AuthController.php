@@ -419,8 +419,8 @@ function handleRegisterCourier(PDO $pdo): void {
   if ($licenseNumber === '' || $licensePhotoUrl === '' || $icNumber === '' || $icPhotoUrl === '' || $avatarUrl === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Driving licence, IC (both number + photo) and a profile photo are all required.']);
   }
-  if (mb_strlen($licenseNumber) > 50) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Licence number is too long (max 50 characters).']);
+  if (mb_strlen($licenseNumber) > 20) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Licence number is too long (max 20 characters).']);
   }
   // Malaysian NRIC is exactly 12 digits (entered without dashes).
   if (!preg_match('/^\d{12}$/', $icNumber)) {

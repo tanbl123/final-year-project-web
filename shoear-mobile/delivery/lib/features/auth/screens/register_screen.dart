@@ -165,7 +165,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _validateLicenseNo(String v) {
     final t = v.trim();
     if (t.isEmpty) return 'Licence number is required.';
-    if (t.length > 50) return 'Licence number is too long.';
+    if (t.length > 20) return 'Licence number is too long (max 20 characters).';
     return null;
   }
 
@@ -494,7 +494,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 12),
           _field(
             controller: _licenseNumber, focusNode: null,
-            label: 'Driving licence number', error: _licenseNumberError, maxLength: 50,
+            label: 'Driving licence number', error: _licenseNumberError, maxLength: 20,
             enabled: !_licenseSameAsIc,
             onChanged: (v) => setState(() => _licenseNumberError = _validateLicenseNo(v)),
           ),
