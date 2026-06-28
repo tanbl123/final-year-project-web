@@ -8,6 +8,7 @@ import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/checkout/screens/checkout_screen.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
+import 'package:customer/features/catalog/screens/product_detail_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -17,6 +18,11 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  // Selected cart-item ids (Shopee-style partial checkout). null = "not yet
+  // touched" → treated as everything selected. We intersect with the live cart
+  // so removed items drop out automatically.
+  Set<String>? _selected;
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +30,31 @@ class _CartScreenState extends State<CartScreen> {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => context.read<CartProvider>().refresh());
     }
+  }
+
+  // The effective selection given the current cart (defaults to all).
+  Set<String> _effectiveSelection(Cart cart) {
+    final ids = cart.items.map((i) => i.cartItemId).toSet();
+    if (_selected == null) return ids;
+    return _selected!.intersection(ids);
+  }
+
+  void _toggleItem(Cart cart, String id) {
+    final sel = {..._effectiveSelection(cart)};
+    sel.contains(id) ? sel.remove(id) : sel.add(id);
+    setState(() => _selected = sel);
+  }
+
+  void _toggleGroup(Cart cart, List<CartItem> group, bool selectAll) {
+    final sel = {..._effectiveSelection(cart)};
+    for (final it in group) {
+      selectAll ? sel.add(it.cartItemId) : sel.remove(it.cartItemId);
+    }
+    setState(() => _selected = sel);
+  }
+
+  void _toggleAll(Cart cart, bool selectAll) {
+    setState(() => _selected = selectAll ? cart.items.map((i) => i.cartItemId).toSet() : <String>{});
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -173,45 +204,67 @@ class _CartScreenState extends State<CartScreen> {
       );
     }
 
+    // group items by seller (Shopee/Lazada multi-seller cart)
+    final groups = <String, List<CartItem>>{};
+    final names = <String, String>{};
+    for (final it in cart.items) {
+      groups.putIfAbsent(it.supplierId, () => []).add(it);
+      names[it.supplierId] = it.supplierName.isEmpty ? 'Seller' : it.supplierName;
+    }
+    final selected = _effectiveSelection(cart);
+
     return Column(
       children: [
         Expanded(
           child: RefreshIndicator(
             onRefresh: () => cartProvider.refresh(),
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              itemCount: cart.items.length,
-              itemBuilder: (context, i) {
-                final item = cart.items[i];
-                return _CartCard(
-                  item: item,
-                  onDecrease: () => _run(() => cartProvider.updateQuantity(
-                      item.cartItemId, item.quantity - 1)),
-                  onIncrease: () => _run(() => cartProvider.updateQuantity(
-                      item.cartItemId, item.quantity + 1)),
-                  onRemove: () async {
-                    final ok = await _confirmRemove(context);
-                    if (ok) _run(() => cartProvider.remove(item.cartItemId));
-                  },
-                );
-              },
+              children: [
+                for (final entry in groups.entries) ...[
+                  _SellerHeader(
+                    name: names[entry.key]!,
+                    allSelected: entry.value.every((i) => selected.contains(i.cartItemId)),
+                    onToggle: (v) => _toggleGroup(cart, entry.value, v),
+                  ),
+                  for (final item in entry.value)
+                    _CartCard(
+                      item: item,
+                      selected: selected.contains(item.cartItemId),
+                      onToggleSelect: () => _toggleItem(cart, item.cartItemId),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: item.productId)),
+                      ),
+                      onDecrease: () => _run(() => cartProvider.updateQuantity(
+                          item.cartItemId, item.quantity - 1)),
+                      onIncrease: () => _run(() => cartProvider.updateQuantity(
+                          item.cartItemId, item.quantity + 1)),
+                      onRemove: () async {
+                        final ok = await _confirmRemove(context);
+                        if (ok) _run(() => cartProvider.remove(item.cartItemId));
+                      },
+                    ),
+                ],
+              ],
             ),
           ),
         ),
-        _summaryBar(context, cart),
+        _summaryBar(context, cart, selected),
       ],
     );
   }
 
-  Widget _summaryBar(BuildContext context, Cart cart) {
+  Widget _summaryBar(BuildContext context, Cart cart, Set<String> selected) {
     final theme = Theme.of(context);
-    final totalItems =
-        cart.items.fold<int>(0, (sum, item) => sum + item.quantity);
+    final chosen = cart.items.where((i) => selected.contains(i.cartItemId)).toList();
+    final selectedUnits = chosen.fold<int>(0, (s, i) => s + i.quantity);
+    final selectedTotal = chosen.fold<double>(0, (s, i) => s + i.subtotal);
+    final allSelected = chosen.length == cart.items.length && cart.items.isNotEmpty;
 
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        padding: const EdgeInsets.fromLTRB(16, 10, 20, 14),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           boxShadow: [
@@ -224,31 +277,40 @@ class _CartScreenState extends State<CartScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Order summary row ──────────────────────────────────────────
+            // ── Select-all + selected total ────────────────────────────────
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Subtotal ($totalItems item${totalItems == 1 ? '' : 's'})',
+                Checkbox(
+                  value: allSelected,
+                  onChanged: (v) => _toggleAll(cart, v ?? false),
+                  visualDensity: VisualDensity.compact,
+                ),
+                Text('All', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                const Spacer(),
+                Text('Selected ($selectedUnits): ',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                Text('RM ${cart.total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('RM ${selectedTotal.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
-            const SizedBox(height: 12),
-            // ── Checkout button ────────────────────────────────────────────
+            const SizedBox(height: 10),
+            // ── Checkout (selected only) ───────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: cart.items.isEmpty
+                onPressed: chosen.isEmpty
                     ? null
                     : () => Navigator.of(context).push(
                           MaterialPageRoute(
-                              builder: (_) => const CheckoutScreen()),
+                            builder: (_) => CheckoutScreen(
+                              selectedCartItemIds: chosen.map((i) => i.cartItemId).toList(),
+                            ),
+                          ),
                         ),
                 icon: const Icon(Icons.lock_outline, size: 18),
-                label: Text(
-                    'Checkout  ·  RM ${cart.total.toStringAsFixed(2)}'),
+                label: Text(chosen.isEmpty
+                    ? 'Select items to checkout'
+                    : 'Checkout (${chosen.length})  ·  RM ${selectedTotal.toStringAsFixed(2)}'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   textStyle: const TextStyle(
@@ -265,14 +327,57 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
+// Seller group header with a select-all-for-this-seller checkbox.
+class _SellerHeader extends StatelessWidget {
+  final String name;
+  final bool allSelected;
+  final ValueChanged<bool> onToggle;
+  const _SellerHeader({required this.name, required this.allSelected, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Checkbox(
+              value: allSelected,
+              onChanged: (v) => onToggle(v ?? false),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(Icons.storefront_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CartCard extends StatelessWidget {
   final CartItem item;
+  final bool selected;
+  final VoidCallback onToggleSelect;
+  final VoidCallback onTap;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onRemove;
 
   const _CartCard({
     required this.item,
+    required this.selected,
+    required this.onToggleSelect,
+    required this.onTap,
     required this.onDecrease,
     required this.onIncrease,
     required this.onRemove,
@@ -284,7 +389,9 @@ class _CartCard extends StatelessWidget {
     final atMax = item.quantity >= item.stock;
     final atMin = item.quantity <= 1;
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -301,10 +408,21 @@ class _CartCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            // ── Top row: image + info + delete ─────────────────────────────
+            // ── Top row: checkbox + image + info + delete ──────────────────
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // selection checkbox
+                SizedBox(
+                  width: 28,
+                  child: Checkbox(
+                    value: selected,
+                    onChanged: (_) => onToggleSelect(),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 4),
                 // product image
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
@@ -436,6 +554,7 @@ class _CartCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }

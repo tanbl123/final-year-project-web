@@ -30,13 +30,15 @@ function cartPayload(PDO $pdo, string $cartId): array {
     "SELECT ci.cartItemId, ci.cartItemQuantity AS quantity,
             pv.productVariantId AS variantId, pv.size, pv.stockQuantity AS stock,
             p.productId, p.productName, p.productBrand AS brand, p.productPrice AS price,
+            p.supplierId, s.companyName AS supplierName,
             (SELECT pi.productImageUrl FROM product_image pi
               WHERE pi.productId = p.productId ORDER BY pi.productImageId LIMIT 1) AS imageUrl
        FROM cart_item ci
        JOIN product_variant pv ON pv.productVariantId = ci.productVariantId
        JOIN product p          ON p.productId = pv.productId
+       JOIN supplier s         ON s.supplierId = p.supplierId
       WHERE ci.cartId = :cid
-      ORDER BY ci.cartItemId"
+      ORDER BY s.companyName, ci.cartItemId"
   );
   $stmt->execute(['cid' => $cartId]);
 
@@ -48,17 +50,19 @@ function cartPayload(PDO $pdo, string $cartId): array {
     $sub   = round($price * $qty, 2);
     $total += $sub;
     $items[] = [
-      'cartItemId'  => $r['cartItemId'],
-      'variantId'   => $r['variantId'],
-      'productId'   => $r['productId'],
-      'productName' => $r['productName'],
-      'brand'       => $r['brand'],
-      'imageUrl'    => $r['imageUrl'],
-      'size'        => $r['size'],
-      'unitPrice'   => $price,
-      'quantity'    => $qty,
-      'stock'       => (int) $r['stock'],
-      'subtotal'    => $sub,
+      'cartItemId'   => $r['cartItemId'],
+      'variantId'    => $r['variantId'],
+      'productId'    => $r['productId'],
+      'productName'  => $r['productName'],
+      'brand'        => $r['brand'],
+      'supplierId'   => $r['supplierId'],
+      'supplierName' => $r['supplierName'],
+      'imageUrl'     => $r['imageUrl'],
+      'size'         => $r['size'],
+      'unitPrice'    => $price,
+      'quantity'     => $qty,
+      'stock'        => (int) $r['stock'],
+      'subtotal'     => $sub,
     ];
   }
   return [

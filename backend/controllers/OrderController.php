@@ -371,19 +371,32 @@ function handleCheckout(PDO $pdo, array $auth): void {
     }
   }
 
+  // Optional partial checkout: only the cart items the customer ticked. Absent
+  // (or empty) → check out the whole cart (backward compatible).
+  $selected = $body['selectedCartItemIds'] ?? null;
+  $selectedIds = is_array($selected)
+      ? array_values(array_filter(array_map(fn($x) => trim((string) $x), $selected)))
+      : [];
+
   $cartId = getOrCreateCartId($pdo, $customerId);
-  $stmt = $pdo->prepare(
-    "SELECT ci.cartItemQuantity AS qty, pv.productVariantId AS variantId, pv.size,
+  $sql =
+    "SELECT ci.cartItemId, ci.cartItemQuantity AS qty, pv.productVariantId AS variantId, pv.size,
             pv.stockQuantity AS stock, p.productName, p.productPrice AS price, p.productStatus AS status
        FROM cart_item ci
        JOIN product_variant pv ON pv.productVariantId = ci.productVariantId
        JOIN product p          ON p.productId = pv.productId
-      WHERE ci.cartId = :cid"
-  );
-  $stmt->execute(['cid' => $cartId]);
+      WHERE ci.cartId = :cid";
+  $params = ['cid' => $cartId];
+  if ($selectedIds) {
+    $in = [];
+    foreach ($selectedIds as $i => $id) { $k = ":ci$i"; $in[] = $k; $params[$k] = $id; }
+    $sql .= ' AND ci.cartItemId IN (' . implode(',', $in) . ')';
+  }
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
   $items = $stmt->fetchAll();
   if (count($items) === 0) {
-    sendJson(400, false, null, ['code' => 'EMPTY_CART', 'message' => 'Your cart is empty.']);
+    sendJson(400, false, null, ['code' => 'EMPTY_CART', 'message' => 'No items selected for checkout.']);
   }
 
   // sanity-check availability (the real guard is the atomic decrement at payment)
@@ -429,7 +442,13 @@ function handleCheckout(PDO $pdo, array $auth): void {
       ]);
     }
 
-    $pdo->prepare('DELETE FROM cart_item WHERE cartId = :cid')->execute(['cid' => $cartId]);
+    // remove only the items that were ordered (others stay in the cart)
+    $orderedIds = array_column($items, 'cartItemId');
+    $delIn = [];
+    $delParams = ['cid' => $cartId];
+    foreach ($orderedIds as $i => $id) { $k = ":d$i"; $delIn[] = $k; $delParams[$k] = $id; }
+    $pdo->prepare('DELETE FROM cart_item WHERE cartId = :cid AND cartItemId IN (' . implode(',', $delIn) . ')')
+        ->execute($delParams);
 
     // Remember this delivery address as the customer's default so it pre-fills
     // their next checkout (matches Amazon/Shopee: last-used address is the default).

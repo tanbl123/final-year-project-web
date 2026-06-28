@@ -5,6 +5,8 @@ class CartItem {
   final String productId;
   final String productName;
   final String brand;
+  final String supplierId;
+  final String supplierName;
   final String? imageUrl;
   final String size;
   final double unitPrice;
@@ -18,6 +20,8 @@ class CartItem {
     required this.productId,
     required this.productName,
     required this.brand,
+    this.supplierId = '',
+    this.supplierName = '',
     this.imageUrl,
     required this.size,
     required this.unitPrice,
@@ -32,6 +36,8 @@ class CartItem {
         productId: j['productId'] as String? ?? '',
         productName: j['productName'] as String? ?? '',
         brand: j['brand'] as String? ?? '',
+        supplierId: j['supplierId'] as String? ?? '',
+        supplierName: j['supplierName'] as String? ?? '',
         imageUrl: (j['imageUrl'] as String?)?.isNotEmpty == true ? j['imageUrl'] as String : null,
         size: j['size']?.toString() ?? '',
         unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,

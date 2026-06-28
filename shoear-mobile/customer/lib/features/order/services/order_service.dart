@@ -42,6 +42,7 @@ class OrderService {
     required String postcode,
     required String city,
     required String state,
+    List<String>? selectedCartItemIds, // null = whole cart
   }) async => CheckoutResult.fromJson(
         await api.post('/orders', {
           'addressLine1': addressLine1,
@@ -49,6 +50,8 @@ class OrderService {
           'postcode':     postcode,
           'city':         city,
           'state':        state,
+          if (selectedCartItemIds != null && selectedCartItemIds.isNotEmpty)
+            'selectedCartItemIds': selectedCartItemIds,
         }) as Map<String, dynamic>,
       );
 

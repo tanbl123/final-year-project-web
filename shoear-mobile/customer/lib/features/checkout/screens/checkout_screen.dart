@@ -19,7 +19,9 @@ import 'package:customer/core/services/places_service.dart';
 import 'package:customer/features/checkout/screens/receipt_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  /// The cart items being checked out. null = the whole cart (legacy callers).
+  final List<String>? selectedCartItemIds;
+  const CheckoutScreen({super.key, this.selectedCartItemIds});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -333,6 +335,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         postcode:     _postcodeCtrl.text.trim(),
         city:         _cityCtrl.text.trim(),
         state:        _state!,
+        selectedCartItemIds: widget.selectedCartItemIds,
       );
       createdOrderId = created.orderId;
 
@@ -517,6 +520,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final needsPhone = context.select<AuthProvider, bool>(
       (a) => a.user?.phoneNumber == null,
     );
+    // Only the items being checked out (the selected ones, or the whole cart).
+    final allItems = cart?.items ?? const [];
+    final items = widget.selectedCartItemIds == null
+        ? allItems
+        : allItems.where((i) => widget.selectedCartItemIds!.contains(i.cartItemId)).toList();
+    final total = items.fold<double>(0, (s, i) => s + i.subtotal);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
@@ -525,7 +534,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
-      body: (cart == null || cart.items.isEmpty)
+      body: (cart == null || items.isEmpty)
           ? const Center(child: Text('Your cart is empty.'))
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -781,12 +790,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 // ── 2. Order items ─────────────────────────────────────────
                 _SectionCard(
                   icon: Icons.shopping_bag_outlined,
-                  title: 'Order Items (${cart.items.length})',
+                  title: 'Order Items (${items.length})',
                   child: Column(
                     children: [
-                      for (int i = 0; i < cart.items.length; i++) ...[
+                      for (int i = 0; i < items.length; i++) ...[
                         if (i > 0) const Divider(height: 16),
-                        _OrderItemRow(item: cart.items[i]),
+                        _OrderItemRow(item: items[i]),
                       ],
                     ],
                   ),
@@ -847,8 +856,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     children: [
                       _PriceRow(
-                        label: 'Subtotal (${cart.items.fold<int>(0, (s, i) => s + i.quantity)} item${cart.items.fold<int>(0, (s, i) => s + i.quantity) == 1 ? '' : 's'})',
-                        value: 'RM ${cart.total.toStringAsFixed(2)}',
+                        label: 'Subtotal (${items.fold<int>(0, (s, i) => s + i.quantity)} item${items.fold<int>(0, (s, i) => s + i.quantity) == 1 ? '' : 's'})',
+                        value: 'RM ${total.toStringAsFixed(2)}',
                       ),
                       const SizedBox(height: 6),
                       _PriceRow(
@@ -862,7 +871,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                       _PriceRow(
                         label: 'Total',
-                        value: 'RM ${cart.total.toStringAsFixed(2)}',
+                        value: 'RM ${total.toStringAsFixed(2)}',
                         bold: true,
                         valueColor: Theme.of(context).colorScheme.primary,
                       ),
@@ -873,7 +882,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
 
       // ── Place order bar ─────────────────────────────────────────────────
-      bottomNavigationBar: (cart == null || cart.items.isEmpty)
+      bottomNavigationBar: (cart == null || items.isEmpty)
           ? null
           : SafeArea(
               child: Container(
@@ -899,7 +908,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   label: Text(
                     _placing
                         ? 'Processing…'
-                        : 'Place Order  ·  RM ${cart.total.toStringAsFixed(2)}',
+                        : 'Place Order  ·  RM ${total.toStringAsFixed(2)}',
                     style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.bold),
                   ),
