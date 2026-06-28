@@ -388,6 +388,12 @@ function handleRegisterCourier(PDO $pdo): void {
   $vehicleBrand = trim($body['vehicleBrand'] ?? '');
   $vehicleModel = trim($body['vehicleModel'] ?? '');
   $vehiclePlate = strtoupper(trim($body['vehiclePlate'] ?? ''));
+  // KYC: driving licence, IC, profile photo (uploaded via /uploads/registration-doc)
+  $licenseNumber   = trim($body['licenseNumber'] ?? '');
+  $licensePhotoUrl = trim($body['licensePhotoUrl'] ?? '');
+  $icNumber        = trim($body['icNumber'] ?? '');
+  $icPhotoUrl      = trim($body['icPhotoUrl'] ?? '');
+  $avatarUrl       = trim($body['avatarUrl'] ?? '');
 
   if ($fullName === '' || $email === '' || $phoneNumber === '' ||
       $vehicleBrand === '' || $vehicleModel === '' || $vehiclePlate === '') {
@@ -408,6 +414,16 @@ function handleRegisterCourier(PDO $pdo): void {
   }
   if (!preg_match('/^[A-Za-z0-9 \-]+$/', $vehiclePlate)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Only letters, numbers, spaces or hyphens.']);
+  }
+  // KYC required: licence (number + photo), IC (number + photo), profile photo
+  if ($licenseNumber === '' || $licensePhotoUrl === '' || $icNumber === '' || $icPhotoUrl === '' || $avatarUrl === '') {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Driving licence, IC (both number + photo) and a profile photo are all required.']);
+  }
+  if (mb_strlen($licenseNumber) > 50) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Licence number is too long (max 50 characters).']);
+  }
+  if (mb_strlen($icNumber) > 20) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'IC number is too long (max 20 characters).']);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please enter a valid email.']);
@@ -467,13 +483,15 @@ function handleRegisterCourier(PDO $pdo): void {
     $userId = nextId($pdo, 'user', 'userId', 'USR');
     $hash   = password_hash($password, PASSWORD_BCRYPT);
     $pdo->prepare(
-      'INSERT INTO `user` (userId, username, password, email, fullName, phoneNumber, role, status)
-       VALUES (:id, :un, :pw, :em, :fn, :ph, "DeliveryPersonnel", "Pending")'
-    )->execute(['id' => $userId, 'un' => $username, 'pw' => $hash, 'em' => $email, 'fn' => $fullName, 'ph' => $phoneNumber]);
+      'INSERT INTO `user` (userId, username, password, email, fullName, phoneNumber, role, status, avatarUrl)
+       VALUES (:id, :un, :pw, :em, :fn, :ph, "DeliveryPersonnel", "Pending", :av)'
+    )->execute(['id' => $userId, 'un' => $username, 'pw' => $hash, 'em' => $email, 'fn' => $fullName, 'ph' => $phoneNumber, 'av' => $avatarUrl !== '' ? $avatarUrl : null]);
 
     $deliveryPersonnelId = nextId($pdo, 'delivery_personnel', 'deliveryPersonnelId', 'DEL');
-    $pdo->prepare('INSERT INTO delivery_personnel (deliveryPersonnelId, userId, vehicleType, vehicleBrand, vehicleModel, vehiclePlate) VALUES (:did, :uid, :vt, :vb, :vm, :vp)')
-        ->execute(['did' => $deliveryPersonnelId, 'uid' => $userId, 'vt' => $vehicleType, 'vb' => $vehicleBrand, 'vm' => $vehicleModel, 'vp' => $vehiclePlate]);
+    $pdo->prepare('INSERT INTO delivery_personnel (deliveryPersonnelId, userId, vehicleType, vehicleBrand, vehicleModel, vehiclePlate, licenseNumber, licensePhotoUrl, icNumber, icPhotoUrl)
+                   VALUES (:did, :uid, :vt, :vb, :vm, :vp, :ln, :lp, :ic, :ip)')
+        ->execute(['did' => $deliveryPersonnelId, 'uid' => $userId, 'vt' => $vehicleType, 'vb' => $vehicleBrand, 'vm' => $vehicleModel, 'vp' => $vehiclePlate,
+                   'ln' => $licenseNumber, 'lp' => $licensePhotoUrl, 'ic' => $icNumber, 'ip' => $icPhotoUrl]);
 
     $pdo->commit();
   } catch (Throwable $e) {

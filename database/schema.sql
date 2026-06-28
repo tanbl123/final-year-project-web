@@ -132,6 +132,10 @@ CREATE TABLE delivery_personnel (
     vehicleBrand        VARCHAR(50) NOT NULL DEFAULT '',
     vehicleModel        VARCHAR(50) NOT NULL DEFAULT '',
     vehiclePlate        VARCHAR(20) NOT NULL DEFAULT '',
+    licenseNumber       VARCHAR(50)  NOT NULL DEFAULT '',   -- driving licence no.
+    licensePhotoUrl     VARCHAR(255) NULL,                  -- photo of the licence
+    icNumber            VARCHAR(20)  NOT NULL DEFAULT '',   -- IC / identity no.
+    icPhotoUrl          VARCHAR(255) NULL,                  -- photo of the IC
     PRIMARY KEY (deliveryPersonnelId),
     UNIQUE KEY uq_delivery_user (userId),
     CONSTRAINT fk_delivery_user FOREIGN KEY (userId) REFERENCES `user`(userId)

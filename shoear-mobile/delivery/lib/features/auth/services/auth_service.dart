@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:delivery/core/api/api_client.dart';
 import 'package:delivery/features/auth/models/courier_session.dart';
 
@@ -34,6 +36,11 @@ class AuthService {
     required String vehiclePlate,
     required String password,
     required String verificationCode,
+    required String licenseNumber,
+    required String licensePhotoUrl,
+    required String icNumber,
+    required String icPhotoUrl,
+    required String avatarUrl,
   }) async {
     final data = await api.post('/auth/register/courier', {
       'fullName': fullName,
@@ -45,9 +52,21 @@ class AuthService {
       'vehiclePlate': vehiclePlate,
       'password': password,
       'verificationCode': verificationCode,
+      'licenseNumber': licenseNumber,
+      'licensePhotoUrl': licensePhotoUrl,
+      'icNumber': icNumber,
+      'icPhotoUrl': icPhotoUrl,
+      'avatarUrl': avatarUrl,
     });
     return (data as Map<String, dynamic>)['message']?.toString() ??
         'Registration submitted. Your account is pending admin approval.';
+  }
+
+  /// POST /uploads/registration-doc — public (pre-login) upload for the courier's
+  /// licence / IC / profile photo during registration. Returns the stored URL.
+  Future<String> uploadRegistrationDoc(File file) async {
+    final data = await api.uploadFile('/uploads/registration-doc', file) as Map<String, dynamic>;
+    return data['url']?.toString() ?? '';
   }
 
   /// POST /auth/forgot-password — email a 6-digit reset code.

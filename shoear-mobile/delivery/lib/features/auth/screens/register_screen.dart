@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'package:delivery/core/utils/snackbar.dart';
@@ -42,6 +44,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _password     = TextEditingController();
   final _confirm      = TextEditingController();
   final _code         = TextEditingController();
+  final _licenseNumber = TextEditingController();
+  final _icNumber      = TextEditingController();
+
+  // KYC photos (uploaded as soon as they're picked → store the returned URL)
+  final _picker = ImagePicker();
+  String? _avatarUrl, _licensePhotoUrl, _icPhotoUrl;
+  bool _upAvatar = false, _upLicense = false, _upIc = false;
+  String? _licenseNumberError, _icNumberError, _docsError;
 
   final _fullNameFocus     = FocusNode();
   final _emailFocus        = FocusNode();
@@ -86,7 +96,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _resendTimer?.cancel();
-    for (final c in [_fullName, _email, _phone, _vehicleBrand, _vehicleModel, _vehiclePlate, _password, _confirm, _code]) c.dispose();
+    for (final c in [_fullName, _email, _phone, _vehicleBrand, _vehicleModel, _vehiclePlate, _password, _confirm, _code, _licenseNumber, _icNumber]) c.dispose();
     for (final f in [_fullNameFocus, _emailFocus, _phoneFocus, _vehiclePlateFocus, _passwordFocus, _confirmFocus]) f.dispose();
     super.dispose();
   }
@@ -151,6 +161,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  String? _validateLicenseNo(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'Licence number is required.';
+    if (t.length > 50) return 'Licence number is too long.';
+    return null;
+  }
+
+  String? _validateIcNo(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return 'IC number is required.';
+    if (t.length > 20) return 'IC number is too long.';
+    return null;
+  }
+
+  bool get _photosUploaded => _avatarUrl != null && _licensePhotoUrl != null && _icPhotoUrl != null;
+
+  // Pick an image and upload it immediately (pre-login public upload). which ∈
+  // {'avatar','license','ic'}.
+  Future<void> _pickPhoto(String which) async {
+    final XFile? x = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+    if (x == null) return;
+    setState(() {
+      if (which == 'avatar') _upAvatar = true; else if (which == 'license') _upLicense = true; else _upIc = true;
+    });
+    try {
+      final url = await context.read<AuthProvider>().authService.uploadRegistrationDoc(File(x.path));
+      if (!mounted) return;
+      setState(() {
+        if (which == 'avatar') _avatarUrl = url; else if (which == 'license') _licensePhotoUrl = url; else _icPhotoUrl = url;
+        _docsError = null;
+      });
+    } catch (e) {
+      if (mounted) context.showSnack(e.toString());
+    } finally {
+      if (mounted) setState(() { _upAvatar = false; _upLicense = false; _upIc = false; });
+    }
+  }
+
   // Step 1 → validate form and email the 6-digit code
   Future<void> _sendCode() async {
     setState(() {
@@ -162,10 +210,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _vehiclePlateError = _validatePlate(_vehiclePlate.text);
       _passwordError     = _validatePassword(_password.text);
       _confirmError      = _validateConfirm();
+      _licenseNumberError = _validateLicenseNo(_licenseNumber.text);
+      _icNumberError      = _validateIcNo(_icNumber.text);
+      _docsError = _photosUploaded ? null : 'Please add your profile photo, licence photo and IC photo.';
     });
     if (_fullNameError != null || _emailError != null || _phoneError != null ||
         _vehicleBrandError != null || _vehicleModelError != null ||
-        _vehiclePlateError != null || _passwordError != null || _confirmError != null) return;
+        _vehiclePlateError != null || _passwordError != null || _confirmError != null ||
+        _licenseNumberError != null || _icNumberError != null || _docsError != null) return;
 
     setState(() => _loading = true);
     try {
@@ -202,6 +254,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             vehiclePlate:     _vehiclePlate.text.trim(),
             password:         _password.text,
             verificationCode: code,
+            licenseNumber:    _licenseNumber.text.trim(),
+            licensePhotoUrl:  _licensePhotoUrl ?? '',
+            icNumber:         _icNumber.text.trim(),
+            icPhotoUrl:       _icPhotoUrl ?? '',
+            avatarUrl:        _avatarUrl ?? '',
           );
       if (!mounted) return;
       // Pending account — no auto-login. Pop back and tell them to wait.
@@ -386,6 +443,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ),
+          // ── Identity & licence (KYC) ──
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text('Identity & licence', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          _photoTile(label: 'Profile photo', url: _avatarUrl, uploading: _upAvatar, onPick: () => _pickPhoto('avatar')),
+          const SizedBox(height: 12),
+          _field(
+            controller: _licenseNumber, focusNode: null,
+            label: 'Driving licence number', error: _licenseNumberError, maxLength: 50,
+            onChanged: (v) => setState(() => _licenseNumberError = _validateLicenseNo(v)),
+          ),
+          _photoTile(label: 'Driving licence photo', url: _licensePhotoUrl, uploading: _upLicense, onPick: () => _pickPhoto('license')),
+          const SizedBox(height: 12),
+          _field(
+            controller: _icNumber, focusNode: null,
+            label: 'IC / identity number', error: _icNumberError, maxLength: 20,
+            onChanged: (v) => setState(() => _icNumberError = _validateIcNo(v)),
+          ),
+          _photoTile(label: 'IC photo', url: _icPhotoUrl, uploading: _upIc, onPick: () => _pickPhoto('ic')),
+          if (_docsError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_docsError!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+            ),
+          const SizedBox(height: 24),
           FilledButton(
             onPressed: _loading ? null : _sendCode,
             child: Padding(
@@ -396,6 +479,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ],
+      );
+
+  Widget _photoTile({
+    required String label,
+    required String? url,
+    required bool uploading,
+    required VoidCallback onPick,
+  }) =>
+      InkWell(
+        onTap: uploading ? null : onPick,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: uploading
+                      ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                      : (url == null
+                          ? Container(color: Colors.grey.shade200, child: Icon(Icons.add_a_photo_outlined, color: Colors.grey.shade600))
+                          : Image.network(url, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200, child: const Icon(Icons.image_outlined)))),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(url == null ? 'Tap to upload' : 'Uploaded · tap to replace',
+                        style: TextStyle(fontSize: 12, color: url == null ? Colors.grey.shade600 : Colors.green.shade700)),
+                  ],
+                ),
+              ),
+              Icon(url == null ? Icons.upload_outlined : Icons.check_circle,
+                  color: url == null ? Colors.grey : Colors.green),
+            ],
+          ),
+        ),
       );
 
   Widget _verifyStep() => ListView(

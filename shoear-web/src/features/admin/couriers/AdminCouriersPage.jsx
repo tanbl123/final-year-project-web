@@ -96,6 +96,7 @@ function AdminCouriersPage() {
                 <th>Courier</th>
                 <th>Contact</th>
                 <th>Vehicle</th>
+                <th>Identity &amp; licence</th>
                 <th>Submitted</th>
                 <th className="text-end">Actions</th>
               </tr>
@@ -104,8 +105,20 @@ function AdminCouriersPage() {
               {pageItems.map((c) => (
                 <tr key={c.userId}>
                   <td>
-                    <div className="fw-semibold">{c.fullName}</div>
-                    <div className="text-muted small">@{c.username}</div>
+                    <div className="d-flex align-items-center gap-2">
+                      {c.avatarUrl ? (
+                        <img src={c.avatarUrl} alt={c.fullName}
+                          style={{ width: 40, height: 40, objectFit: 'cover' }}
+                          className="rounded-circle border" />
+                      ) : (
+                        <div className="rounded-circle border bg-light d-flex align-items-center justify-content-center text-muted"
+                          style={{ width: 40, height: 40, fontSize: 18 }}>🛵</div>
+                      )}
+                      <div>
+                        <div className="fw-semibold">{c.fullName}</div>
+                        <div className="text-muted small">@{c.username}</div>
+                      </div>
+                    </div>
                   </td>
                   <td>
                     <div>{c.email}</div>
@@ -113,6 +126,20 @@ function AdminCouriersPage() {
                   </td>
                   <td className="small">
                     {c.vehicleType && c.vehicleBrand ? `${c.vehicleType} • ${c.vehicleBrand} ${c.vehicleModel} — ${c.vehiclePlate}` : '—'}
+                  </td>
+                  <td className="small">
+                    <div>
+                      <span className="text-muted">Licence:</span> {c.licenseNumber || '—'}
+                      {c.licensePhotoUrl && (
+                        <a href={c.licensePhotoUrl} target="_blank" rel="noreferrer" className="ms-1">view</a>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-muted">IC:</span> {c.icNumber || '—'}
+                      {c.icPhotoUrl && (
+                        <a href={c.icPhotoUrl} target="_blank" rel="noreferrer" className="ms-1">view</a>
+                      )}
+                    </div>
                   </td>
                   <td className="text-muted small">{new Date(c.created_at).toLocaleDateString()}</td>
                   <td className="text-end text-nowrap">

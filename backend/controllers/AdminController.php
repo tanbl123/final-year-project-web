@@ -67,7 +67,8 @@ function handleRejectSupplier(PDO $pdo, string $userId): void {
 function handleListPendingCouriers(PDO $pdo): void {
   $stmt = $pdo->query(
     "SELECT u.userId, d.deliveryPersonnelId, d.vehicleType, d.vehicleBrand, d.vehicleModel, d.vehiclePlate,
-            u.username, u.email, u.fullName, u.phoneNumber, u.created_at
+            d.licenseNumber, d.licensePhotoUrl, d.icNumber, d.icPhotoUrl,
+            u.username, u.email, u.fullName, u.phoneNumber, u.avatarUrl, u.created_at
        FROM `user` u
        JOIN delivery_personnel d ON d.userId = u.userId
       WHERE u.role = 'DeliveryPersonnel' AND u.status = 'Pending'
