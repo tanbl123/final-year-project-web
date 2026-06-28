@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -222,6 +224,7 @@ class _OrderTabListState extends State<_OrderTabList> with AutomaticKeepAliveCli
             order: o,
             paying: _payingId == o.orderId,
             onPay: () => _payOrder(o),
+            onExpired: _fetchFirst, // window ran out → reload (server cancels it)
             onTap: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: o.orderId)),
@@ -239,24 +242,15 @@ class _OrderCard extends StatelessWidget {
   final CustomerOrderSummary order;
   final VoidCallback onTap;
   final VoidCallback onPay;
+  final VoidCallback? onExpired; // payment window ran out → refresh the list
   final bool paying;
   const _OrderCard({
     required this.order,
     required this.onTap,
     required this.onPay,
+    this.onExpired,
     this.paying = false,
   });
-
-  // "3:45 PM" style time from a payBy datetime string.
-  String? _payByLabel() {
-    if (order.payBy == null) return null;
-    final dt = DateTime.tryParse(order.payBy!);
-    if (dt == null) return null;
-    final h12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final ampm = dt.hour < 12 ? 'AM' : 'PM';
-    final mm = dt.minute.toString().padLeft(2, '0');
-    return '$h12:$mm $ampm';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +258,6 @@ class _OrderCard extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     final dt = order.orderDate == null ? null : DateTime.tryParse(order.orderDate!)?.toLocal();
     final dateStr = dt == null ? '' : '${dt.day}/${dt.month}/${dt.year}';
-    final payBy = _payByLabel();
     final statusColor = order.awaitingPayment
         ? Colors.orange.shade700
         : (kOrderStatusColors[order.orderStatus] ?? Colors.grey);
@@ -379,13 +372,10 @@ class _OrderCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          payBy == null
-                              ? 'Awaiting payment'
-                              : 'Pay before $payBy or it will be cancelled',
-                          style: TextStyle(
-                              fontSize: 11.5, color: Colors.orange.shade800),
-                        ),
+                        child: order.payBy == null
+                            ? Text('Awaiting payment',
+                                style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800))
+                            : _PayCountdown(payBy: order.payBy!, onExpired: onExpired),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
@@ -456,6 +446,79 @@ class _ErrorView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Live "Pay within MM:SS" countdown for an unpaid order. When it hits zero it
+// shows an expiring note and asks the list to reload (the server cancels the
+// order on that refresh).
+class _PayCountdown extends StatefulWidget {
+  final String payBy; // ISO deadline
+  final VoidCallback? onExpired;
+  const _PayCountdown({required this.payBy, this.onExpired});
+
+  @override
+  State<_PayCountdown> createState() => _PayCountdownState();
+}
+
+class _PayCountdownState extends State<_PayCountdown> {
+  Timer? _timer;
+  late Duration _left = _remaining();
+  bool _firedExpired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final r = _remaining();
+      setState(() => _left = r);
+      if (r <= Duration.zero && !_firedExpired) {
+        _firedExpired = true;
+        _timer?.cancel();
+        WidgetsBinding.instance.addPostFrameCallback((_) => widget.onExpired?.call());
+      }
+    });
+  }
+
+  Duration _remaining() {
+    final due = DateTime.tryParse(widget.payBy);
+    if (due == null) return Duration.zero;
+    final d = due.difference(DateTime.now());
+    return d.isNegative ? Duration.zero : d;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _fmt(Duration d) {
+    final mm = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final ss = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return d.inHours > 0 ? '${d.inHours.toString().padLeft(2, '0')}:$mm:$ss' : '$mm:$ss';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_left <= Duration.zero) {
+      return Text('Payment expired — cancelling…',
+          style: TextStyle(fontSize: 11.5, color: Colors.red.shade700));
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.timer_outlined, size: 13, color: Colors.orange.shade800),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text('Pay within ${_fmt(_left)} or it will be cancelled',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800, fontWeight: FontWeight.w600)),
+        ),
+      ],
     );
   }
 }
