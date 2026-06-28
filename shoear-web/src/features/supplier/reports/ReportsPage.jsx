@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getSalesReport } from './reportService';
+import { useAuth } from '../../auth/AuthContext';
 
 const rm = (n) => 'RM ' + Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -18,6 +19,7 @@ function StatCard({ label, value, sub, color = 'dark' }) {
 }
 
 function ReportsPage() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,10 +33,45 @@ function ReportsPage() {
     return () => { active = false; };
   }, []);
 
+  const hasSales = !!data && data.summary.products > 0;
+
+  async function exportPdf() {
+    const { generateReportPdf } = await import('../../../utils/reportPdf'); // lazy: keep jsPDF out of the main bundle
+    const rate = data.commissionRate;
+    generateReportPdf({
+      title: 'Sales Report',
+      generatedBy: user?.fullName,
+      referencePrefix: 'SR',
+      summary: [
+        { label: 'Gross sales', value: rm(data.summary.grossSales) },
+        { label: `Commission (${rate}%)`, value: rm(data.summary.commission) },
+        { label: 'Net earnings (after commission)', value: rm(data.summary.netEarnings) },
+        { label: 'Units sold', value: String(data.summary.unitsSold) },
+        { label: 'Products sold', value: String(data.summary.products) },
+      ],
+      head: ['Product', 'Units', 'Gross sales', `Net (after ${rate}%)`],
+      body: data.byProduct.map((p) => [
+        p.productName,
+        p.units,
+        rm(p.gross),
+        rm(p.gross * (1 - rate / 100)),
+      ]),
+      foot: [['Total', data.summary.unitsSold, rm(data.summary.grossSales), rm(data.summary.netEarnings)]],
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+    });
+  }
+
   return (
     <div className="container py-4 text-start">
-      <h1 className="mb-1">📊 Sales Report</h1>
-      <p className="text-muted">Your paid sales, and what you keep after platform commission.</p>
+      <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <h1 className="mb-1">📊 Sales Report</h1>
+          <p className="text-muted">Your paid sales, and what you keep after platform commission.</p>
+        </div>
+        <button className="btn btn-outline-primary" onClick={exportPdf} disabled={!hasSales}>
+          ⬇ Export PDF
+        </button>
+      </div>
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
 

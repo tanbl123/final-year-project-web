@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getCommissionReport, getCommission, setCommission } from '../adminService';
+import { useAuth } from '../../auth/AuthContext';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 
 const rm = (n) => 'RM ' + Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function AdminCommissionPage() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);          // per-supplier report
   const [commission, setCommissionState] = useState(null);  // { current, history }
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,28 @@ function AdminCommissionPage() {
 
   const currentRate = commission?.current?.commissionRateValue != null
     ? Number(commission.current.commissionRateValue) : null;
+
+  const hasReport = !!data && data.summary.suppliers > 0;
+
+  async function exportPdf() {
+    const { generateReportPdf } = await import('../../../utils/reportPdf'); // lazy: keep jsPDF out of the main bundle
+    const rate = data.commissionRate;
+    generateReportPdf({
+      title: 'Commission Report',
+      generatedBy: user?.fullName,
+      referencePrefix: 'CR',
+      summary: [
+        { label: 'Gross sales', value: rm(data.summary.grossSales) },
+        { label: `Total commission (${rate}%)`, value: rm(data.summary.totalCommission) },
+        { label: 'Suppliers with sales', value: String(data.summary.suppliers) },
+        { label: 'Current commission rate', value: currentRate != null ? `${currentRate}%` : '—' },
+      ],
+      head: ['Supplier', 'Units', 'Gross sales', `Commission (${rate}%)`],
+      body: data.bySupplier.map((s) => [s.companyName, s.units, rm(s.gross), rm(s.commission)]),
+      foot: [['Total', '—', rm(data.summary.grossSales), rm(data.summary.totalCommission)]],
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+    });
+  }
 
   return (
     <div className="container py-4 text-start">
@@ -140,7 +164,12 @@ function AdminCommissionPage() {
           </div>
 
           {/* per-supplier report */}
-          <h5 className="mb-3">Commission earned by supplier</h5>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">Commission earned by supplier</h5>
+            <button className="btn btn-outline-primary btn-sm" onClick={exportPdf} disabled={!hasReport}>
+              ⬇ Export PDF
+            </button>
+          </div>
           {!data || data.summary.suppliers === 0 ? (
             <div className="card card-body text-center text-muted">No sales recorded yet.</div>
           ) : (
