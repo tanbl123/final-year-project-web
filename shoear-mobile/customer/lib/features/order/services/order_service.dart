@@ -3,6 +3,14 @@ import 'dart:io';
 import 'package:customer/core/api/api_client.dart';
 import 'package:customer/features/order/models/order.dart';
 
+/// One page of the customer's order history (for infinite scroll).
+class OrdersPage {
+  final List<CustomerOrderSummary> orders;
+  final int page;
+  final int total;
+  OrdersPage({required this.orders, required this.page, required this.total});
+}
+
 /// Checkout, payment and receipt (all require a Customer token).
 class OrderService {
   final ApiClient api;
@@ -64,12 +72,20 @@ class OrderService {
         await api.get('/orders/$orderId/receipt') as Map<String, dynamic>,
       );
 
-  /// GET /orders — the customer's order history (newest first).
-  Future<List<CustomerOrderSummary>> listOrders() async {
-    final data = await api.get('/orders') as Map<String, dynamic>;
-    return ((data['orders'] as List?) ?? [])
-        .map((e) => CustomerOrderSummary.fromJson(e as Map<String, dynamic>))
-        .toList();
+  /// GET /orders — one page of the customer's order history (newest first).
+  /// [status] filters by tab group: topay | paid | completed | cancelled
+  /// (null = all). Returns the page items plus total, for infinite scroll.
+  Future<OrdersPage> listOrders({String? status, int page = 1, int limit = 15}) async {
+    final query = <String, String>{'page': '$page', 'limit': '$limit'};
+    if (status != null && status.isNotEmpty) query['status'] = status;
+    final data = await api.get('/orders', query: query) as Map<String, dynamic>;
+    return OrdersPage(
+      orders: ((data['orders'] as List?) ?? [])
+          .map((e) => CustomerOrderSummary.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      page: (data['page'] as num?)?.toInt() ?? page,
+      total: (data['total'] as num?)?.toInt() ?? 0,
+    );
   }
 
   /// GET /orders/{id} — full order detail (items, payment, per-parcel tracking).

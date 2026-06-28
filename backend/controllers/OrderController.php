@@ -471,6 +471,33 @@ function handleCheckout(PDO $pdo, array $auth): void {
 function handleListCustomerOrders(PDO $pdo, array $auth): void {
   $customerId = requireCustomerId($pdo, $auth);
   cancelExpiredUnpaidOrders($pdo, $customerId); // tidy stale unpaid orders first
+
+  // Optional status-group filter (matches the app's order tabs) + pagination.
+  $groups = [
+    'topay'     => ['Placed'],
+    'paid'      => ['Paid', 'Processing', 'Shipped', 'OutForDelivery'],
+    'completed' => ['Delivered', 'Completed'],
+    'cancelled' => ['Cancelled'],
+  ];
+  $group = strtolower(trim($_GET['status'] ?? ''));
+  $statuses = $groups[$group] ?? null;
+  $page  = max(1, (int) ($_GET['page'] ?? 1));
+  $limit = min(50, max(1, (int) ($_GET['limit'] ?? 15)));
+  $offset = ($page - 1) * $limit;
+
+  $where = 'o.customerId = :cid';
+  $params = ['cid' => $customerId];
+  if ($statuses !== null) {
+    $in = [];
+    foreach ($statuses as $i => $s) { $k = ":st$i"; $in[] = $k; $params[$k] = $s; }
+    $where .= ' AND o.orderStatus IN (' . implode(',', $in) . ')';
+  }
+
+  // total (for the app to know whether more pages exist)
+  $cnt = $pdo->prepare("SELECT COUNT(*) FROM `order` o WHERE $where");
+  $cnt->execute($params);
+  $total = (int) $cnt->fetchColumn();
+
   $stmt = $pdo->prepare(
     "SELECT o.orderId, o.orderDate, o.orderStatus, o.orderTotalAmount,
             (SELECT COUNT(*) FROM order_item oi WHERE oi.orderId = o.orderId) AS itemCount,
@@ -498,17 +525,21 @@ function handleListCustomerOrders(PDO $pdo, array $auth): void {
               WHERE oi.orderId = o.orderId ORDER BY oi.orderItemId LIMIT 1) AS previewImage
        FROM `order` o
        LEFT JOIN payment pay ON pay.orderId = o.orderId
-      WHERE o.customerId = :cid
-      ORDER BY o.orderDate DESC"
+      WHERE $where
+      ORDER BY o.orderDate DESC
+      LIMIT :limit OFFSET :offset"
   );
-  $stmt->execute(['cid' => $customerId]);
+  foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+  $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+  $stmt->execute();
   $rows = $stmt->fetchAll();
   foreach ($rows as &$r) {
     $r['orderTotalAmount'] = (float) $r['orderTotalAmount'];
     $r['itemCount']        = (int) $r['itemCount'];
   }
   unset($r);
-  sendJson(200, true, ['orders' => $rows]);
+  sendJson(200, true, ['orders' => $rows, 'page' => $page, 'limit' => $limit, 'total' => $total]);
 }
 
 // GET /orders/{orderId} — one of the customer's own orders, in full (items,

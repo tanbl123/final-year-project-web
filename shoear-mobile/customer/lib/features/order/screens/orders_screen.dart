@@ -32,90 +32,14 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  Future<List<CustomerOrderSummary>>? _future;
-  bool _wasLoggedIn = false;
-  String? _payingId; // order currently being paid (shows a spinner)
-
-  @override
-  void initState() {
-    super.initState();
-    appRefreshTick.addListener(_onRefreshSignal);
-  }
-
-  @override
-  void dispose() {
-    appRefreshTick.removeListener(_onRefreshSignal);
-    super.dispose();
-  }
-
-  // A push arrived or the app resumed — re-fetch if signed in.
-  void _onRefreshSignal() {
-    if (mounted && _wasLoggedIn) _refresh();
-  }
-
-  Future<void> _refresh() async {
-    final next = context.read<OrderService>().listOrders();
-    setState(() => _future = next);
-    await next;
-  }
-
-  /// Resume payment for an unpaid order (Shopee's "Pay Now"). Reuses the same
-  /// Stripe flow as checkout; the server re-checks the order and stock first.
-  Future<void> _payOrder(CustomerOrderSummary order) async {
-    final orders = context.read<OrderService>();
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _payingId = order.orderId);
-    try {
-      final result = await payOrderWithStripe(orders, order.orderId);
-      if (!mounted) return;
-      messenger
-        ..removeCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(result == PayResult.paid
-              ? 'Payment successful.'
-              : 'Payment cancelled — your order is still awaiting payment.'),
-        ));
-    } catch (e) {
-      if (!mounted) return;
-      messenger
-        ..removeCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      if (mounted) setState(() => _payingId = null);
-      await _refresh(); // reflect Paid / Cancelled / still-Placed
-    }
-  }
-
-  // Status tabs, Shopee-style. Filtering is done over the single fetched list.
+  // Status tabs, Shopee-style. Each tab loads its OWN paginated list — the
+  // server filters by group, so tabs scroll independently and lazy-load.
   static const _tabs = ['All', 'To Pay', 'Paid', 'Completed', 'Cancelled'];
-
-  List<CustomerOrderSummary> _filter(List<CustomerOrderSummary> all, int tab) {
-    switch (tab) {
-      case 1: // To Pay — created but not yet paid
-        return all.where((o) => o.orderStatus == 'Placed').toList();
-      case 2: // Paid / in progress
-        return all
-            .where((o) => const ['Paid', 'Processing', 'Shipped', 'OutForDelivery']
-                .contains(o.orderStatus))
-            .toList();
-      case 3: // Completed
-        return all
-            .where((o) => const ['Delivered', 'Completed'].contains(o.orderStatus))
-            .toList();
-      case 4: // Cancelled
-        return all.where((o) => o.orderStatus == 'Cancelled').toList();
-      default: // All
-        return all;
-    }
-  }
+  static const _groups = [null, 'topay', 'paid', 'completed', 'cancelled'];
 
   @override
   Widget build(BuildContext context) {
     final loggedIn = context.watch<AuthProvider>().isLoggedIn;
-    if (loggedIn != _wasLoggedIn) {
-      _wasLoggedIn = loggedIn;
-      _future = null; // reload on login / drop on logout
-    }
     return DefaultTabController(
       length: _tabs.length,
       child: Scaffold(
@@ -154,30 +78,121 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
 
   Widget _ordersBody(BuildContext context) {
-    _future ??= context.read<OrderService>().listOrders();
-    return FutureBuilder<List<CustomerOrderSummary>>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snap.hasError) {
-          return _ErrorView(message: snap.error.toString(), onRetry: _refresh);
-        }
-        final orders = snap.data ?? [];
-        return TabBarView(
-          children: [
-            for (int t = 0; t < _tabs.length; t++) _list(_filter(orders, t)),
-          ],
-        );
-      },
+    return TabBarView(
+      children: [
+        for (int t = 0; t < _tabs.length; t++)
+          _OrderTabList(key: ValueKey(_groups[t]), status: _groups[t]),
+      ],
     );
   }
+}
 
-  Widget _list(List<CustomerOrderSummary> orders) {
-    if (orders.isEmpty) {
+/// One order tab: its own paginated, lazily-loaded list (server filters by the
+/// status group). Kept alive so switching tabs doesn't refetch every time.
+class _OrderTabList extends StatefulWidget {
+  final String? status; // null = All
+  const _OrderTabList({super.key, this.status});
+
+  @override
+  State<_OrderTabList> createState() => _OrderTabListState();
+}
+
+class _OrderTabListState extends State<_OrderTabList> with AutomaticKeepAliveClientMixin {
+  final _scroll = ScrollController();
+  final List<CustomerOrderSummary> _items = [];
+  int _page = 1, _total = 0;
+  bool _loading = true, _loadingMore = false;
+  Object? _error;
+  String? _payingId;
+  bool get _hasMore => _items.length < _total;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+    appRefreshTick.addListener(_onTick); // push / app-resume → reload page 1
+    _fetchFirst();
+  }
+
+  @override
+  void dispose() {
+    appRefreshTick.removeListener(_onTick);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onTick() { if (mounted) _fetchFirst(); }
+
+  Future<void> _fetchFirst() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await context.read<OrderService>().listOrders(status: widget.status, page: 1);
+      if (!mounted) return;
+      setState(() {
+        _items..clear()..addAll(res.orders);
+        _page = res.page; _total = res.total; _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e; _loading = false; });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || _loading || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final res = await context.read<OrderService>().listOrders(status: widget.status, page: _page + 1);
+      if (!mounted) return;
+      setState(() {
+        _items.addAll(res.orders);
+        _page = res.page; _total = res.total; _loadingMore = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scroll.hasClients && _scroll.position.pixels >= _scroll.position.maxScrollExtent - 300) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _payOrder(CustomerOrderSummary order) async {
+    final orders = context.read<OrderService>();
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _payingId = order.orderId);
+    try {
+      final result = await payOrderWithStripe(orders, order.orderId);
+      if (!mounted) return;
+      messenger
+        ..removeCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(result == PayResult.paid
+              ? 'Payment successful.'
+              : 'Payment cancelled — your order is still awaiting payment.'),
+        ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger..removeCurrentSnackBar()..showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _payingId = null);
+      await _fetchFirst();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAlive
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) return _ErrorView(message: _error.toString(), onRetry: _fetchFirst);
+    if (_items.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _refresh,
+        onRefresh: _fetchFirst,
         child: ListView(
           children: [
             const SizedBox(height: 120),
@@ -189,22 +204,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _refresh,
+      onRefresh: _fetchFirst,
       child: ListView.separated(
+        controller: _scroll,
         padding: const EdgeInsets.all(12),
-        itemCount: orders.length,
+        itemCount: _items.length + (_loadingMore ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) => _OrderCard(
-          order: orders[i],
-          paying: _payingId == orders[i].orderId,
-          onPay: () => _payOrder(orders[i]),
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orders[i].orderId)),
+        itemBuilder: (context, i) {
+          if (i >= _items.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
             );
-            _refresh(); // status may have changed while viewing
-          },
-        ),
+          }
+          final o = _items[i];
+          return _OrderCard(
+            order: o,
+            paying: _payingId == o.orderId,
+            onPay: () => _payOrder(o),
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: o.orderId)),
+              );
+              _fetchFirst(); // status may have changed while viewing
+            },
+          );
+        },
       ),
     );
   }
