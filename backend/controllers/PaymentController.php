@@ -194,9 +194,12 @@ function handleGetReceipt(PDO $pdo, array $auth, string $orderId): void {
   $stmt = $pdo->prepare(
     "SELECT r.receiptId, r.receiptGeneratedDate, o.orderId, o.orderDate,
             o.orderTotalAmount, o.orderDeliveryAddress,
+            buyer.fullName AS customerName,
             pay.paymentMethod, pay.transactionId, pay.paymentAmount, pay.paymentDate
        FROM receipt r
        JOIN `order` o        ON o.orderId = r.orderId
+       JOIN customer c       ON c.customerId = o.customerId
+       JOIN `user` buyer     ON buyer.userId = c.userId
        LEFT JOIN payment pay ON pay.orderId = o.orderId
       WHERE r.orderId = :oid AND o.customerId = :cid"
   );
@@ -207,6 +210,19 @@ function handleGetReceipt(PDO $pdo, array $auth, string $orderId): void {
   }
   $rcpt['orderTotalAmount'] = (float) $rcpt['orderTotalAmount'];
   if ($rcpt['paymentAmount'] !== null) { $rcpt['paymentAmount'] = (float) $rcpt['paymentAmount']; }
+
+  // seller(s) on the order — a marketplace receipt should name who sold the items
+  $sel = $pdo->prepare(
+    "SELECT DISTINCT s.companyName
+       FROM order_item oi
+       JOIN product_variant pv ON pv.productVariantId = oi.productVariantId
+       JOIN product p          ON p.productId = pv.productId
+       JOIN supplier s         ON s.supplierId = p.supplierId
+      WHERE oi.orderId = :oid
+      ORDER BY s.companyName"
+  );
+  $sel->execute(['oid' => $orderId]);
+  $rcpt['sellers'] = array_column($sel->fetchAll(), 'companyName');
 
   $it = $pdo->prepare(
     "SELECT p.productName, p.productBrand AS brand, oi.orderSize AS size, oi.orderQuantity AS qty,

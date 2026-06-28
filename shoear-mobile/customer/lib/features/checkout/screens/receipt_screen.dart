@@ -122,6 +122,21 @@ class ReceiptScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
+              // ── Sold by / Billed to ────────────────────────────────────
+              if (receipt.sellers.isNotEmpty || (receipt.customerName ?? '').isNotEmpty) ...[
+                _Card(
+                  icon: Icons.storefront_outlined,
+                  title: 'Details',
+                  child: Column(
+                    children: [
+                      if (receipt.sellers.isNotEmpty) _kv('Sold by', receipt.sellers.join(', ')),
+                      if ((receipt.customerName ?? '').isNotEmpty) _kv('Billed to', receipt.customerName!),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
               // ── Payment ────────────────────────────────────────────────
               _Card(
                 icon: Icons.payment_outlined,

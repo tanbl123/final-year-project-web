@@ -45,6 +45,8 @@ class Receipt {
   final String orderId;
   final double total;
   final String deliveryAddress;
+  final String? customerName; // who the receipt is billed to
+  final List<String> sellers; // supplier(s) the items were bought from
   final String? paymentMethod;
   final String? transactionId;
   final double? paymentAmount;
@@ -56,6 +58,8 @@ class Receipt {
     required this.orderId,
     required this.total,
     required this.deliveryAddress,
+    this.customerName,
+    this.sellers = const [],
     this.paymentMethod,
     this.transactionId,
     this.paymentAmount,
@@ -68,6 +72,8 @@ class Receipt {
         orderId: j['orderId'] as String? ?? '',
         total: (j['orderTotalAmount'] as num?)?.toDouble() ?? 0,
         deliveryAddress: j['orderDeliveryAddress'] as String? ?? '',
+        customerName: j['customerName'] as String?,
+        sellers: ((j['sellers'] as List?) ?? []).map((e) => e.toString()).toList(),
         paymentMethod: j['paymentMethod'] as String?,
         transactionId: j['transactionId'] as String?,
         paymentAmount: (j['paymentAmount'] as num?)?.toDouble(),

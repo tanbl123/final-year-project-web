@@ -19,7 +19,7 @@ String _fmt(String? iso) {
   final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
   final ampm = d.hour < 12 ? 'AM' : 'PM';
   final mm = d.minute.toString().padLeft(2, '0');
-  return '${d.day}/${d.month}/${d.year} · $h:$mm $ampm';
+  return '${d.day}/${d.month}/${d.year}  $h:$mm $ampm';
 }
 
 Future<Uint8List> buildReceiptPdf(Receipt r) async {
@@ -53,6 +53,27 @@ Future<Uint8List> buildReceiptPdf(Receipt r) async {
         pw.Divider(color: PdfColors.grey400),
         pw.SizedBox(height: 10),
 
+        // ── Billed to / Sold by ──────────────────────────────────────────
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                pw.Text('Billed to', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                pw.Text(r.customerName ?? '-', style: const pw.TextStyle(fontSize: 11)),
+              ]),
+            ),
+            if (r.sellers.isNotEmpty)
+              pw.Expanded(
+                child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                  pw.Text('Sold by', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                  pw.Text(r.sellers.join(', '), style: const pw.TextStyle(fontSize: 11)),
+                ]),
+              ),
+          ],
+        ),
+        pw.SizedBox(height: 14),
+
         // ── Items ────────────────────────────────────────────────────────
         pw.Text('Order Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
         pw.SizedBox(height: 6),
@@ -82,7 +103,7 @@ Future<Uint8List> buildReceiptPdf(Receipt r) async {
         // ── Payment ──────────────────────────────────────────────────────
         pw.Text('Payment', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
         pw.SizedBox(height: 4),
-        pw.Text('Method: ${r.paymentMethod ?? '—'}', style: const pw.TextStyle(fontSize: 11)),
+        pw.Text('Method: ${r.paymentMethod ?? '-'}', style: const pw.TextStyle(fontSize: 11)),
         if ((r.transactionId ?? '').isNotEmpty)
           pw.Text('Reference: ${r.transactionId}', style: const pw.TextStyle(fontSize: 11)),
         pw.SizedBox(height: 16),
@@ -94,7 +115,7 @@ Future<Uint8List> buildReceiptPdf(Receipt r) async {
         pw.SizedBox(height: 24),
 
         pw.Divider(color: PdfColors.grey400),
-        pw.Text('This is a system-generated receipt — ShoeAR. Thank you for your purchase.',
+        pw.Text('This is a system-generated receipt from ShoeAR. Thank you for your purchase.',
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
       ],
     ),
