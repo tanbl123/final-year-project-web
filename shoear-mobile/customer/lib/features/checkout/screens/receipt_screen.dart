@@ -207,6 +207,14 @@ class ReceiptScreen extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
+              const SizedBox(height: 16),
+              Center(
+                child: Text(
+                  'Need help? $kShoearSupportEmail · $kShoearWebsite',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+              ),
             ],
           ),
         ),

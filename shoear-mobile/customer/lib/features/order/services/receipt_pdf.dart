@@ -10,6 +10,10 @@ import 'package:customer/features/order/models/order.dart';
 /// (and email-it-yourself). Used by the receipt screen's "Download / Share"
 /// button — fully on-device, no backend.
 
+// Platform support details shown on the receipt (PDF + on-screen footer).
+const String kShoearSupportEmail = 'support@shoear.com';
+const String kShoearWebsite = 'www.shoear.com';
+
 String _money(double n) => 'RM ${n.toStringAsFixed(2)}';
 
 String _fmt(String? iso) {
@@ -116,6 +120,9 @@ Future<Uint8List> buildReceiptPdf(Receipt r) async {
 
         pw.Divider(color: PdfColors.grey400),
         pw.Text('This is a system-generated receipt from ShoeAR. Thank you for your purchase.',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+        pw.SizedBox(height: 2),
+        pw.Text('Need help? $kShoearSupportEmail  |  $kShoearWebsite',
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
       ],
     ),
