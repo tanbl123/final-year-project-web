@@ -293,6 +293,13 @@ if ($method === 'DELETE' && preg_match('#^/wishlist/items/([^/]+)$#', $path, $m)
   handleRemoveWishlistItem($pdo, $auth, $m[1]);
 }
 
+// remove every "no longer available" (removed/rejected) saved product at once
+if ($method === 'DELETE' && $path === '/wishlist/unavailable') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRemoveUnavailableWishlist($pdo, $auth);
+}
+
 // ── public catalog (customer app browsing; guests allowed — no token) ──
 if ($method === 'GET' && $path === '/catalog/products') {
   $pdo = getPDO();

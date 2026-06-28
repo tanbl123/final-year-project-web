@@ -43,10 +43,49 @@ class _WishlistScreenState extends State<WishlistScreen> {
   @override
   Widget build(BuildContext context) {
     final loggedIn = context.watch<AuthProvider>().isLoggedIn;
+    final unavailable = context.select<WishlistProvider, int>((w) => w.unavailableCount);
     return Scaffold(
-      appBar: AppBar(title: const Text('Wishlist')),
+      appBar: AppBar(
+        title: const Text('Wishlist'),
+        actions: [
+          if (loggedIn && unavailable > 0)
+            TextButton(
+              onPressed: _removeUnavailable,
+              child: Text('Remove unavailable ($unavailable)',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+        ],
+      ),
       body: !loggedIn ? _signInPrompt(context) : _body(context),
     );
+  }
+
+  Future<void> _removeUnavailable() async {
+    final wl = context.read<WishlistProvider>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove unavailable items?'),
+        content: const Text(
+            'This removes products that are no longer available from your wishlist. '
+            'Out-of-stock items are kept (they may come back).'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await wl.removeUnavailable();
+      if (mounted) context.showSnack('Removed unavailable items.');
+    } catch (e) {
+      if (mounted) context.showSnack(e.toString());
+    }
   }
 
   Widget _signInPrompt(BuildContext context) => Center(
@@ -110,9 +149,16 @@ class _WishlistScreenState extends State<WishlistScreen> {
                   return Card(
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: it.productId)),
-              ),
+              onTap: () {
+                // A removed product can't open its (Approved-only) detail page.
+                if (!it.available) {
+                  context.showSnack('This product is no longer available.');
+                  return;
+                }
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: it.productId)),
+                );
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

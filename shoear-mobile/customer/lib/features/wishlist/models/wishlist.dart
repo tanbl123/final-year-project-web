@@ -48,6 +48,7 @@ class Wishlist {
   final int total;                 // total saved (for pagination)
   final int page;                  // which page these items are
   final List<String> savedIds;     // ALL saved product ids (hearts app-wide)
+  final int unavailableCount;      // saved products that are no longer available
 
   Wishlist({
     required this.wishlistId,
@@ -56,6 +57,7 @@ class Wishlist {
     this.total = 0,
     this.page = 1,
     this.savedIds = const [],
+    this.unavailableCount = 0,
   });
 
   factory Wishlist.fromJson(Map<String, dynamic> j) => Wishlist(
@@ -67,5 +69,6 @@ class Wishlist {
         total: (j['total'] as num?)?.toInt() ?? (j['itemCount'] as num?)?.toInt() ?? 0,
         page: (j['page'] as num?)?.toInt() ?? 1,
         savedIds: ((j['savedIds'] as List?) ?? []).map((e) => e.toString()).toList(),
+        unavailableCount: (j['unavailableCount'] as num?)?.toInt() ?? 0,
       );
 }

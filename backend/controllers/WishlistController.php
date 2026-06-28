@@ -29,6 +29,16 @@ function wishlistPayload(PDO $pdo, string $wishlistId, int $page = 1, int $limit
   $idsStmt->execute(['wid' => $wishlistId]);
   $savedIds = array_column($idsStmt->fetchAll(), 'productId');
 
+  // how many saved products are no longer available (removed/rejected) — so the
+  // app can offer a "remove unavailable" action.
+  $unavStmt = $pdo->prepare(
+    "SELECT COUNT(*) FROM wishlist_item wi
+       JOIN product p ON p.productId = wi.productId
+      WHERE wi.wishlistId = :wid AND p.productStatus <> 'Approved'"
+  );
+  $unavStmt->execute(['wid' => $wishlistId]);
+  $unavailableCount = (int) $unavStmt->fetchColumn();
+
   $stmt = $pdo->prepare(
     "SELECT wi.wishlistItemId, p.productId, p.productName AS name, p.productBrand AS brand,
             p.productPrice AS price, p.productStatus AS status, c.categoryName AS categoryName,
@@ -70,13 +80,28 @@ function wishlistPayload(PDO $pdo, string $wishlistId, int $page = 1, int $limit
   }
   // itemCount = TOTAL saved (used for the count badge), not the page size.
   return [
-    'wishlistId' => $wishlistId,
-    'items'      => $items,
-    'itemCount'  => $total,
-    'total'      => $total,
-    'page'       => $page,
-    'savedIds'   => $savedIds,
+    'wishlistId'       => $wishlistId,
+    'items'            => $items,
+    'itemCount'        => $total,
+    'total'            => $total,
+    'page'             => $page,
+    'savedIds'         => $savedIds,
+    'unavailableCount' => $unavailableCount,
   ];
+}
+
+// DELETE /wishlist/unavailable — drop every saved product that's no longer
+// available (supplier-removed / rejected). Out-of-stock items are kept (they
+// may restock). Returns the refreshed wishlist (page 1).
+function handleRemoveUnavailableWishlist(PDO $pdo, array $auth): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  $wishlistId = getOrCreateWishlistId($pdo, $customerId);
+  $pdo->prepare(
+    "DELETE wi FROM wishlist_item wi
+       JOIN product p ON p.productId = wi.productId
+      WHERE wi.wishlistId = :wid AND p.productStatus <> 'Approved'"
+  )->execute(['wid' => $wishlistId]);
+  sendJson(200, true, wishlistPayload($pdo, $wishlistId));
 }
 
 // GET /wishlist — optional ?page&limit for the wishlist screen's infinite scroll.

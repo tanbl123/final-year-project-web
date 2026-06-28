@@ -18,4 +18,8 @@ class WishlistService {
   /// DELETE /wishlist/items/{productId}
   Future<Wishlist> remove(String productId) async =>
       Wishlist.fromJson(await api.delete('/wishlist/items/$productId') as Map<String, dynamic>);
+
+  /// DELETE /wishlist/unavailable — clear all no-longer-available saved products.
+  Future<Wishlist> removeUnavailable() async =>
+      Wishlist.fromJson(await api.delete('/wishlist/unavailable') as Map<String, dynamic>);
 }

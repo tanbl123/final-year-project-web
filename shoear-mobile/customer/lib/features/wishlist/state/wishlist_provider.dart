@@ -19,6 +19,7 @@ class WishlistProvider extends ChangeNotifier {
 
   Set<String> _savedIds = {};     // ALL saved product ids — drives hearts app-wide
   bool isSaved(String productId) => _savedIds.contains(productId);
+  int get unavailableCount => _wishlist?.unavailableCount ?? 0;
 
   bool _loading = false;
   bool get loading => _loading;
@@ -110,6 +111,17 @@ class WishlistProvider extends ChangeNotifier {
         savedIds: w.savedIds,
       );
     }
+    notifyListeners();
+  }
+
+  /// Clear all no-longer-available saved products (user-initiated). Reloads to
+  /// page 1 from the response. Throws [ApiException] on failure.
+  Future<void> removeUnavailable() async {
+    final w = await _service.removeUnavailable();
+    _wishlist = w;
+    _savedIds = w.savedIds.toSet();
+    _total = w.total;
+    _page = 1;
     notifyListeners();
   }
 
