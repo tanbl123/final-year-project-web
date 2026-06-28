@@ -90,31 +90,6 @@ class ReceiptScreen extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // Save / share / print this receipt — the OS sheet covers saving to
-            // Files, emailing it, and printing, all from one button.
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  try {
-                    await shareReceiptPdf(receipt);
-                  } catch (_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                        ..removeCurrentSnackBar()
-                        ..showSnackBar(const SnackBar(content: Text('Could not generate the receipt.')));
-                    }
-                  }
-                },
-                icon: const Icon(Icons.ios_share),
-                label: const Text('Download / Share receipt'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-
               // ── Items ──────────────────────────────────────────────────
               _Card(
                 icon: Icons.shopping_bag_outlined,
@@ -192,6 +167,29 @@ class ReceiptScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Save / share / print this receipt — the OS sheet covers saving
+              // to Files, emailing it, and printing, all from one button.
+              OutlinedButton.icon(
+                onPressed: () async {
+                  try {
+                    await shareReceiptPdf(receipt);
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                        ..removeCurrentSnackBar()
+                        ..showSnackBar(const SnackBar(content: Text('Could not generate the receipt.')));
+                    }
+                  }
+                },
+                icon: const Icon(Icons.ios_share),
+                label: const Text('Download / Share receipt'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],
