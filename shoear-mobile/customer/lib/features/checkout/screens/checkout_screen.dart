@@ -17,6 +17,7 @@ import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/services/postcode_service.dart';
 import 'package:customer/core/services/places_service.dart';
 import 'package:customer/features/checkout/screens/receipt_screen.dart';
+import 'package:customer/features/shell/main_shell.dart';
 
 class CheckoutScreen extends StatefulWidget {
   /// The cart items being checked out. null = the whole cart (legacy callers).
@@ -413,8 +414,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'it later from My Orders.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Later'),
+            onPressed: () {
+              Navigator.of(ctx).pop(); // close the dialog
+              if (!mounted) return;
+              // Don't strand the customer on the now-empty checkout page — take
+              // them to My Orders, where this order waits under "To Pay".
+              mainShellTab.value = MainTab.orders;
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            },
+            child: const Text('Pay later'),
           ),
           FilledButton(
             onPressed: () {
@@ -534,7 +542,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
-      body: (cart == null || items.isEmpty)
+      body: (_placing && items.isEmpty)
+          // order already placed, payment in progress — don't flash "cart empty"
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Completing your order…'),
+                ],
+              ),
+            )
+          : (cart == null || items.isEmpty)
           ? const Center(child: Text('Your cart is empty.'))
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
