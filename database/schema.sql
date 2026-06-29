@@ -637,6 +637,16 @@ CREATE TABLE easyparcel_oauth (
 ) ENGINE=InnoDB;
 INSERT INTO easyparcel_oauth (id) VALUES (1);
 
+-- App-level cron throttle. ONE row (id = 1): after handling a request the app
+-- checks lastSweepAt and, if older than the configured interval, runs the
+-- time-based sweeps once (no OS cron needed). See backend/lib/sweeps.php and
+-- migrations/2026_06_29_cron_state.sql.
+CREATE TABLE cron_state (
+    id          TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    lastSweepAt DATETIME NULL
+) ENGINE=InnoDB;
+INSERT INTO cron_state (id, lastSweepAt) VALUES (1, NULL);
+
 -- =====================================================================
 --  END OF SCHEMA
 -- =====================================================================

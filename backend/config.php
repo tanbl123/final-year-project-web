@@ -26,6 +26,12 @@ $config = [
   // Where Stripe sends the supplier back after hosted onboarding.
   'app_url' => getenv('APP_URL') ?: 'http://localhost:5173',
 
+  // App-level cron: how often (minutes) the time-based sweeps may auto-run after
+  // a request, so they fire on a timer WITHOUT an OS cron job. The manual "Run
+  // reminders" button still works regardless. Set to 0 to disable auto-running
+  // (e.g. if you wire a real OS cron / Task Scheduler to /admin/run-sweeps).
+  'sweeps_auto_interval_minutes' => (int) (getenv('SWEEPS_AUTO_INTERVAL') ?: 10),
+
   // Google Places (New) API key for address autocomplete on the web supplier
   // form. Kept server-side (the browser hits our /places/* proxy, never Google
   // directly). Leave empty to disable autocomplete — the form still works with

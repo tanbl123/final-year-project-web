@@ -133,3 +133,39 @@ function runNotificationSweeps(PDO $pdo): array {
     'autoCancelled'    => $cancelled,
   ];
 }
+
+// Everything the manual "Run reminders" button does, in one call: the
+// notification sweeps + the gated courier monthly payout. Used by BOTH the
+// manual endpoint and the app-level auto-runner so they behave identically.
+function runAllSweeps(PDO $pdo, array $config): array {
+  $result = runNotificationSweeps($pdo);
+  if (function_exists('sweepCourierPayouts')) {
+    $result['courierPayouts'] = sweepCourierPayouts($pdo, $config);
+  }
+  return $result;
+}
+
+// App-level "cron": run the sweeps automatically, at most once per
+// sweeps_auto_interval_minutes, triggered opportunistically by request traffic
+// (called post-response). Concurrency-safe — the conditional UPDATE lets only
+// ONE request win the slot, so two simultaneous requests can't double-run.
+// No-op (cheap) when not due, when disabled (interval 0), or on any error.
+function maybeRunSweeps(PDO $pdo, array $config): void {
+  $interval = (int) ($config['sweeps_auto_interval_minutes'] ?? 0);
+  if ($interval <= 0) { return; }   // disabled (e.g. a real OS cron is wired up)
+  try {
+    // Claim the slot atomically: only succeeds if it's actually due. rowCount()
+    // is 1 for the single winning request, 0 for everyone else.
+    $claim = $pdo->prepare(
+      'UPDATE cron_state
+          SET lastSweepAt = NOW()
+        WHERE id = 1
+          AND (lastSweepAt IS NULL OR lastSweepAt <= (NOW() - INTERVAL :mins MINUTE))'
+    );
+    $claim->execute(['mins' => $interval]);
+    if ($claim->rowCount() < 1) { return; }   // not due, or another request won
+    runAllSweeps($pdo, $config);
+  } catch (Throwable $e) {
+    // never let background housekeeping affect the request that triggered it
+  }
+}

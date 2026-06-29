@@ -69,6 +69,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 $config = require __DIR__ . '/../../config.php';
 $secret = $config['jwt_secret'];
 
+// App-level "cron": after the response is sent, opportunistically run the
+// time-based sweeps if they're due (throttled to sweeps_auto_interval_minutes,
+// concurrency-safe). This fires the scheduled housekeeping on a timer without an
+// OS cron job. It runs post-response (flushing first when the SAPI allows) so it
+// never adds latency to the request, and is fully best-effort.
+register_shutdown_function(function () use ($config) {
+  if (function_exists('fastcgi_finish_request')) { @fastcgi_finish_request(); }
+  try {
+    if (function_exists('maybeRunSweeps')) {
+      maybeRunSweeps(getPDO(), $config);
+    }
+  } catch (Throwable $e) { /* ignore — background housekeeping only */ }
+});
+
 // ── method + path after /shoear/api/v1 ──
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -572,8 +586,7 @@ if ($method === 'POST' && $path === '/admin/run-sweeps') {
   $auth = requireAuth($secret);
   requireAdmin($auth);
   $pdo  = getPDO();
-  $result = runNotificationSweeps($pdo);
-  $result['courierPayouts'] = sweepCourierPayouts($pdo, $config);  // automatic monthly payout (gated)
+  $result = runAllSweeps($pdo, $config);   // notification sweeps + gated courier payout
   sendJson(200, true, ['swept' => $result]);
 }
 
