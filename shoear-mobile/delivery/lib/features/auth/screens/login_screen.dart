@@ -147,6 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             border:     const OutlineInputBorder(),
                             helperText: ' ',
                             errorText:  _passwordError ?? _loginError,
+                            errorMaxLines: 4,   // let long messages (e.g. "pending approval") wrap
                             suffixIcon: IconButton(
                               icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                               onPressed: () => setState(() => _obscure = !_obscure),
