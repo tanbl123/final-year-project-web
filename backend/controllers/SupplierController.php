@@ -355,7 +355,7 @@ function shipmentPartiesFor(PDO $pdo, array $config, string $deliveryId): array 
     'SELECT s.companyName AS company, su.phoneNumber AS pickPhone,
             s.operationalLine1 AS pickLine1, s.operationalCity AS pickCity,
             s.operationalPostcode AS pickCode, s.operationalState AS pickState,
-            buyer.fullName AS sendName, buyer.phoneNumber AS sendPhone,
+            buyer.fullName AS sendName, buyer.phoneNumber AS sendPhone, buyer.email AS sendEmail,
             o.deliveryLine1 AS sendLine1, o.deliveryCity AS sendCity,
             o.deliveryPostcode AS sendCode, o.deliveryState AS sendState,
             o.orderTotalAmount AS value
@@ -376,6 +376,7 @@ function shipmentPartiesFor(PDO $pdo, array $config, string $deliveryId): array 
   ];
   $receiver = [
     'name' => $r['sendName'] ?? '', 'company' => '', 'phone' => $r['sendPhone'] ?? '',
+    'email' => $r['sendEmail'] ?? '',
     'line1' => $r['sendLine1'] ?? '', 'line2' => '', 'city' => $r['sendCity'] ?? '',
     'state' => $r['sendState'] ?? '', 'code' => $r['sendCode'] ?? '',
   ];

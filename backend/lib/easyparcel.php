@@ -16,7 +16,7 @@
 const EP_STATE_CODES = [
   'Johor' => 'jhr', 'Kedah' => 'kdh', 'Kelantan' => 'ktn', 'Melaka' => 'mlk',
   'Negeri Sembilan' => 'nsn', 'Pahang' => 'phg', 'Perak' => 'prk', 'Perlis' => 'pls',
-  'Pulau Pinang' => 'png', 'Sabah' => 'sbh', 'Sarawak' => 'swk', 'Selangor' => 'sgr',
+  'Pulau Pinang' => 'png', 'Sabah' => 'sbh', 'Sarawak' => 'srw', 'Selangor' => 'sgr',
   'Terengganu' => 'trg', 'Kuala Lumpur' => 'kul', 'Labuan' => 'lbn', 'Putrajaya' => 'pjy',
 ];
 
@@ -91,7 +91,10 @@ function easyParcelBook(array $config, array $sender, array $receiver, array $pa
     'send_addr1' => $receiver['line1'], 'send_addr2' => $receiver['line2'] ?? '',
     'send_city' => $receiver['city'], 'send_state' => $sendState,
     'send_code' => $receiver['code'], 'send_country' => 'MY',
-    'sms' => 'false',
+    // required by 1.4.0.0: pickup date (today), SMS flag, receiver email
+    'collect_date' => date('Y-m-d'),
+    'sms' => '0',
+    'send_email' => $receiver['email'] ?? '',
   ]]]);
   $orderNo = $submitResp['result'][0]['order_number'] ?? ($submitResp['result'][0]['orderno'] ?? '');
   if ($orderNo === '') { return null; }
