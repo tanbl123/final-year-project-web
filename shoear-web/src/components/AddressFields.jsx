@@ -83,10 +83,17 @@ function AddressFields({ value, onChange, errors = {}, disabled = false, idPrefi
     <div className="row g-2">
       <div className="col-12 position-relative">
         <label htmlFor={`${idPrefix}-line1`} className="form-label small mb-1">Address line</label>
-        <input id={`${idPrefix}-line1`} className={cls('line1')} value={value.line1}
-          onChange={onLine1} disabled={disabled} autoComplete="off"
-          onBlur={() => setTimeout(() => setSuggestions([]), 150)}
-          placeholder="Unit, street, building, area" maxLength={150} />
+        <div className="position-relative">
+          <input id={`${idPrefix}-line1`} className={cls('line1') + ' pe-5'} value={value.line1}
+            onChange={onLine1} disabled={disabled} autoComplete="off"
+            onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+            placeholder="Unit, street, building, area" maxLength={150} />
+          {value.line1 && !disabled && (
+            <button type="button" aria-label="Clear" className="btn-close position-absolute"
+              style={{ top: '50%', right: 12, transform: 'translateY(-50%)' }}
+              onClick={() => { onChange({ ...value, line1: '' }); setSuggestions([]); }} />
+          )}
+        </div>
         {suggestions.length > 0 && (
           <ul className="list-group position-absolute w-100 shadow-sm"
             style={{ zIndex: 1000, maxHeight: 240, overflowY: 'auto' }}>
