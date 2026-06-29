@@ -89,7 +89,6 @@ export function getBusinessDetails() {
 export function updateOperationalAddress(addr) {
   return apiPut('/supplier/operational-address', {
     operationalLine1: addr.line1.trim(),
-    operationalLine2: addr.line2.trim(),
     operationalPostcode: addr.postcode.trim(),
     operationalCity: addr.city.trim(),
     operationalState: addr.state,

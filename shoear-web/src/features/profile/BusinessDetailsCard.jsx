@@ -64,7 +64,6 @@ function BusinessDetailsCard({ onToast }) {
   function opBaseline() {
     return {
       line1: cur.operationalLine1 || '',
-      line2: cur.operationalLine2 || '',
       postcode: cur.operationalPostcode || '',
       city: cur.operationalCity || '',
       state: cur.operationalState || '',
@@ -83,7 +82,7 @@ function BusinessDetailsCard({ onToast }) {
         current: {
           ...d.current,
           operationalAddress: saved.operationalAddress,
-          operationalLine1: opAddr.line1.trim(), operationalLine2: opAddr.line2.trim(),
+          operationalLine1: opAddr.line1.trim(),
           operationalPostcode: opAddr.postcode.trim(), operationalCity: opAddr.city.trim(),
           operationalState: opAddr.state,
         },

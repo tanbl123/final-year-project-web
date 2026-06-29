@@ -18,17 +18,9 @@ function AddressFields({ value, onChange, errors = {}, disabled = false, idPrefi
       <div className="col-12">
         <label htmlFor={`${idPrefix}-line1`} className="form-label small mb-1">Address line 1</label>
         <input id={`${idPrefix}-line1`} className={cls('line1')} value={value.line1}
-          onChange={set('line1')} disabled={disabled} placeholder="Unit / street" maxLength={150} />
+          onChange={set('line1')} disabled={disabled}
+          placeholder="Unit, street, building, area" maxLength={150} />
         {errors.line1 && <div className="invalid-feedback d-block">{errors.line1}</div>}
-      </div>
-
-      <div className="col-12">
-        <label htmlFor={`${idPrefix}-line2`} className="form-label small mb-1">
-          Address line 2 <span className="text-muted">(optional)</span>
-        </label>
-        <input id={`${idPrefix}-line2`} className={cls('line2')} value={value.line2}
-          onChange={set('line2')} disabled={disabled} placeholder="Building / area" maxLength={150} />
-        {errors.line2 && <div className="invalid-feedback d-block">{errors.line2}</div>}
       </div>
 
       <div className="col-sm-4">

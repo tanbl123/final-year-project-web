@@ -202,7 +202,6 @@ function RegisterPage() {
       companyName: form.companyName.trim(),
       companyAddress: form.companyAddress.trim(),
       operationalLine1: operational.line1.trim(),
-      operationalLine2: operational.line2.trim(),
       operationalPostcode: operational.postcode.trim(),
       operationalCity: operational.city.trim(),
       operationalState: operational.state,

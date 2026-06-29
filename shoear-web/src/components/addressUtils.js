@@ -9,11 +9,12 @@ export const MY_STATES = [
 ];
 
 export function emptyAddress() {
-  return { line1: '', line2: '', postcode: '', city: '', state: '' };
+  return { line1: '', postcode: '', city: '', state: '' };
 }
 
 // Validate a structured address; returns a { field: message } map (empty = ok).
-// line2 is optional. Mirrors the backend rules in lib/address.php.
+// Line 1 holds the full street address (everything before the postcode), matching
+// the customer's address form. Mirrors the backend rules in lib/address.php.
 export function validateAddress(a) {
   const e = {};
   if (!a.line1.trim()) e.line1 = 'Address line 1 is required.';
