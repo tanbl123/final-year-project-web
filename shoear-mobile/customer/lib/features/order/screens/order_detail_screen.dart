@@ -366,7 +366,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   children: [
                     for (int i = 0; i < o.deliveries.length; i++) ...[
                       if (i > 0) const Divider(height: 20),
-                      _ParcelBlock(parcel: o.deliveries[i]),
+                      _ParcelBlock(parcel: o.deliveries[i], orderId: o.orderId),
                     ],
                   ],
                 ),
@@ -684,12 +684,34 @@ class _ItemRow extends StatelessWidget {
 }
 
 // ── One parcel block (inside the Delivery Tracking card) ────────────────────
-class _ParcelBlock extends StatelessWidget {
+class _ParcelBlock extends StatefulWidget {
   final ParcelDelivery parcel;
-  const _ParcelBlock({required this.parcel});
+  final String orderId;
+  const _ParcelBlock({required this.parcel, required this.orderId});
+
+  @override
+  State<_ParcelBlock> createState() => _ParcelBlockState();
+}
+
+class _ParcelBlockState extends State<_ParcelBlock> {
+  bool _resending = false;
+
+  // Re-send myself the delivery code (notification + push) if I missed it.
+  Future<void> _resendOtp() async {
+    setState(() => _resending = true);
+    try {
+      await context.read<OrderService>().resendDeliveryOtp(widget.orderId, widget.parcel.deliveryId);
+      if (mounted) context.showSnack('Code re-sent to your notifications.');
+    } catch (e) {
+      if (mounted) context.showSnack(e.toString());
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final parcel = widget.parcel;
     final color = _deliveryColors[parcel.deliveryStatus] ?? Colors.grey;
     final showOtp = parcel.deliveryStatus == 'OutForDelivery' && (parcel.otpCode?.isNotEmpty ?? false);
     return Column(
@@ -737,6 +759,16 @@ class _ParcelBlock extends StatelessWidget {
                 Text('Show this code to the courier', style: TextStyle(fontSize: 12, color: Colors.amber.shade900)),
                 const SizedBox(height: 4),
                 Text(parcel.otpCode!, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 6)),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: _resending ? null : _resendOtp,
+                  icon: _resending
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.refresh, size: 16, color: Colors.amber.shade900),
+                  label: Text(_resending ? 'Sending…' : 'Resend code',
+                      style: TextStyle(fontSize: 12, color: Colors.amber.shade900)),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
               ],
             ),
           ),

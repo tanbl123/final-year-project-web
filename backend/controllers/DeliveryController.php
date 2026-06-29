@@ -257,7 +257,55 @@ function handleUpdateDeliveryStatus(PDO $pdo, array $auth, string $deliveryId): 
     sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not update the delivery.']);
   }
 
+  // The moment a parcel goes out for delivery, push the customer their code so
+  // they don't have to be in the app to find it (mirrors Shopee/Lazada/Amazon).
+  if ($status === 'OutForDelivery' && isset($otp)) {
+    notifyDeliveryOtp($pdo, $del, $otp);
+  }
+
   sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => $status]);
+}
+
+// Notify the buyer of a parcel's delivery OTP via in-app notification + FCM push
+// (no-op push until FCM is configured). Best-effort: never blocks the caller.
+// Includes the supplier name so multi-parcel orders are unambiguous.
+function notifyDeliveryOtp(PDO $pdo, array $del, string $otp): void {
+  $supplierName = '';
+  try {
+    $s = $pdo->prepare('SELECT companyName FROM supplier WHERE supplierId = :sid');
+    $s->execute(['sid' => $del['supplierId']]);
+    $supplierName = (string) ($s->fetchColumn() ?: '');
+  } catch (Throwable $e) { /* ignore — fall back to generic wording */ }
+
+  $who = $supplierName !== '' ? "Your {$supplierName} parcel" : 'Your order';
+  notifyOrderCustomer(
+    $pdo, (string) $del['orderId'], 'delivery_otp',
+    'Out for delivery 🚚',
+    "{$who} is out for delivery. Show code {$otp} to the courier to confirm."
+  );
+}
+
+// POST /orders/{orderId}/deliveries/{deliveryId}/resend-otp — the customer
+// re-sends themselves the delivery code (in-app + push) for one out-for-delivery
+// parcel, e.g. if they missed or dismissed the notification.
+function handleResendDeliveryOtp(PDO $pdo, array $auth, string $orderId, string $deliveryId): void {
+  $customerId = requireCustomerId($pdo, $auth);
+  // the parcel must belong to an order this customer owns
+  $stmt = $pdo->prepare(
+    'SELECT d.deliveryId, d.orderId, d.supplierId, d.deliveryStatus, d.otpCode
+       FROM delivery d JOIN `order` o ON o.orderId = d.orderId
+      WHERE d.deliveryId = :did AND d.orderId = :oid AND o.customerId = :cid'
+  );
+  $stmt->execute(['did' => $deliveryId, 'oid' => $orderId, 'cid' => $customerId]);
+  $del = $stmt->fetch();
+  if (!$del) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Delivery not found.']);
+  }
+  if ($del['deliveryStatus'] !== 'OutForDelivery' || (string) ($del['otpCode'] ?? '') === '') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This parcel is not out for delivery.']);
+  }
+  notifyDeliveryOtp($pdo, $del, (string) $del['otpCode']);
+  sendJson(200, true, ['deliveryId' => $deliveryId]);
 }
 
 // POST /deliveries/{deliveryId}/verify-otp — multipart: { otpCode, file }.

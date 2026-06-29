@@ -157,6 +157,13 @@ if ($method === 'GET' && preg_match('#^/orders/([^/]+)/receipt$#', $path, $m)) {
   handleGetReceipt($pdo, $auth, $m[1]);
 }
 
+// customer re-sends themselves the delivery OTP for one out-for-delivery parcel
+if ($method === 'POST' && preg_match('#^/orders/([^/]+)/deliveries/([^/]+)/resend-otp$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleResendDeliveryOtp($pdo, $auth, $m[1], $m[2]);
+}
+
 // ── customer reviews (create on a purchased product; edit/delete your own) ──
 if ($method === 'GET' && preg_match('#^/products/([^/]+)/reviews/mine$#', $path, $m)) {
   $auth = requireAuth($secret);

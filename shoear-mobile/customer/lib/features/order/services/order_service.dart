@@ -102,6 +102,12 @@ class OrderService {
     await api.post('/orders/$orderId/cancel', {});
   }
 
+  /// POST /orders/{id}/deliveries/{deliveryId}/resend-otp — re-send myself the
+  /// delivery code (notification + push) for one out-for-delivery parcel.
+  Future<void> resendDeliveryOtp(String orderId, String deliveryId) async {
+    await api.post('/orders/$orderId/deliveries/$deliveryId/resend-otp', {});
+  }
+
   /// POST /uploads/refund-proof — upload a supporting photo for a refund,
   /// returns its stored URL (sent back as refundProof).
   Future<String> uploadRefundProof(File photo) async {
