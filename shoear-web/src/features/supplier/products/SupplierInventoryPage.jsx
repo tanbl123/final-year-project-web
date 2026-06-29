@@ -5,6 +5,7 @@ import { useUnsavedChangesWarning } from '../../../hooks/useUnsavedChangesWarnin
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
 
 const ROWS_PER_PAGE = 15;
@@ -29,6 +30,16 @@ function SupplierInventoryPage() {
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+
+  // Sorting is at the PRODUCT level so each product's size rows stay grouped
+  // together. 'stock' sorts by a product's lowest size stock (restock priority).
+  const [sortKey, setSortKey] = useState('productName');
+  const [sortDir, setSortDir] = useState('asc');
+  function toggleSort(key) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  }
+  const sort = { sortKey, sortDir, toggleSort };
 
   const saving = savingIds.length > 0;
 
@@ -91,10 +102,33 @@ function SupplierInventoryPage() {
     });
   }, [rows, search, filter]);
 
-  const { page, setPage, totalPages, pageItems } = usePagination(visible, ROWS_PER_PAGE);
+  // Group the visible rows by product (preserving size order), sort the groups,
+  // then flatten — so rows of one product never interleave with another's.
+  const sortedVisible = useMemo(() => {
+    const groups = [];
+    const byId = new Map();
+    for (const r of visible) {
+      if (!byId.has(r.productId)) { const g = { rows: [] }; byId.set(r.productId, g); groups.push(g); }
+      byId.get(r.productId).rows.push(r);
+    }
+    const valueOfGroup = (g) => {
+      const f = g.rows[0];
+      if (sortKey === 'stock') return Math.min(...g.rows.map((r) => r.stock));
+      if (sortKey === 'status') return f.status ?? '';
+      return f.productName ?? '';
+    };
+    groups.sort((a, b) => {
+      const va = valueOfGroup(a), vb = valueOfGroup(b);
+      const cmp = (typeof va === 'number' && typeof vb === 'number')
+        ? va - vb : String(va).localeCompare(String(vb));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return groups.flatMap((g) => g.rows);
+  }, [visible, sortKey, sortDir]);
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sortedVisible, ROWS_PER_PAGE);
   // back to page 1 when the search/filter changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [search, filter, setPage]);
 
@@ -218,11 +252,11 @@ function SupplierInventoryPage() {
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
                 <tr>
-                  <th>Product</th>
+                  <SortableTh label="Product" columnKey="productName" sort={sort} />
                   <th style={{ width: 80 }}>Size</th>
-                  <th className="text-end text-nowrap" style={{ width: 90 }}>In stock</th>
+                  <SortableTh label="In stock" columnKey="stock" sort={sort} className="text-end text-nowrap" style={{ width: 90 }} />
                   <th className="text-center" style={{ width: 170 }}>New quantity</th>
-                  <th className="text-center" style={{ width: 100 }}>Status</th>
+                  <SortableTh label="Status" columnKey="status" sort={sort} className="text-center" style={{ width: 100 }} />
                   <th className="text-center" style={{ width: 150 }}>Action</th>
                 </tr>
               </thead>
