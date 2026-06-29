@@ -9,7 +9,7 @@ import 'package:customer/features/order/services/order_payment.dart';
 import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/utils/refresh_bus.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
-import 'package:customer/features/auth/screens/login_screen.dart';
+import 'package:customer/core/widgets/sign_in_prompt.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
 import 'package:customer/features/checkout/screens/receipt_screen.dart';
 
@@ -61,23 +61,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  Widget _signInPrompt(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.receipt_long, size: 48, color: Colors.grey.shade400),
-              const SizedBox(height: 12),
-              const Text('Sign in to see your orders.', textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('Login'),
-              ),
-            ],
-          ),
-        ),
+  Widget _signInPrompt(BuildContext context) => const SignInPrompt(
+        icon: Icons.receipt_long,
+        title: 'Sign in to see your orders',
+        subtitle: 'Your orders will appear here',
       );
 
   Widget _ordersBody(BuildContext context) {

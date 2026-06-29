@@ -6,7 +6,7 @@ import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/auth/services/account_service.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/auth/screens/change_password_screen.dart';
-import 'package:customer/features/auth/screens/login_screen.dart';
+import 'package:customer/core/widgets/sign_in_prompt.dart';
 import 'package:customer/features/profile/screens/edit_profile_screen.dart';
 
 /// The customer's profile: view/edit details, change password, delete account.
@@ -36,23 +36,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _signInPrompt(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.person_outline, size: 48, color: Colors.grey.shade400),
-              const SizedBox(height: 12),
-              const Text('Sign in to manage your account.', textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('Login'),
-              ),
-            ],
-          ),
-        ),
+  Widget _signInPrompt(BuildContext context) => const SignInPrompt(
+        icon: Icons.person_outline,
+        title: 'Sign in to manage your account',
+        subtitle: 'View your profile, addresses and more',
       );
 
   Widget _profileBody(BuildContext context) {

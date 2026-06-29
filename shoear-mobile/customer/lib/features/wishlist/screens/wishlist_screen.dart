@@ -5,7 +5,7 @@ import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/wishlist/state/wishlist_provider.dart';
 import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/utils/snackbar.dart';
-import 'package:customer/features/auth/screens/login_screen.dart';
+import 'package:customer/core/widgets/sign_in_prompt.dart';
 import 'package:customer/features/catalog/screens/product_detail_screen.dart';
 
 /// The customer's saved products. Tap to view; tap the heart to remove.
@@ -88,23 +88,10 @@ class _WishlistScreenState extends State<WishlistScreen> {
     }
   }
 
-  Widget _signInPrompt(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.favorite_border, size: 48, color: Colors.grey.shade400),
-              const SizedBox(height: 12),
-              const Text('Sign in to save products.', textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('Login'),
-              ),
-            ],
-          ),
-        ),
+  Widget _signInPrompt(BuildContext context) => const SignInPrompt(
+        icon: Icons.favorite_border,
+        title: 'Sign in to save products',
+        subtitle: 'Your wishlist will be saved here',
       );
 
   Widget _body(BuildContext context) {

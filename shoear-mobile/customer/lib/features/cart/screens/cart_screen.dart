@@ -7,7 +7,7 @@ import 'package:customer/features/cart/state/cart_provider.dart';
 import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/checkout/screens/checkout_screen.dart';
-import 'package:customer/features/auth/screens/login_screen.dart';
+import 'package:customer/core/widgets/sign_in_prompt.dart';
 import 'package:customer/features/catalog/screens/product_detail_screen.dart';
 
 class CartScreen extends StatefulWidget {
@@ -134,37 +134,10 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _signInPrompt(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.shopping_cart_outlined,
-                  size: 72, color: Colors.grey.shade300),
-              const SizedBox(height: 16),
-              Text('Sign in to view your cart',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700)),
-              const SizedBox(height: 8),
-              Text('Items you add will be saved here',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
-                style: FilledButton.styleFrom(
-                    minimumSize: const Size(200, 48),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12))),
-                child: const Text('Login'),
-              ),
-            ],
-          ),
-        ),
+  Widget _signInPrompt(BuildContext context) => const SignInPrompt(
+        icon: Icons.shopping_cart_outlined,
+        title: 'Sign in to view your cart',
+        subtitle: 'Items you add will be saved here',
       );
 
   Widget _cartBody(BuildContext context) {
