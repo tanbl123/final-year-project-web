@@ -36,6 +36,16 @@ return [
   // Leave unset to keep manual entry + the offline postcode lookup (no cost).
   // 'google_places_api_key' => 'AIza...REPLACE_ME',
 
+  // OPTIONAL — EasyParcel (Malaysia) for AUTO-BOOKING long-distance (Standard)
+  // parcels: generates the carrier + tracking number for the supplier, like
+  // Shopee. Sign up free at easyparcel.com → Developer Hub → register an app →
+  // API key. Uses the FREE demo sandbox by default (no real charges); set
+  // 'easyparcel_live' => true only for real paid bookings. Leave unset to keep
+  // manual carrier + tracking entry (no booking, no cost).
+  // 'easyparcel_api_key' => 'EP-XXXXXXXX',
+  // 'easyparcel_live'    => false,
+  // 'easyparcel_default_weight' => 1.0,   // kg, used for the rate quote
+
   // Google Sign-In for the customer mobile app.
   // Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 client ID
   // (Android client, package name com.example.customer). Paste the client ID here so

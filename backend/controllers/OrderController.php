@@ -109,7 +109,7 @@ function handleListSupplierOrders(PDO $pdo, array $auth): void {
 
 // GET /supplier/orders/{orderId}  — one order in detail, limited to this
 // supplier's items. 404 if the order has none of their products.
-function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId): void {
+function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId, array $config = []): void {
   $supplierId = requireSupplierId($pdo, $auth);
 
   // the supplier's line items for this order (price/size from the snapshots)
@@ -181,6 +181,9 @@ function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId): void {
   );
   $dl->execute(['oid' => $orderId, 'sid' => $supplierId]);
   $order['myDelivery'] = $dl->fetch() ?: null;
+
+  // lets the seller centre offer "Book & ship automatically" for Standard parcels
+  $order['easyParcelEnabled'] = function_exists('easyParcelEnabled') && easyParcelEnabled($config);
 
   sendJson(200, true, $order);
 }

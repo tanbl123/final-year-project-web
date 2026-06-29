@@ -8,6 +8,11 @@ export function shipStandardParcel(deliveryId, carrier, trackingNumber) {
   return apiPost(`/supplier/deliveries/${deliveryId}/ship`, { carrier, trackingNumber }, getToken());
 }
 
+// Auto-book the shipment via EasyParcel (generates the carrier + tracking number).
+export function bookStandardParcel(deliveryId) {
+  return apiPost(`/supplier/deliveries/${deliveryId}/ship`, { auto: true }, getToken());
+}
+
 // Mark a shipped Standard parcel as delivered.
 export function markStandardDelivered(deliveryId) {
   return apiPost(`/supplier/deliveries/${deliveryId}/delivered`, {}, getToken());

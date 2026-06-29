@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getSupplierOrder, shipStandardParcel, markStandardDelivered, STANDARD_CARRIERS } from './orderService';
+import { getSupplierOrder, shipStandardParcel, bookStandardParcel, markStandardDelivered, STANDARD_CARRIERS } from './orderService';
 import BackButton from '../../../components/BackButton';
 import Toast from '../../../components/Toast';
 
@@ -54,6 +54,20 @@ function SupplierOrderDetailPage() {
       load();
     } catch (err) {
       setShipErr(err.message);
+    } finally {
+      setShipBusy(false);
+    }
+  }
+
+  async function bookAuto() {
+    setShipBusy(true); setShipErr('');
+    try {
+      const res = await bookStandardParcel(order.myDelivery.deliveryId);
+      setToast(`Booked with ${res.trackingCarrier} — tracking ${res.trackingNumber}.`);
+      load();
+    } catch (err) {
+      // auto-book failed → leave the manual form for the supplier to use
+      setShipErr(`${err.message} `);
     } finally {
       setShipBusy(false);
     }
@@ -202,6 +216,18 @@ function SupplierOrderDetailPage() {
                 This order ships to a different state, so it goes via standard shipping —
                 send it with a courier and enter the tracking number below.
               </p>
+
+              {order.myDelivery.deliveryStatus === 'Pending' && order.easyParcelEnabled && (
+                <div className="mb-3">
+                  <button className="btn btn-success" onClick={bookAuto} disabled={shipBusy}>
+                    {shipBusy ? 'Booking…' : '📦 Book & ship automatically'}
+                  </button>
+                  <div className="form-text">
+                    Generates the cheapest courier label + tracking number for you (via EasyParcel).
+                  </div>
+                  <div className="text-muted small my-2">— or enter the details manually —</div>
+                </div>
+              )}
 
               {order.myDelivery.deliveryStatus === 'Pending' && (
                 <div className="row g-2 align-items-end" style={{ maxWidth: 560 }}>

@@ -348,10 +348,51 @@ function requireSupplierStandardDelivery(PDO $pdo, string $supplierId, string $d
   return $del;
 }
 
-// POST /supplier/deliveries/{deliveryId}/ship — body: { carrier, trackingNumber }.
-// The supplier has shipped a Standard parcel via a 3PL; record the carrier +
-// tracking number and move it Pending → OutForDelivery (in transit).
-function handleShipStandardDelivery(PDO $pdo, array $auth, string $deliveryId): void {
+// Gather the EasyParcel sender (supplier pickup) + receiver (customer) parties
+// and parcel details for a delivery, from the structured addresses.
+function shipmentPartiesFor(PDO $pdo, array $config, string $deliveryId): array {
+  $stmt = $pdo->prepare(
+    'SELECT s.companyName AS company, su.phoneNumber AS pickPhone,
+            s.operationalLine1 AS pickLine1, s.operationalCity AS pickCity,
+            s.operationalPostcode AS pickCode, s.operationalState AS pickState,
+            buyer.fullName AS sendName, buyer.phoneNumber AS sendPhone,
+            o.deliveryLine1 AS sendLine1, o.deliveryCity AS sendCity,
+            o.deliveryPostcode AS sendCode, o.deliveryState AS sendState,
+            o.orderTotalAmount AS value
+       FROM delivery d
+       JOIN supplier s    ON s.supplierId = d.supplierId
+       JOIN `user` su     ON su.userId = s.userId
+       JOIN `order` o     ON o.orderId = d.orderId
+       JOIN customer c    ON c.customerId = o.customerId
+       JOIN `user` buyer  ON buyer.userId = c.userId
+      WHERE d.deliveryId = :id'
+  );
+  $stmt->execute(['id' => $deliveryId]);
+  $r = $stmt->fetch() ?: [];
+  $sender = [
+    'name' => $r['company'] ?? '', 'company' => $r['company'] ?? '', 'phone' => $r['pickPhone'] ?? '',
+    'line1' => $r['pickLine1'] ?? '', 'line2' => '', 'city' => $r['pickCity'] ?? '',
+    'state' => $r['pickState'] ?? '', 'code' => $r['pickCode'] ?? '',
+  ];
+  $receiver = [
+    'name' => $r['sendName'] ?? '', 'company' => '', 'phone' => $r['sendPhone'] ?? '',
+    'line1' => $r['sendLine1'] ?? '', 'line2' => '', 'city' => $r['sendCity'] ?? '',
+    'state' => $r['sendState'] ?? '', 'code' => $r['sendCode'] ?? '',
+  ];
+  $parcel = [
+    'weight' => (string) ($config['easyparcel_default_weight'] ?? 1),
+    'content' => 'Footwear', 'value' => (string) ($r['value'] ?? '0'),
+  ];
+  return [$sender, $receiver, $parcel];
+}
+
+// POST /supplier/deliveries/{deliveryId}/ship — record the shipment and move the
+// parcel Pending → OutForDelivery. Two modes:
+//   • { auto: true }  → auto-book via EasyParcel (Shopee-style): generates the
+//     carrier + tracking number for the supplier (when EasyParcel is configured).
+//   • { carrier, trackingNumber } → the supplier shipped it themselves and types
+//     the details in (the always-available fallback).
+function handleShipStandardDelivery(PDO $pdo, array $config, array $auth, string $deliveryId): void {
   $supplierId = requireSupplierId($pdo, $auth);
   $del = requireSupplierStandardDelivery($pdo, $supplierId, $deliveryId);
   if ($del['deliveryStatus'] !== 'Pending') {
@@ -361,11 +402,26 @@ function handleShipStandardDelivery(PDO $pdo, array $auth, string $deliveryId): 
   $body     = getJsonBody();
   $carrier  = trim($body['carrier'] ?? '');
   $tracking = trim($body['trackingNumber'] ?? '');
-  if (!in_array($carrier, STANDARD_CARRIERS, true)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please choose a valid courier.']);
-  }
-  if ($tracking === '' || mb_strlen($tracking) > 64) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A tracking number is required (max 64 characters).']);
+  $auto     = !empty($body['auto']);
+
+  if ($auto) {
+    if (!easyParcelEnabled($config)) {
+      sendJson(409, false, null, ['code' => 'NOT_CONFIGURED', 'message' => 'Auto-booking is not set up. Enter the carrier and tracking number manually.']);
+    }
+    [$sender, $receiver, $parcel] = shipmentPartiesFor($pdo, $config, $deliveryId);
+    $booked = easyParcelBook($config, $sender, $receiver, $parcel);
+    if (!$booked) {
+      sendJson(502, false, null, ['code' => 'BOOKING_FAILED', 'message' => 'Could not auto-book the shipment. Please enter the carrier and tracking number manually.']);
+    }
+    $carrier  = $booked['carrier'];
+    $tracking = $booked['tracking'];
+  } else {
+    if (!in_array($carrier, STANDARD_CARRIERS, true)) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please choose a valid courier.']);
+    }
+    if ($tracking === '' || mb_strlen($tracking) > 64) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A tracking number is required (max 64 characters).']);
+    }
   }
 
   $pdo->prepare(
@@ -382,7 +438,7 @@ function handleShipStandardDelivery(PDO $pdo, array $auth, string $deliveryId): 
 
   sendJson(200, true, [
     'deliveryId' => $deliveryId, 'deliveryStatus' => 'OutForDelivery',
-    'trackingCarrier' => $carrier, 'trackingNumber' => $tracking,
+    'trackingCarrier' => $carrier, 'trackingNumber' => $tracking, 'auto' => $auto,
   ]);
 }
 

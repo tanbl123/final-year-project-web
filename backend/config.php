@@ -33,6 +33,16 @@ $config = [
   // in config.local.php (it's gitignored). Same key the customer app uses.
   'google_places_api_key' => getenv('GOOGLE_PLACES_API_KEY') ?: '',
 
+  // EasyParcel (Malaysia) — auto-books a Standard (long-distance) parcel and
+  // returns a carrier + tracking number, like Shopee generating an airway bill.
+  // Leave empty to keep manual carrier + tracking entry (no booking, no cost).
+  // Uses the FREE demo sandbox by default; set easyparcel_live=true for real
+  // (paid) bookings. Put the key in config.local.php. Default parcel weight (kg)
+  // is used for the rate quote since we don't capture per-product weight.
+  'easyparcel_api_key'       => getenv('EASYPARCEL_API_KEY') ?: '',
+  'easyparcel_live'          => getenv('EASYPARCEL_LIVE') === '1',
+  'easyparcel_default_weight'=> (float) (getenv('EASYPARCEL_WEIGHT') ?: 1.0),
+
   // Flat fee (MYR) a courier earns per completed (Delivered) parcel. Snapshotted
   // onto each delivery when it's confirmed, so changing this never alters past
   // earnings. Couriers are paid out their accrued balance via Stripe Connect.
