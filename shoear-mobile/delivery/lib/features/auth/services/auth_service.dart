@@ -38,7 +38,7 @@ class AuthService {
     required String verificationCode,
     required String licenseNumber,
     required String licensePhotoUrl,
-    required String licenseClass,
+    required List<String> licenseClasses,
     required String licenseExpiry,   // YYYY-MM-DD
     required String icNumber,
     required String icPhotoUrl,
@@ -59,7 +59,7 @@ class AuthService {
       'verificationCode': verificationCode,
       'licenseNumber': licenseNumber,
       'licensePhotoUrl': licensePhotoUrl,
-      'licenseClass': licenseClass,
+      'licenseClass': licenseClasses,
       'licenseExpiry': licenseExpiry,
       'icNumber': icNumber,
       'icPhotoUrl': icPhotoUrl,

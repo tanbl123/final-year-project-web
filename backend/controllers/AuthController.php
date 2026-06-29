@@ -391,7 +391,13 @@ function handleRegisterCourier(PDO $pdo): void {
   // KYC: driving licence, IC, profile photo (uploaded via /uploads/registration-doc)
   $licenseNumber   = trim($body['licenseNumber'] ?? '');
   $licensePhotoUrl = trim($body['licensePhotoUrl'] ?? '');
-  $licenseClass    = trim($body['licenseClass'] ?? '');
+  // Licence class(es): a courier can hold several (e.g. B2 + D). Accept an array
+  // or a comma-separated string; normalise to a clean, de-duplicated list.
+  $rawClasses      = $body['licenseClass'] ?? [];
+  if (is_string($rawClasses)) { $rawClasses = explode(',', $rawClasses); }
+  $licenseClasses  = is_array($rawClasses)
+    ? array_values(array_unique(array_filter(array_map('trim', $rawClasses))))
+    : [];
   $licenseExpiry   = trim($body['licenseExpiry'] ?? '');   // YYYY-MM-DD
   $icNumber        = trim($body['icNumber'] ?? '');
   $icPhotoUrl      = trim($body['icPhotoUrl'] ?? '');
@@ -437,10 +443,16 @@ function handleRegisterCourier(PDO $pdo): void {
   if (!preg_match('/^\d{12}$/', $icNumber)) {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'IC must be 12 digits (e.g. 901231145678).']);
   }
-  // Driving licence class must be a recognised Malaysian class.
-  $allowedClasses = ['B', 'B1', 'B2', 'D', 'DA', 'E', 'E1', 'E2'];
-  if (!in_array($licenseClass, $allowedClasses, true)) {
-    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please select a valid driving licence class.']);
+  // Driving licence class(es) — at least one, each a recognised value.
+  // 'D' = car (manual, covers auto too); 'D-AUTO' = car restricted to automatic.
+  $allowedClasses = ['B2', 'B', 'D', 'D-AUTO', 'E', 'E1', 'E2'];
+  if (count($licenseClasses) === 0) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please select at least one driving licence class.']);
+  }
+  foreach ($licenseClasses as $lc) {
+    if (!in_array($lc, $allowedClasses, true)) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'One of the selected licence classes is invalid.']);
+    }
   }
   // Licence expiry must be a real date that is still in the future.
   $exp = DateTime::createFromFormat('Y-m-d', $licenseExpiry);
@@ -541,7 +553,7 @@ function handleRegisterCourier(PDO $pdo): void {
     $pdo->prepare('INSERT INTO delivery_personnel (deliveryPersonnelId, userId, vehicleType, vehicleBrand, vehicleModel, vehiclePlate, licenseNumber, licensePhotoUrl, licenseClass, licenseExpiry, icNumber, icPhotoUrl, dateOfBirth, termsAcceptedAt, coverageZones)
                    VALUES (:did, :uid, :vt, :vb, :vm, :vp, :ln, :lp, :lc, :le, :ic, :ip, :dob, NOW(), :cz)')
         ->execute(['did' => $deliveryPersonnelId, 'uid' => $userId, 'vt' => $vehicleType, 'vb' => $vehicleBrand, 'vm' => $vehicleModel, 'vp' => $vehiclePlate,
-                   'ln' => $licenseNumber, 'lp' => $licensePhotoUrl, 'lc' => $licenseClass, 'le' => $licenseExpiry,
+                   'ln' => $licenseNumber, 'lp' => $licensePhotoUrl, 'lc' => implode(',', $licenseClasses), 'le' => $licenseExpiry,
                    'ic' => $icNumber, 'ip' => $icPhotoUrl, 'dob' => $dateOfBirth, 'cz' => implode(',', $coverageZones)]);
 
     $pdo->commit();

@@ -57,7 +57,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _licenseNumberError, _icNumberError, _docsError;
 
   // Extra KYC: licence class + expiry, date of birth (18+), PDPA/T&C consent.
-  String? _licenseClass;            // e.g. 'B2' (motorcycle), 'D' (car)
+  // A courier may hold several classes (e.g. B2 + D). 'D' = car (manual, covers
+  // auto); 'D-AUTO' = car restricted to automatic transmission.
+  final Set<String> _licenseClasses = {};
+  static const _licenseClassOptions = [
+    ('B2', 'B2 — Motorcycle (≤ 250cc)'),
+    ('B', 'B — Motorcycle (any cc)'),
+    ('D', 'D — Car (manual)'),
+    ('D-AUTO', 'D — Car (automatic only)'),
+    ('E', 'E — Lorry / van'),
+    ('E1', 'E1 — Light lorry'),
+    ('E2', 'E2 — Medium lorry'),
+  ];
   DateTime? _licenseExpiry;
   DateTime? _dateOfBirth;
   bool _termsAccepted = false;
@@ -196,7 +207,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  String? _validateLicenseClass() => _licenseClass == null ? 'Please select your licence class.' : null;
+  String? _validateLicenseClass() => _licenseClasses.isEmpty ? 'Please select your licence class(es).' : null;
 
   String? _validateLicenseExpiry() {
     if (_licenseExpiry == null) return 'Please set your licence expiry date.';
@@ -341,7 +352,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             verificationCode: code,
             licenseNumber:    _licenseSameAsIc ? _icNumber.text.trim() : _licenseNumber.text.trim(),
             licensePhotoUrl:  _licensePhotoUrl ?? '',
-            licenseClass:     _licenseClass ?? '',
+            licenseClasses:   _licenseClasses.toList(),
             licenseExpiry:    _licenseExpiry != null ? _fmtDate(_licenseExpiry!) : '',
             icNumber:         _icNumber.text.trim(),
             icPhotoUrl:       _icPhotoUrl ?? '',
@@ -618,22 +629,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: DropdownButtonFormField<String>(
-              value: _licenseClass,
-              decoration: InputDecoration(
-                labelText: 'Licence class',
-                border: const OutlineInputBorder(),
-                errorText: _licenseClassError,
+            child: InkWell(
+              onTap: _pickLicenseClasses,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Licence class(es)',
+                  border: const OutlineInputBorder(),
+                  errorText: _licenseClassError,
+                  suffixIcon: const Icon(Icons.arrow_drop_down),
+                ),
+                child: Text(
+                  _licenseClasses.isEmpty
+                      ? 'Select your licence class(es)'
+                      : _licenseClassOptions
+                          .where((o) => _licenseClasses.contains(o.$1))
+                          .map((o) => o.$1)
+                          .join(', '),
+                  style: TextStyle(
+                    color: _licenseClasses.isEmpty
+                        ? Theme.of(context).hintColor
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               ),
-              items: const [
-                DropdownMenuItem(value: 'B2', child: Text('B2 — Motorcycle (≤ 250cc)')),
-                DropdownMenuItem(value: 'B',  child: Text('B — Motorcycle (any cc)')),
-                DropdownMenuItem(value: 'D',  child: Text('D — Car')),
-                DropdownMenuItem(value: 'E',  child: Text('E — Lorry / van')),
-                DropdownMenuItem(value: 'E1', child: Text('E1 — Light lorry')),
-                DropdownMenuItem(value: 'E2', child: Text('E2 — Medium lorry')),
-              ],
-              onChanged: (v) => setState(() { _licenseClass = v; _licenseClassError = _validateLicenseClass(); }),
             ),
           ),
           _dateField(
@@ -747,6 +765,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // Multi-select states the courier delivers to (checklist dialog).
+  // Multi-select driving licence classes (a courier may hold several).
+  Future<void> _pickLicenseClasses() async {
+    final temp = Set<String>.from(_licenseClasses);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Driving licence class(es)'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final o in _licenseClassOptions)
+                  CheckboxListTile(
+                    value: temp.contains(o.$1),
+                    title: Text(o.$2),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (v) => setLocal(() { if (v == true) { temp.add(o.$1); } else { temp.remove(o.$1); } }),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, temp), child: const Text('Done')),
+          ],
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _licenseClasses
+          ..clear()
+          ..addAll(result);
+        _licenseClassError = _validateLicenseClass();
+      });
+    }
+  }
+
   Future<void> _pickCoverageZones() async {
     final temp = Set<String>.from(_coverageZones);
     final result = await showDialog<Set<String>>(

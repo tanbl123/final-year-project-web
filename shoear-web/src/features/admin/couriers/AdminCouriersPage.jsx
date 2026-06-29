@@ -145,7 +145,9 @@ function AdminCouriersPage() {
                   <td className="small">
                     <div>
                       <span className="text-muted">Licence:</span> {c.licenseNumber || '—'}
-                      {c.licenseClass && <span className="ms-1 badge bg-light text-dark border">{c.licenseClass}</span>}
+                      {c.licenseClass && c.licenseClass.split(',').filter(Boolean).map((lc) => (
+                        <span key={lc} className="ms-1 badge bg-light text-dark border">{lc}</span>
+                      ))}
                       {c.licensePhotoUrl && (
                         <a href={c.licensePhotoUrl} target="_blank" rel="noreferrer" className="ms-1">view</a>
                       )}
