@@ -369,6 +369,9 @@ function adminBadgeCounts(PDO $pdo): array {
     'deliveries' => "SELECT COUNT(*) FROM delivery WHERE deliveryPersonnelId IS NULL",
     'issues'     => "SELECT COUNT(*) FROM delivery_issue WHERE issueStatus = 'Open'",
     'refunds'    => "SELECT COUNT(*) FROM refund WHERE refundStatus = 'Pending'",
+    // Finance: approved couriers who still haven't set up a payout account
+    'courierPayouts' => "SELECT COUNT(*) FROM delivery_personnel dp JOIN `user` u ON u.userId = dp.userId
+                           WHERE u.role = 'DeliveryPersonnel' AND u.status = 'Active' AND dp.payoutsEnabled = 0",
   ];
   $out = [];
   foreach ($counts as $key => $sql) {
