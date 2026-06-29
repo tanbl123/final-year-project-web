@@ -20,11 +20,13 @@ function ResubmitApplicationPage() {
   const [reason, setReason] = useState('');
   const [readonly, setReadonly] = useState({ username: '', email: '' });
   const [form, setForm] = useState({
-    companyName: '', operationalAddress: '', phoneNumber: '',
+    companyName: '', phoneNumber: '',
     businessRegNo: '', taxNumber: '', businessLicenseUrl: '',
   });
-  const [company, setCompany] = useState(emptyAddress());   // structured business address
+  const [company, setCompany] = useState(emptyAddress());        // structured business address
   const [companyErrors, setCompanyErrors] = useState({});
+  const [operational, setOperational] = useState(emptyAddress()); // structured pickup address
+  const [operationalErrors, setOperationalErrors] = useState({});
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -43,7 +45,6 @@ function ResubmitApplicationPage() {
         setReadonly({ username: a.username, email: a.email });
         setForm({
           companyName: a.companyName || '',
-          operationalAddress: a.operationalAddress || a.companyAddress || '',
           phoneNumber: a.phoneNumber || '',
           businessRegNo: a.businessRegNo || '',
           taxNumber: a.taxNumber || '',
@@ -54,6 +55,12 @@ function ResubmitApplicationPage() {
           postcode: a.companyPostcode || '',
           city: a.companyCity || '',
           state: a.companyState || '',
+        });
+        setOperational({
+          line1: a.operationalLine1 || '',
+          postcode: a.operationalPostcode || '',
+          city: a.operationalCity || '',
+          state: a.operationalState || '',
         });
         if (a.businessLicenseUrl) setLicenseName('Current document');
         if (a.status === 'Active') navigate('/products', { replace: true });
@@ -121,9 +128,11 @@ function ResubmitApplicationPage() {
     const found = validate(form);
     const cleaned = Object.fromEntries(Object.entries(found).filter(([, v]) => v));
     const coFound = validateAddress(company);
-    if (Object.keys(cleaned).length > 0 || Object.keys(coFound).length > 0) {
+    const opFound = validateAddress(operational);
+    if (Object.keys(cleaned).length > 0 || Object.keys(coFound).length > 0 || Object.keys(opFound).length > 0) {
       setErrors(cleaned);
       setCompanyErrors(coFound);
+      setOperationalErrors(opFound);
       return;
     }
 
@@ -135,7 +144,10 @@ function ResubmitApplicationPage() {
         companyPostcode: company.postcode.trim(),
         companyCity: company.city.trim(),
         companyState: company.state,
-        operationalAddress: form.operationalAddress.trim(),
+        operationalLine1: operational.line1.trim(),
+        operationalPostcode: operational.postcode.trim(),
+        operationalCity: operational.city.trim(),
+        operationalState: operational.state,
         phoneNumber: form.phoneNumber.trim(),
         businessRegNo: form.businessRegNo.trim(),
         taxNumber: form.taxNumber.trim(),
@@ -217,7 +229,15 @@ function ResubmitApplicationPage() {
             }}
             errors={companyErrors} />
         </div>
-        {field('operationalAddress', 'Operational (pickup) address')}
+        <div className="mb-3">
+          <label className="form-label">Operational (pickup) address</label>
+          <AddressFields value={operational} idPrefix="op"
+            onChange={(next) => {
+              setOperational(next);
+              setOperationalErrors((prev) => (Object.keys(prev).length ? validateAddress(next) : prev));
+            }}
+            errors={operationalErrors} />
+        </div>
         {field('phoneNumber', 'Phone number', 'tel')}
 
         <hr className="my-3" />

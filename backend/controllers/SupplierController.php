@@ -12,8 +12,9 @@ function handleGetApplication(PDO $pdo, array $auth): void {
     'SELECT u.username, u.email, u.phoneNumber, u.status, u.rejectionReason,
             s.companyName, s.companyAddress,
             s.companyLine1, s.companyPostcode, s.companyCity, s.companyState,
-            s.operationalAddress, s.businessRegNo,
-            s.businessLicenseUrl, s.taxNumber
+            s.operationalAddress,
+            s.operationalLine1, s.operationalPostcode, s.operationalCity, s.operationalState,
+            s.businessRegNo, s.businessLicenseUrl, s.taxNumber
        FROM `user` u
        JOIN supplier s ON s.userId = u.userId
       WHERE u.userId = :id'
@@ -88,8 +89,19 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
   } else {
     $companyAddress = trim($body['companyAddress'] ?? '');
   }
-  $operationalAddress = trim($body['operationalAddress'] ?? '');
-  if ($operationalAddress === '') $operationalAddress = $companyAddress;
+  // structured operational (pickup) address (new client) → compose; else combined
+  $opAddr = readStructuredAddress($body, 'operational');
+  $opStructured = hasStructuredAddress($opAddr);
+  if ($opStructured) {
+    $opErr = structuredAddressError($opAddr);
+    if ($opErr) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $opErr]);
+    }
+    $operationalAddress = composeAddress($opAddr);
+  } else {
+    $operationalAddress = trim($body['operationalAddress'] ?? '');
+    if ($operationalAddress === '') $operationalAddress = $companyAddress;
+  }
   $businessRegNo      = trim($body['businessRegNo'] ?? '');
   $businessLicenseUrl = trim($body['businessLicenseUrl'] ?? '');
   $taxNumber          = trim($body['taxNumber'] ?? '');     // optional
@@ -129,6 +141,7 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
           SET companyName = :cn, companyAddress = :ca,
               companyLine1 = :cl1, companyPostcode = :cpc, companyCity = :cc, companyState = :cst,
               operationalAddress = :oa,
+              operationalLine1 = :ol1, operationalPostcode = :opc, operationalCity = :oc, operationalState = :ost,
               businessRegNo = :brn, businessLicenseUrl = :blu, taxNumber = :tax
         WHERE userId = :id'
     )->execute([
@@ -138,6 +151,10 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
       'cc'  => $coStructured ? $coAddr['city'] : null,
       'cst' => $coStructured ? $coAddr['state'] : null,
       'oa' => $operationalAddress,
+      'ol1' => $opStructured ? $opAddr['line1'] : null,
+      'opc' => $opStructured ? $opAddr['postcode'] : null,
+      'oc'  => $opStructured ? $opAddr['city'] : null,
+      'ost' => $opStructured ? $opAddr['state'] : null,
       'brn' => $businessRegNo,
       'blu' => $businessLicenseUrl, 'tax' => ($taxNumber === '' ? null : $taxNumber),
       'id' => $auth['userId'],
