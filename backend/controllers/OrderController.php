@@ -52,6 +52,9 @@ function cancelExpiredUnpaidOrders(PDO $pdo, ?string $customerId = null): int {
     $upd->execute(['oid' => $oid]);
     if ($upd->rowCount() > 0) {
       $cancelled++;
+      // Defensive: unpaid orders have no parcel yet, but keep the invariant that
+      // a cancelled order never leaves a live delivery behind.
+      $pdo->prepare("DELETE FROM delivery WHERE orderId = :oid")->execute(['oid' => $oid]);
       if (function_exists('notifyOrderAutoCancelled')) {
         notifyOrderAutoCancelled($pdo, $oid);
       }
@@ -697,6 +700,12 @@ function handleCancelOrder(PDO $pdo, array $auth, string $orderId): void {
     $pdo->prepare("UPDATE `order` SET orderStatus = 'Cancelled' WHERE orderId = :oid")
         ->execute(['oid' => $orderId]);
     $pdo->prepare("UPDATE payment SET paymentStatus = 'Refunded' WHERE orderId = :oid")
+        ->execute(['oid' => $orderId]);
+    // Void the parcel(s): cancellation is only allowed before anything ships, so
+    // the delivery is still Pending/Assigned. Removing it keeps the cancelled
+    // order out of the courier dispatch queue and the supplier "needs booking"
+    // list — otherwise a parcel for a cancelled order would still look active.
+    $pdo->prepare("DELETE FROM delivery WHERE orderId = :oid")
         ->execute(['oid' => $orderId]);
     $pdo->commit();
   } catch (Throwable $e) {
