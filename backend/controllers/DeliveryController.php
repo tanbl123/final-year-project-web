@@ -19,11 +19,13 @@ function handleListDeliveries(PDO $pdo): void {
     $params['status'] = $status;
   }
   if ($unassigned) {
-    $where[] = 'd.deliveryPersonnelId IS NULL';
+    // only IN-HOUSE parcels need a courier assigned; Standard ones ship via 3PL
+    $where[] = "d.deliveryPersonnelId IS NULL AND d.deliveryMethod = 'InHouse'";
   }
 
   $sql =
     "SELECT d.deliveryId, d.orderId, d.supplierId, d.deliveryStatus, d.deliveryPersonnelId,
+            d.deliveryMethod, d.trackingCarrier, d.trackingNumber,
             d.deliveryDate, d.estimatedDeliveryTime,
             cu.fullName  AS courierName,
             s.companyName AS supplierName, s.operationalAddress AS pickupAddress,

@@ -364,7 +364,10 @@ CREATE TABLE delivery (
     deliveryId          VARCHAR(10)  NOT NULL,            -- DLV0001
     orderId             VARCHAR(10)  NOT NULL,
     supplierId          VARCHAR(10)  NOT NULL,            -- one delivery per supplier in the order (split fulfilment)
-    deliveryPersonnelId VARCHAR(10)  NULL,                -- assigned later by admin
+    deliveryPersonnelId VARCHAR(10)  NULL,                -- assigned later by admin (in-house only)
+    deliveryMethod      ENUM('InHouse','Standard') NOT NULL DEFAULT 'InHouse', -- in-house courier vs 3PL
+    trackingCarrier     VARCHAR(50)  NULL,                -- Standard shipping: carrier (J&T, Pos Laju, …)
+    trackingNumber      VARCHAR(64)  NULL,                -- Standard shipping: tracking number
     deliveryStatus      ENUM('Pending','Assigned','PickedUp',
                             'OutForDelivery','Delivered','Failed')
                             NOT NULL DEFAULT 'Pending',

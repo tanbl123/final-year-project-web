@@ -403,7 +403,7 @@ function adminBadgeCounts(PDO $pdo): array {
     'changes'    => "SELECT COUNT(*) FROM supplier_change_request WHERE requestStatus = 'Pending'",
     'products'   => "SELECT COUNT(*) FROM product WHERE productStatus = 'Pending'",
     // Operations queues
-    'deliveries' => "SELECT COUNT(*) FROM delivery WHERE deliveryPersonnelId IS NULL",
+    'deliveries' => "SELECT COUNT(*) FROM delivery WHERE deliveryPersonnelId IS NULL AND deliveryMethod = 'InHouse'",
     'issues'     => "SELECT COUNT(*) FROM delivery_issue WHERE issueStatus = 'Open'",
     'refunds'    => "SELECT COUNT(*) FROM refund WHERE refundStatus = 'Pending'",
     // Finance: approved couriers who still haven't set up a payout account

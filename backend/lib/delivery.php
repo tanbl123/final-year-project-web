@@ -126,18 +126,30 @@ function assignDelivery(PDO $pdo, string $orderId, string $supplierId): array {
   $stmt->execute(['o' => $orderId, 's' => $supplierId]);
   $existing = $stmt->fetch();
 
-  // Zone-based dispatch: only auto-assign a courier whose coverage zone includes
-  // the order's delivery state. If none is free the parcel stays Pending for the
-  // admin queue (a human can still assign across zones). Orders with no recorded
-  // state fall back to plain load-based selection.
+  // In-house vs standard shipping decision. ShoeAR's couriers are a LOCAL service
+  // (one rider does pickup + drop), so they only handle orders where the supplier
+  // and the customer are in the SAME state. When the states differ the parcel is
+  // routed to STANDARD shipping (the supplier ships via a 3PL + tracking number);
+  // no in-house courier is assigned. If either state is unknown (legacy data) we
+  // fall back to in-house so nothing regresses.
   $stState = $pdo->prepare("SELECT deliveryState FROM `order` WHERE orderId = :o");
   $stState->execute(['o' => $orderId]);
-  $state = $stState->fetchColumn() ?: null;
+  $custState = trim((string) ($stState->fetchColumn() ?: ''));
 
-  $candidates = scoreCouriers($pdo, $state);
+  $stSup = $pdo->prepare('SELECT operationalState FROM supplier WHERE supplierId = :s');
+  $stSup->execute(['s' => $supplierId]);
+  $supState = trim((string) ($stSup->fetchColumn() ?: ''));
+
+  $isStandard = $custState !== '' && $supState !== '' && $custState !== $supState;
+
+  // Standard parcels never get an in-house courier — they wait for the supplier
+  // to ship them. Only in-house parcels are scored against the courier roster.
   $best = null;
-  foreach ($candidates as $c) {           // already ranked covering-first, then load
-    if ($c['coversZone']) { $best = $c; break; }
+  if (!$isStandard) {
+    $candidates = scoreCouriers($pdo, $custState !== '' ? $custState : null);
+    foreach ($candidates as $c) {         // already ranked covering-first, then load
+      if ($c['coversZone']) { $best = $c; break; }
+    }
   }
 
   if ($existing) {
@@ -171,10 +183,29 @@ function assignDelivery(PDO $pdo, string $orderId, string $supplierId): array {
 
   $deliveryId = nextId($pdo, 'delivery', 'deliveryId', 'DLV');
 
+  // Standard shipping: no in-house courier — the supplier ships it via a 3PL.
+  // Pending here means "awaiting the supplier to ship", not "awaiting admin".
+  if ($isStandard) {
+    $pdo->prepare(
+      "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryMethod, deliveryStatus)
+       VALUES (:id, :o, :s, NULL, 'Standard', 'Pending')"
+    )->execute(['id' => $deliveryId, 'o' => $orderId, 's' => $supplierId]);
+
+    return [
+      'deliveryId'          => $deliveryId,
+      'orderId'             => $orderId,
+      'supplierId'          => $supplierId,
+      'deliveryPersonnelId' => null,
+      'deliveryMethod'      => 'Standard',
+      'deliveryStatus'      => 'Pending',
+      'auto'                => false,
+    ];
+  }
+
   if ($best) {
     $pdo->prepare(
-      "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryStatus)
-       VALUES (:id, :o, :s, :dp, 'Assigned')"
+      "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryMethod, deliveryStatus)
+       VALUES (:id, :o, :s, :dp, 'InHouse', 'Assigned')"
     )->execute(['id' => $deliveryId, 'o' => $orderId, 's' => $supplierId, 'dp' => $best['deliveryPersonnelId']]);
 
     return [
@@ -182,15 +213,16 @@ function assignDelivery(PDO $pdo, string $orderId, string $supplierId): array {
       'orderId'             => $orderId,
       'supplierId'          => $supplierId,
       'deliveryPersonnelId' => $best['deliveryPersonnelId'],
+      'deliveryMethod'      => 'InHouse',
       'deliveryStatus'      => 'Assigned',
       'auto'                => true,
     ];
   }
 
-  // No courier available → queue it for the admin to assign by hand.
+  // In-house but no courier free → queue it for the admin to assign by hand.
   $pdo->prepare(
-    "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryStatus)
-     VALUES (:id, :o, :s, NULL, 'Pending')"
+    "INSERT INTO delivery (deliveryId, orderId, supplierId, deliveryPersonnelId, deliveryMethod, deliveryStatus)
+     VALUES (:id, :o, :s, NULL, 'InHouse', 'Pending')"
   )->execute(['id' => $deliveryId, 'o' => $orderId, 's' => $supplierId]);
 
   return [
@@ -198,6 +230,7 @@ function assignDelivery(PDO $pdo, string $orderId, string $supplierId): array {
     'orderId'             => $orderId,
     'supplierId'          => $supplierId,
     'deliveryPersonnelId' => null,
+    'deliveryMethod'      => 'InHouse',
     'deliveryStatus'      => 'Pending',
     'auto'                => false,
   ];
