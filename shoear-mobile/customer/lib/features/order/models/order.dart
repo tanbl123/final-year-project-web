@@ -26,8 +26,9 @@ class ReceiptItem {
   final int qty;
   final double unitPrice;
   final double subtotal;
+  final String? imageUrl;
 
-  ReceiptItem({required this.productName, required this.brand, required this.size, required this.qty, required this.unitPrice, required this.subtotal});
+  ReceiptItem({required this.productName, required this.brand, required this.size, required this.qty, required this.unitPrice, required this.subtotal, this.imageUrl});
 
   factory ReceiptItem.fromJson(Map<String, dynamic> j) => ReceiptItem(
         productName: j['productName'] as String? ?? '',
@@ -36,6 +37,7 @@ class ReceiptItem {
         qty: (j['qty'] as num?)?.toInt() ?? 0,
         unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,
         subtotal: (j['subtotal'] as num?)?.toDouble() ?? 0,
+        imageUrl: (j['imageUrl'] as String?)?.isEmpty ?? true ? null : j['imageUrl'] as String?,
       );
 }
 

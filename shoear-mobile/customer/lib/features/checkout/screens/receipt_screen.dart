@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:customer/core/widgets/product_image.dart';
 import 'package:customer/features/order/models/order.dart';
 import 'package:customer/features/order/screens/order_detail_screen.dart';
 import 'package:customer/features/order/services/receipt_pdf.dart';
@@ -364,15 +365,13 @@ class _ItemRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 46,
+            height: 46,
+            child: ProductImage(url: item.imageUrl),
           ),
-          child: Icon(Icons.inventory_2_outlined,
-              size: 22, color: Colors.grey.shade500),
         ),
         const SizedBox(width: 12),
         Expanded(
