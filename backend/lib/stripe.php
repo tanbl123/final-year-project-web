@@ -45,22 +45,24 @@ function stripeApi(string $secret, string $method, string $path, array $params =
 
 // Params for creating a Connect account for a Malaysian platform.
 //
-// MY risk-control rules forbid the PLATFORM from being liable for losses — which
-// is the default for `type: 'express'` accounts, so Stripe rejects them with
-// "Platforms in MY cannot create accounts where the platform is loss-liable".
-// Instead we use `controller` properties to put loss liability on the CONNECTED
-// account, while keeping Stripe-hosted (Express-style) onboarding via account
-// links (requirement_collection = 'stripe'). $capabilities is e.g.
-// ['transfers' => ['requested' => 'true']].
+// MY risk-control rules forbid the PLATFORM from being liable for losses. Stripe
+// enforces this twice:
+//   • `type: 'express'`  → platform is loss-liable          → rejected in MY.
+//   • Express DASHBOARD  → also requires platform liability  → rejected in MY.
+// So we use the Standard-account shape via `controller`: the CONNECTED account
+// bears losses and pays fees, with a FULL Stripe dashboard. Onboarding stays
+// Stripe-hosted via account links because requirement_collection = 'stripe'.
+// (Standard accounts log in at dashboard.stripe.com — login_links don't apply.)
+// $capabilities is e.g. ['transfers' => ['requested' => 'true']].
 function stripeConnectAccountParams(array $capabilities): array {
   return [
     'country'      => 'MY',
     'capabilities' => $capabilities,
     'controller'   => [
       'losses'                 => ['payments' => 'stripe'],   // connected account bears losses, not the platform
-      'fees'                   => ['payer' => 'account'],
+      'fees'                   => ['payer' => 'account'],     // connected account pays Stripe fees
       'requirement_collection' => 'stripe',                   // Stripe collects requirements → hosted onboarding works
-      'stripe_dashboard'       => ['type' => 'express'],
+      'stripe_dashboard'       => ['type' => 'full'],         // Standard-style dashboard (express forces platform liability)
     ],
   ];
 }
