@@ -103,8 +103,8 @@ function AdminIntegrationsPage() {
           <div className="card-body">
             <p className="text-muted">
               Auto-books a carrier and tracking number for <strong>Standard</strong> (long-distance)
-              parcels, so suppliers don&apos;t have to arrange the courier themselves — the way Shopee
-              generates an airway bill. In-house local deliveries are unaffected.
+              parcels, so suppliers don&apos;t have to arrange the courier themselves. In-house local
+              deliveries are unaffected.
             </p>
 
             {!status?.configured && (
