@@ -144,7 +144,19 @@ function handleRegister(PDO $pdo): void {
   $verificationCode = trim($body['verificationCode'] ?? '');
   $phoneNumber    = trim($body['phoneNumber'] ?? '');
   $companyName    = trim($body['companyName'] ?? '');
-  $companyAddress = trim($body['companyAddress'] ?? '');
+  // business (registered/SSM) address — STRUCTURED from the new client
+  // (companyLine1/…/companyState); older clients send only the combined line.
+  $coAddr = readStructuredAddress($body, 'company');
+  $coStructured = hasStructuredAddress($coAddr);
+  if ($coStructured) {
+    $coErr = structuredAddressError($coAddr);
+    if ($coErr) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $coErr]);
+    }
+    $companyAddress = composeAddress($coAddr);
+  } else {
+    $companyAddress = trim($body['companyAddress'] ?? '');
+  }
   // operational (pickup) address — where couriers collect orders, and the basis
   // for delivery routing (in-house vs standard shipping). The new client sends a
   // STRUCTURED address (operationalLine1/…/operationalState); older clients send
@@ -271,12 +283,17 @@ function handleRegister(PDO $pdo): void {
     $supplierId = nextId($pdo, 'supplier', 'supplierId', 'SUP');
     $pdo->prepare(
       'INSERT INTO supplier
-         (supplierId, userId, companyName, companyAddress, operationalAddress,
-          operationalLine1, operationalPostcode, operationalCity, operationalState,
+         (supplierId, userId, companyName, companyAddress,
+          companyLine1, companyPostcode, companyCity, companyState,
+          operationalAddress, operationalLine1, operationalPostcode, operationalCity, operationalState,
           businessRegNo, businessLicenseUrl, taxNumber)
-       VALUES (:sid, :uid, :cn, :ca, :oa, :ol1, :opc, :oc, :ost, :brn, :blu, :tax)'
+       VALUES (:sid, :uid, :cn, :ca, :cl1, :cpc, :cc, :cst, :oa, :ol1, :opc, :oc, :ost, :brn, :blu, :tax)'
     )->execute([
       'sid' => $supplierId, 'uid' => $userId, 'cn' => $companyName, 'ca' => $companyAddress,
+      'cl1' => $coStructured ? $coAddr['line1'] : null,
+      'cpc' => $coStructured ? $coAddr['postcode'] : null,
+      'cc'  => $coStructured ? $coAddr['city'] : null,
+      'cst' => $coStructured ? $coAddr['state'] : null,
       'oa' => $operationalAddress,
       'ol1' => $opStructured ? $opAddr['line1'] : null,
       'opc' => $opStructured ? $opAddr['postcode'] : null,

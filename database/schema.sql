@@ -94,7 +94,11 @@ CREATE TABLE supplier (
     supplierId      VARCHAR(10)  NOT NULL,                -- SUP0001
     userId          VARCHAR(10)  NOT NULL,
     companyName     VARCHAR(150) NOT NULL,
-    companyAddress  VARCHAR(255) NOT NULL,                -- registered business address (matches SSM)
+    companyAddress  VARCHAR(255) NOT NULL,                -- registered business address (matches SSM); combined single line
+    companyLine1    VARCHAR(150) NULL,                    -- structured business address parts
+    companyPostcode VARCHAR(10)  NULL,
+    companyCity     VARCHAR(100) NULL,
+    companyState    VARCHAR(50)  NULL,
     operationalAddress VARCHAR(255) NOT NULL,             -- where couriers collect orders (pickup); combined single line, defaults to companyAddress
     operationalLine1    VARCHAR(150) NULL,                -- structured pickup address (source of truth for routing + 3PL rates)
     operationalPostcode VARCHAR(10)  NULL,
@@ -505,7 +509,11 @@ CREATE TABLE supplier_change_request (
     requestId          VARCHAR(10)  NOT NULL,                 -- SCR0001
     supplierId         VARCHAR(10)  NOT NULL,
     companyName        VARCHAR(150) NOT NULL,                 -- proposed values
-    companyAddress     VARCHAR(255) NOT NULL,                 -- registered business address (verified)
+    companyAddress     VARCHAR(255) NOT NULL,                 -- registered business address (verified); combined single line
+    companyLine1       VARCHAR(150) NULL,                     -- structured business address parts
+    companyPostcode    VARCHAR(10)  NULL,
+    companyCity        VARCHAR(100) NULL,
+    companyState       VARCHAR(50)  NULL,
     businessRegNo      VARCHAR(50)  NOT NULL,
     taxNumber          VARCHAR(50)  NULL,
     businessLicenseUrl VARCHAR(255) NOT NULL,

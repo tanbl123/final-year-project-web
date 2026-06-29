@@ -52,8 +52,6 @@ function validateForm(form) {
     errors.phoneNumber = 'Enter a valid Malaysian phone number, e.g. 0123456789.';
   }
 
-  if (form.companyAddress.trim() === '') errors.companyAddress = 'Company address is required.';
-
   // business verification
   if (form.businessRegNo.trim() === '') {
     errors.businessRegNo = 'Business registration number is required.';
@@ -89,9 +87,12 @@ function applyFieldError(errors, name, form) {
 function RegisterPage() {
   const [form, setForm] = useState({
     companyName: '', email: '', phoneNumber: '',
-    companyAddress: '', password: '', confirm: '',
+    password: '', confirm: '',
     businessRegNo: '', taxNumber: '', businessLicenseUrl: '',
   });
+  // structured business (registered/SSM) address
+  const [company, setCompany] = useState(emptyAddress());
+  const [companyErrors, setCompanyErrors] = useState({});
   // structured operational (pickup) address — drives delivery routing, so it's
   // collected as proper Malaysian address parts (its own required block).
   const [operational, setOperational] = useState(emptyAddress());
@@ -183,6 +184,12 @@ function RegisterPage() {
     setOpErrors((prev) => (Object.keys(prev).length ? validateAddress(next) : prev));
   }
 
+  // same, for the structured business (registered) address
+  function handleCompanyChange(next) {
+    setCompany(next);
+    setCompanyErrors((prev) => (Object.keys(prev).length ? validateAddress(next) : prev));
+  }
+
   // clear a field via its ✕ button (mirrors handleChange's live re-validation)
   function clearField(name) {
     const nextForm = { ...form, [name]: '' };
@@ -200,7 +207,10 @@ function RegisterPage() {
       email: form.email.trim(),
       phoneNumber: form.phoneNumber.trim(),
       companyName: form.companyName.trim(),
-      companyAddress: form.companyAddress.trim(),
+      companyLine1: company.line1.trim(),
+      companyPostcode: company.postcode.trim(),
+      companyCity: company.city.trim(),
+      companyState: company.state,
       operationalLine1: operational.line1.trim(),
       operationalPostcode: operational.postcode.trim(),
       operationalCity: operational.city.trim(),
@@ -219,13 +229,16 @@ function RegisterPage() {
     setFormError('');
 
     const found = validateForm(form);
+    const coFound = validateAddress(company);
     const opFound = validateAddress(operational);
-    if (Object.keys(found).length > 0 || Object.keys(opFound).length > 0) {
+    if (Object.keys(found).length > 0 || Object.keys(coFound).length > 0 || Object.keys(opFound).length > 0) {
       setErrors(found);
+      setCompanyErrors(coFound);
       setOpErrors(opFound);
       return;
     }
     setErrors({});
+    setCompanyErrors({});
     setOpErrors({});
 
     setIsSubmitting(true);
@@ -432,9 +445,15 @@ function RegisterPage() {
 
         <h6 className="text-muted text-uppercase small fw-bold">Company</h6>
         {field('companyName', 'Company name')}
-        {field('companyAddress', 'Business address')}
 
         <div className="mb-1 mt-2">
+          <label className="form-label mb-1">Business address</label>
+          <div className="form-text mt-0 mb-2">Your registered business address (matches your SSM document).</div>
+          <AddressFields value={company} onChange={handleCompanyChange}
+            errors={companyErrors} idPrefix="co" />
+        </div>
+
+        <div className="mb-1 mt-3">
           <label className="form-label mb-1">Operational (pickup) address</label>
           <div className="form-text mt-0 mb-2">
             Where couriers collect your orders. The state decides whether an order ships

@@ -336,11 +336,15 @@ function handleApproveChangeRequest(PDO $pdo, array $auth, string $requestId): v
   try {
     $pdo->prepare(
       'UPDATE supplier
-          SET companyName = :cn, companyAddress = :ca, businessRegNo = :brn,
-              taxNumber = :tax, businessLicenseUrl = :blu
+          SET companyName = :cn, companyAddress = :ca,
+              companyLine1 = :cl1, companyPostcode = :cpc, companyCity = :cc, companyState = :cst,
+              businessRegNo = :brn, taxNumber = :tax, businessLicenseUrl = :blu
         WHERE supplierId = :sid'
     )->execute([
-      'cn' => $req['companyName'], 'ca' => $req['companyAddress'], 'brn' => $req['businessRegNo'],
+      'cn' => $req['companyName'], 'ca' => $req['companyAddress'],
+      'cl1' => $req['companyLine1'] ?? null, 'cpc' => $req['companyPostcode'] ?? null,
+      'cc' => $req['companyCity'] ?? null, 'cst' => $req['companyState'] ?? null,
+      'brn' => $req['businessRegNo'],
       'tax' => $req['taxNumber'], 'blu' => $req['businessLicenseUrl'],
       'sid' => $req['supplierId'],
     ]);

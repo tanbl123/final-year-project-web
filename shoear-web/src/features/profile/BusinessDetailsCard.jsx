@@ -10,7 +10,7 @@ import { emptyAddress, validateAddress } from '../../components/addressUtils';
 
 const SSM_RE = /^(\d{12}|\d{6,8}-?[A-Za-z])$/;
 const SST_RE = /^[A-Za-z0-9][A-Za-z0-9-]{6,18}[A-Za-z0-9]$/;
-const EMPTY_REQ = { companyName: '', companyAddress: '', businessRegNo: '', taxNumber: '', businessLicenseUrl: '' };
+const EMPTY_REQ = { companyName: '', businessRegNo: '', taxNumber: '', businessLicenseUrl: '' };
 
 // Supplier-only card on the profile page. The operational (pickup) address is
 // editable freely; the verified identity fields (company name, business address,
@@ -30,6 +30,8 @@ function BusinessDetailsCard({ onToast }) {
   // change request form (verified fields)
   const [reqOpen, setReqOpen] = useState(false);
   const [req, setReq] = useState(EMPTY_REQ);
+  const [reqAddr, setReqAddr] = useState(emptyAddress());   // structured business address
+  const [reqAddrErrors, setReqAddrErrors] = useState({});
   const [reqErrors, setReqErrors] = useState({});
   const [reqSubmitting, setReqSubmitting] = useState(false);
   const [licenseName, setLicenseName] = useState('');
@@ -106,11 +108,17 @@ function BusinessDetailsCard({ onToast }) {
   function openRequest() {
     setReq({
       companyName: cur.companyName || '',
-      companyAddress: cur.companyAddress || '',
       businessRegNo: cur.businessRegNo || '',
       taxNumber: cur.taxNumber || '',
       businessLicenseUrl: cur.businessLicenseUrl || '',
     });
+    setReqAddr({
+      line1: cur.companyLine1 || '',
+      postcode: cur.companyPostcode || '',
+      city: cur.companyCity || '',
+      state: cur.companyState || '',
+    });
+    setReqAddrErrors({});
     setLicenseName(cur.businessLicenseUrl ? 'Current document' : '');
     setReqErrors({});
     setReqOpen(true);
@@ -152,7 +160,6 @@ function BusinessDetailsCard({ onToast }) {
   function validateReq() {
     const e = {};
     if (!req.companyName.trim()) e.companyName = 'Company name is required.';
-    if (!req.companyAddress.trim()) e.companyAddress = 'Business address is required.';
     if (!req.businessRegNo.trim()) e.businessRegNo = 'SSM number is required.';
     else if (!SSM_RE.test(req.businessRegNo.trim())) e.businessRegNo = 'Enter a valid SSM number, e.g. 202301012345 or 1234567-A.';
     if (req.taxNumber.trim() && !SST_RE.test(req.taxNumber.trim())) e.taxNumber = 'Enter a valid SST number, e.g. W10-1808-32000001.';
@@ -162,7 +169,10 @@ function BusinessDetailsCard({ onToast }) {
   // has anything actually changed vs the current verified values?
   const reqDirty = reqOpen && (
     req.companyName.trim() !== (cur.companyName || '') ||
-    req.companyAddress.trim() !== (cur.companyAddress || '') ||
+    reqAddr.line1.trim() !== (cur.companyLine1 || '') ||
+    reqAddr.postcode.trim() !== (cur.companyPostcode || '') ||
+    reqAddr.city.trim() !== (cur.companyCity || '') ||
+    (reqAddr.state || '') !== (cur.companyState || '') ||
     req.businessRegNo.trim() !== (cur.businessRegNo || '') ||
     req.taxNumber.trim() !== (cur.taxNumber || '') ||
     req.businessLicenseUrl !== (cur.businessLicenseUrl || '')
@@ -171,13 +181,21 @@ function BusinessDetailsCard({ onToast }) {
   async function submitReq(e) {
     e.preventDefault();
     const errs = validateReq();
-    if (Object.keys(errs).length) { setReqErrors(errs); return; }
+    const addrErrs = validateAddress(reqAddr);
+    if (Object.keys(errs).length || Object.keys(addrErrs).length) {
+      setReqErrors(errs);
+      setReqAddrErrors(addrErrs);
+      return;
+    }
     if (!reqDirty) { setReqErrors({ companyName: 'Change at least one detail before submitting.' }); return; }
     setReqSubmitting(true);
     try {
       await submitBusinessChangeRequest({
         companyName: req.companyName.trim(),
-        companyAddress: req.companyAddress.trim(),
+        companyLine1: reqAddr.line1.trim(),
+        companyPostcode: reqAddr.postcode.trim(),
+        companyCity: reqAddr.city.trim(),
+        companyState: reqAddr.state,
         businessRegNo: req.businessRegNo.trim(),
         taxNumber: req.taxNumber.trim(),
         businessLicenseUrl: req.businessLicenseUrl,
@@ -309,12 +327,12 @@ function BusinessDetailsCard({ onToast }) {
             </div>
             <div className="mb-3">
               <label className="form-label">Business address</label>
-              <ClearableInput type="text" maxLength="255"
-                className={reqErrors.companyAddress ? 'is-invalid' : ''}
-                value={req.companyAddress}
-                onChange={(e) => setReqField('companyAddress', e.target.value)}
-                onClear={() => setReqField('companyAddress', '')} />
-              {reqErrors.companyAddress && <div className="invalid-feedback d-block">{reqErrors.companyAddress}</div>}
+              <AddressFields value={reqAddr} idPrefix="req-co"
+                onChange={(next) => {
+                  setReqAddr(next);
+                  if (Object.keys(reqAddrErrors).length) setReqAddrErrors(validateAddress(next));
+                }}
+                errors={reqAddrErrors} />
             </div>
             <div className="mb-3">
               <label className="form-label">Business registration no. (SSM)</label>

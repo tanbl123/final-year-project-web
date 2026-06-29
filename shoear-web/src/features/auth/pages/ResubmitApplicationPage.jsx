@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getMyApplication, resubmitApplication, uploadRegistrationDoc } from '../authService';
 import { useAuth } from '../AuthContext';
 import ClearableInput from '../../../components/ClearableInput';
+import AddressFields from '../../../components/AddressFields';
+import { emptyAddress, validateAddress } from '../../../components/addressUtils';
 
 // Shown to a supplier whose registration was rejected (a curable rejection).
 // They see why it was rejected, fix the flagged details on a prefilled form,
@@ -18,9 +20,11 @@ function ResubmitApplicationPage() {
   const [reason, setReason] = useState('');
   const [readonly, setReadonly] = useState({ username: '', email: '' });
   const [form, setForm] = useState({
-    companyName: '', companyAddress: '', operationalAddress: '', phoneNumber: '',
+    companyName: '', operationalAddress: '', phoneNumber: '',
     businessRegNo: '', taxNumber: '', businessLicenseUrl: '',
   });
+  const [company, setCompany] = useState(emptyAddress());   // structured business address
+  const [companyErrors, setCompanyErrors] = useState({});
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -39,12 +43,17 @@ function ResubmitApplicationPage() {
         setReadonly({ username: a.username, email: a.email });
         setForm({
           companyName: a.companyName || '',
-          companyAddress: a.companyAddress || '',
           operationalAddress: a.operationalAddress || a.companyAddress || '',
           phoneNumber: a.phoneNumber || '',
           businessRegNo: a.businessRegNo || '',
           taxNumber: a.taxNumber || '',
           businessLicenseUrl: a.businessLicenseUrl || '',
+        });
+        setCompany({
+          line1: a.companyLine1 || '',
+          postcode: a.companyPostcode || '',
+          city: a.companyCity || '',
+          state: a.companyState || '',
         });
         if (a.businessLicenseUrl) setLicenseName('Current document');
         if (a.status === 'Active') navigate('/products', { replace: true });
@@ -58,7 +67,6 @@ function ResubmitApplicationPage() {
   function validate(f) {
     const e = {};
     if (f.companyName.trim() === '') e.companyName = 'Company name is required.';
-    if (f.companyAddress.trim() === '') e.companyAddress = 'Company address is required.';
     if (f.phoneNumber.trim() === '') e.phoneNumber = 'Phone number is required.';
     else if (!/^(0\d{8,10}|\+?60\d{8,10})$/.test(f.phoneNumber.trim())) {
       e.phoneNumber = 'Enter a valid Malaysian phone number, e.g. 0123456789.';
@@ -112,13 +120,21 @@ function ResubmitApplicationPage() {
     setFormError('');
     const found = validate(form);
     const cleaned = Object.fromEntries(Object.entries(found).filter(([, v]) => v));
-    if (Object.keys(cleaned).length > 0) { setErrors(cleaned); return; }
+    const coFound = validateAddress(company);
+    if (Object.keys(cleaned).length > 0 || Object.keys(coFound).length > 0) {
+      setErrors(cleaned);
+      setCompanyErrors(coFound);
+      return;
+    }
 
     setSubmitting(true);
     try {
       const res = await resubmitApplication({
         companyName: form.companyName.trim(),
-        companyAddress: form.companyAddress.trim(),
+        companyLine1: company.line1.trim(),
+        companyPostcode: company.postcode.trim(),
+        companyCity: company.city.trim(),
+        companyState: company.state,
         operationalAddress: form.operationalAddress.trim(),
         phoneNumber: form.phoneNumber.trim(),
         businessRegNo: form.businessRegNo.trim(),
@@ -192,7 +208,15 @@ function ResubmitApplicationPage() {
         <hr className="my-3" />
         <h6 className="text-muted text-uppercase small fw-bold">Company</h6>
         {field('companyName', 'Company name')}
-        {field('companyAddress', 'Business address')}
+        <div className="mb-3">
+          <label className="form-label">Business address</label>
+          <AddressFields value={company} idPrefix="co"
+            onChange={(next) => {
+              setCompany(next);
+              setCompanyErrors((prev) => (Object.keys(prev).length ? validateAddress(next) : prev));
+            }}
+            errors={companyErrors} />
+        </div>
         {field('operationalAddress', 'Operational (pickup) address')}
         {field('phoneNumber', 'Phone number', 'tel')}
 

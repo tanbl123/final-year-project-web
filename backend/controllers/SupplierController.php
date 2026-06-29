@@ -10,7 +10,9 @@ function handleGetApplication(PDO $pdo, array $auth): void {
   requireSupplierId($pdo, $auth);
   $stmt = $pdo->prepare(
     'SELECT u.username, u.email, u.phoneNumber, u.status, u.rejectionReason,
-            s.companyName, s.companyAddress, s.operationalAddress, s.businessRegNo,
+            s.companyName, s.companyAddress,
+            s.companyLine1, s.companyPostcode, s.companyCity, s.companyState,
+            s.operationalAddress, s.businessRegNo,
             s.businessLicenseUrl, s.taxNumber
        FROM `user` u
        JOIN supplier s ON s.userId = u.userId
@@ -74,7 +76,18 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
   $body               = getJsonBody();
   $phoneNumber        = trim($body['phoneNumber'] ?? '');
   $companyName        = trim($body['companyName'] ?? '');
-  $companyAddress     = trim($body['companyAddress'] ?? '');
+  // structured business address (new client) → compose; else combined string
+  $coAddr = readStructuredAddress($body, 'company');
+  $coStructured = hasStructuredAddress($coAddr);
+  if ($coStructured) {
+    $coErr = structuredAddressError($coAddr);
+    if ($coErr) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $coErr]);
+    }
+    $companyAddress = composeAddress($coAddr);
+  } else {
+    $companyAddress = trim($body['companyAddress'] ?? '');
+  }
   $operationalAddress = trim($body['operationalAddress'] ?? '');
   if ($operationalAddress === '') $operationalAddress = $companyAddress;
   $businessRegNo      = trim($body['businessRegNo'] ?? '');
@@ -113,11 +126,18 @@ function handleResubmitApplication(PDO $pdo, array $auth): void {
 
     $pdo->prepare(
       'UPDATE supplier
-          SET companyName = :cn, companyAddress = :ca, operationalAddress = :oa,
+          SET companyName = :cn, companyAddress = :ca,
+              companyLine1 = :cl1, companyPostcode = :cpc, companyCity = :cc, companyState = :cst,
+              operationalAddress = :oa,
               businessRegNo = :brn, businessLicenseUrl = :blu, taxNumber = :tax
         WHERE userId = :id'
     )->execute([
-      'cn' => $companyName, 'ca' => $companyAddress, 'oa' => $operationalAddress,
+      'cn' => $companyName, 'ca' => $companyAddress,
+      'cl1' => $coStructured ? $coAddr['line1'] : null,
+      'cpc' => $coStructured ? $coAddr['postcode'] : null,
+      'cc'  => $coStructured ? $coAddr['city'] : null,
+      'cst' => $coStructured ? $coAddr['state'] : null,
+      'oa' => $operationalAddress,
       'brn' => $businessRegNo,
       'blu' => $businessLicenseUrl, 'tax' => ($taxNumber === '' ? null : $taxNumber),
       'id' => $auth['userId'],
@@ -158,7 +178,9 @@ function handleGetBusinessDetails(PDO $pdo, array $auth): void {
   $supplierId = requireSupplierId($pdo, $auth);
 
   $cur = $pdo->prepare(
-    'SELECT companyName, companyAddress, operationalAddress,
+    'SELECT companyName, companyAddress,
+            companyLine1, companyPostcode, companyCity, companyState,
+            operationalAddress,
             operationalLine1, operationalPostcode, operationalCity, operationalState,
             businessRegNo, taxNumber, businessLicenseUrl
        FROM supplier WHERE supplierId = :sid'
@@ -169,7 +191,9 @@ function handleGetBusinessDetails(PDO $pdo, array $auth): void {
   // the most recent request (Pending shows as a live banner; Rejected lets the
   // supplier see why their last attempt was turned down)
   $req = $pdo->prepare(
-    'SELECT requestId, companyName, companyAddress, businessRegNo, taxNumber, businessLicenseUrl,
+    'SELECT requestId, companyName, companyAddress,
+            companyLine1, companyPostcode, companyCity, companyState,
+            businessRegNo, taxNumber, businessLicenseUrl,
             requestStatus, reviewNote, created_at, reviewed_at
        FROM supplier_change_request
       WHERE supplierId = :sid
@@ -236,7 +260,17 @@ function handleSubmitChangeRequest(PDO $pdo, array $auth): void {
 
   $body               = getJsonBody();
   $companyName        = trim($body['companyName'] ?? '');
-  $companyAddress     = trim($body['companyAddress'] ?? '');
+  // structured business address (new client) → compose; else combined string
+  $coAddr = readStructuredAddress($body, 'company');
+  if (hasStructuredAddress($coAddr)) {
+    $coErr = structuredAddressError($coAddr);
+    if ($coErr) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $coErr]);
+    }
+    $companyAddress = composeAddress($coAddr);
+  } else {
+    $companyAddress = trim($body['companyAddress'] ?? '');
+  }
   $businessRegNo      = trim($body['businessRegNo'] ?? '');
   $taxNumber          = trim($body['taxNumber'] ?? '');
   $businessLicenseUrl = trim($body['businessLicenseUrl'] ?? '');
@@ -258,10 +292,16 @@ function handleSubmitChangeRequest(PDO $pdo, array $auth): void {
   $requestId = nextId($pdo, 'supplier_change_request', 'requestId', 'SCR');
   $pdo->prepare(
     'INSERT INTO supplier_change_request
-       (requestId, supplierId, companyName, companyAddress, businessRegNo, taxNumber, businessLicenseUrl)
-     VALUES (:rid, :sid, :cn, :ca, :brn, :tax, :blu)'
+       (requestId, supplierId, companyName, companyAddress,
+        companyLine1, companyPostcode, companyCity, companyState,
+        businessRegNo, taxNumber, businessLicenseUrl)
+     VALUES (:rid, :sid, :cn, :ca, :cl1, :cpc, :cc, :cst, :brn, :tax, :blu)'
   )->execute([
     'rid' => $requestId, 'sid' => $supplierId, 'cn' => $companyName, 'ca' => $companyAddress,
+    'cl1' => hasStructuredAddress($coAddr) ? $coAddr['line1'] : null,
+    'cpc' => hasStructuredAddress($coAddr) ? $coAddr['postcode'] : null,
+    'cc'  => hasStructuredAddress($coAddr) ? $coAddr['city'] : null,
+    'cst' => hasStructuredAddress($coAddr) ? $coAddr['state'] : null,
     'brn' => $businessRegNo, 'tax' => ($taxNumber === '' ? null : $taxNumber),
     'blu' => $businessLicenseUrl,
   ]);
