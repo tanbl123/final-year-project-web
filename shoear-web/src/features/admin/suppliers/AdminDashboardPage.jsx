@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getPendingSuppliers, approveSupplier, rejectSupplier } from '../adminService';
+import { getPendingSuppliers, approveSupplier, rejectSupplier, refreshBadges } from '../adminService';
 import Pagination from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
 
@@ -37,6 +37,7 @@ function AdminDashboardPage() {
       await approveSupplier(supplier.userId);
       setSuppliers((prev) => prev.filter((s) => s.userId !== supplier.userId));
       setNotice(`${supplier.companyName} approved.`);
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -61,6 +62,7 @@ function AdminDashboardPage() {
       await rejectSupplier(supplier.userId, { reason: reason.trim(), terminal });
       setSuppliers((prev) => prev.filter((s) => s.userId !== supplier.userId));
       setNotice(`${supplier.companyName} ${terminal ? 'banned' : 'rejected'}.`);
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getRefunds, setRefundStatus, refundProofUrls } from '../../supplier/refunds/refundService';
+import { refreshBadges } from '../adminService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
@@ -55,6 +56,7 @@ function AdminRefundsPage() {
       await setRefundStatus(refund.refundId, newStatus);
       setToast(`${refund.refundId} → ${newStatus}.`);
       load();
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {

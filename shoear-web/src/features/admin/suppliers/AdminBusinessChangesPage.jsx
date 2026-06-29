@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Pagination from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
 import {
-  getSupplierChangeRequests, approveChangeRequest, rejectChangeRequest,
+  getSupplierChangeRequests, approveChangeRequest, rejectChangeRequest, refreshBadges,
 } from '../adminService';
 
 // One field's current → proposed value. Highlights when it actually changed.
@@ -53,6 +53,7 @@ function AdminBusinessChangesPage() {
       await approveChangeRequest(r.requestId);
       setRequests((prev) => prev.filter((x) => x.requestId !== r.requestId));
       setNotice(`Changes for ${r.newCompanyName} approved and applied.`);
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -71,6 +72,7 @@ function AdminBusinessChangesPage() {
       await rejectChangeRequest(r.requestId, reason.trim());
       setRequests((prev) => prev.filter((x) => x.requestId !== r.requestId));
       setNotice(`Changes for ${r.curCompanyName} rejected.`);
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {

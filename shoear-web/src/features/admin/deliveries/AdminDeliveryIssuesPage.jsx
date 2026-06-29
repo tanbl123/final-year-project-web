@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDeliveryIssues, resolveDeliveryIssue } from '../adminService';
+import { getDeliveryIssues, resolveDeliveryIssue, refreshBadges } from '../adminService';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
@@ -56,6 +56,7 @@ function AdminDeliveryIssuesPage() {
       await resolveDeliveryIssue(issueId);
       setToast('Issue marked resolved.');
       load();
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {

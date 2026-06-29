@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getPendingProducts, approveProduct, rejectProduct } from '../adminService';
+import { getPendingProducts, approveProduct, rejectProduct, refreshBadges } from '../adminService';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Pagination from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
@@ -36,6 +36,7 @@ function AdminProductApprovalsPage() {
 
       setProducts((prev) => prev.filter((p) => p.productId !== product.productId));
       setNotice(`${product.productName} ${action === 'approve' ? 'approved' : 'rejected'}.`);
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDeliveries, getCouriers, assignDelivery } from '../adminService';
+import { getDeliveries, getCouriers, assignDelivery, refreshBadges } from '../adminService';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
 import SortableTh from '../../../components/SortableTh';
@@ -88,6 +88,7 @@ function AdminDeliveriesPage() {
       setToast(`${assignTarget.orderId} (${assignTarget.supplierName}) → ${chosenCourier}.`);
       closeAssign();
       load();
+      refreshBadges();
     } catch (err) {
       setError(err.message);
     } finally {
