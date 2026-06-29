@@ -52,6 +52,15 @@ function easyParcelSubdivision(string $state): string {
   return EP_SUBDIVISION_CODES[$state] ?? '';
 }
 
+// Normalise a Malaysian phone to the national number WITHOUT the trunk "0" or
+// country code — EasyParcel takes the country code separately
+// (phone_number_country_code = "MY"), so "0192223333"/"+60192223333" → "192223333".
+function easyParcelPhone(string $phone): string {
+  $digits = preg_replace('/\D+/', '', $phone);
+  if (strpos($digits, '60') === 0) { $digits = substr($digits, 2); }
+  return ltrim($digits, '0');
+}
+
 // The redirect URI EasyParcel sends the browser back to after consent. MUST
 // match exactly what's registered in the Developer-Hub app. Configurable; falls
 // back to deriving it from the current request host.
@@ -283,19 +292,21 @@ function easyParcelBook(PDO $pdo, array $config, array $sender, array $receiver,
     'weight' => $weight, 'width' => 10, 'length' => 10, 'height' => 10,
     'sender' => [
       'name' => $sender['name'], 'company' => $sender['company'] ?? '',
-      'phone_number' => $sender['phone'], 'email' => $sender['email'] ?? '',
+      'phone_number_country_code' => 'MY', 'phone_number' => easyParcelPhone($sender['phone'] ?? ''),
+      'email' => $sender['email'] ?? '',
       'address_1' => $sender['line1'], 'address_2' => $sender['line2'] ?? '',
       'city' => $sender['city'], 'postcode' => $sender['code'],
       'subdivision_code' => $pickSub, 'country_code' => 'MY',
     ],
     'receiver' => [
       'name' => $receiver['name'], 'company' => $receiver['company'] ?? '',
-      'phone_number' => $receiver['phone'], 'email' => $receiver['email'] ?? '',
+      'phone_number_country_code' => 'MY', 'phone_number' => easyParcelPhone($receiver['phone'] ?? ''),
+      'email' => $receiver['email'] ?? '',
       'address_1' => $receiver['line1'], 'address_2' => $receiver['line2'] ?? '',
       'city' => $receiver['city'], 'postcode' => $receiver['code'],
       'subdivision_code' => $sendSub, 'country_code' => 'MY',
     ],
-    'items' => [[
+    'item' => [[
       'content' => $parcel['content'] ?? 'Footwear', 'weight' => $weight,
       'width' => 10, 'length' => 10, 'height' => 10,
       'currency_code' => 'MYR', 'value' => $value, 'quantity' => 1,
