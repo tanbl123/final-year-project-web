@@ -6,6 +6,15 @@
 //   Android emulator : http://10.0.2.2/shoear/api/v1     (10.0.2.2 = your PC's localhost)
 //   iOS simulator    : http://localhost/shoear/api/v1
 //   Physical phone   : http://<your-PC-LAN-IP>/shoear/api/v1   e.g. http://192.168.1.5/shoear/api/v1
+//                      (phone + PC must be on the same Wi-Fi; XAMPP Apache must
+//                       allow LAN access)
 //
-// Default below assumes the Android emulator — change it to match your setup.
-const String apiBaseUrl = 'http://10.0.2.2/shoear/api/v1';
+// The default below assumes the Android emulator. To target a physical phone
+// WITHOUT editing this file, override it at build time:
+//
+//   flutter run --dart-define=API_BASE_URL=http://192.168.1.5/shoear/api/v1
+//
+const String apiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'http://10.0.2.2/shoear/api/v1',
+);
