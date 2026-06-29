@@ -25,6 +25,7 @@ class DeliveryDetailScreen extends StatefulWidget {
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   late Future<DeliveryDetail> _future;
   final _otp = TextEditingController();
+  File? _proofPhoto;   // proof-of-delivery photo staged for the confirm step
   bool _busy = false;
 
   @override
@@ -57,16 +58,23 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
-  Future<void> _confirmOtp() async {
+  // Confirm delivery requires BOTH the 4-digit OTP and a proof photo. They're
+  // sent together so a parcel can't be closed with only one.
+  Future<void> _confirmDelivery() async {
     final code = _otp.text.trim();
+    if (_proofPhoto == null) {
+      _toast('Take a proof-of-delivery photo first.');
+      return;
+    }
     if (code.length != 4) {
       _toast('Enter the 4-digit customer OTP.');
       return;
     }
     setState(() => _busy = true);
     try {
-      await context.read<DeliveryService>().verifyOtp(widget.deliveryId, code);
+      await context.read<DeliveryService>().verifyOtp(widget.deliveryId, code, _proofPhoto!);
       _otp.clear();
+      setState(() => _proofPhoto = null);
       _toast('Delivery confirmed.');
       _reload();
     } catch (e) {
@@ -76,7 +84,9 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
-  Future<void> _uploadProof() async {
+  // Pick/snap the proof photo and stage it locally — it's uploaded as part of
+  // the confirm-delivery request, not on its own.
+  Future<void> _pickProof() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (_) => SafeArea(
@@ -102,16 +112,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     final picked = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 80);
     if (picked == null) return;
 
-    setState(() => _busy = true);
-    try {
-      await context.read<DeliveryService>().uploadProof(widget.deliveryId, File(picked.path));
-      _toast('Proof uploaded.');
-      _reload();
-    } catch (e) {
-      _toast(e.toString());
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    setState(() => _proofPhoto = File(picked.path));
   }
 
   @override
@@ -249,9 +250,31 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         return [
           Text('Confirm delivery', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text('Ask the customer for the 4-digit OTP shown in their app.',
+          Text('Both a proof-of-delivery photo and the customer’s 4-digit OTP are required.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+
+          // 1) proof photo — staged locally, uploaded on confirm
+          Text('1. Proof of delivery photo', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 6),
+          if (_proofPhoto != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(_proofPhoto!, height: 160, width: double.infinity, fit: BoxFit.cover),
+            ),
+            const SizedBox(height: 8),
+          ],
+          OutlinedButton.icon(
+            onPressed: _pickProof,
+            icon: Icon(_proofPhoto == null ? Icons.add_a_photo_outlined : Icons.refresh),
+            label: Text(_proofPhoto == null ? 'Take proof photo' : 'Retake photo'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          ),
+          const SizedBox(height: 16),
+
+          // 2) customer OTP
+          Text('2. Customer OTP', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 6),
           TextField(
             controller: _otp,
             keyboardType: TextInputType.number,
@@ -264,17 +287,13 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             ),
           ),
           const SizedBox(height: 8),
+
+          // 3) confirm — sends photo + OTP together
           FilledButton.icon(
-            onPressed: _confirmOtp,
+            onPressed: _confirmDelivery,
             icon: const Icon(Icons.check_circle_outline),
             label: const Text('Confirm delivery'),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _uploadProof,
-            icon: const Icon(Icons.add_a_photo_outlined),
-            label: Text(d.proofOfDelivery == null ? 'Upload proof photo' : 'Replace proof photo'),
           ),
           const SizedBox(height: 8),
           _reportIssueButton(d.orderId),

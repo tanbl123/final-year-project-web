@@ -260,12 +260,18 @@ function handleUpdateDeliveryStatus(PDO $pdo, array $auth, string $deliveryId): 
   sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => $status]);
 }
 
-// POST /deliveries/{deliveryId}/verify-otp — body: { otpCode }. On a match
-// (delivery must be OutForDelivery) → Delivered, order → Delivered.
+// POST /deliveries/{deliveryId}/verify-otp — multipart: { otpCode, file }.
+// Confirming a delivery now requires BOTH the customer's OTP (proof of the right
+// person) AND a proof-of-delivery photo (proof of the drop-off) in one step, so
+// no parcel can be marked Delivered without both. On a match (delivery must be
+// OutForDelivery) → Delivered + proof stored, order → Delivered.
 function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId, array $config = []): void {
   $courierId = requireDeliveryPersonnelId($pdo, $auth);
-  $body = getJsonBody();
-  $otp  = trim($body['otpCode'] ?? '');
+  // OTP arrives as a multipart field alongside the photo; fall back to a JSON
+  // body so older clients that send { otpCode } still validate the same way.
+  $otp = isset($_POST['otpCode'])
+    ? trim((string) $_POST['otpCode'])
+    : trim((string) (getJsonBody()['otpCode'] ?? ''));
 
   $del = requireOwnDelivery($pdo, $courierId, $deliveryId);
   if ($del['deliveryStatus'] !== 'OutForDelivery') {
@@ -274,6 +280,15 @@ function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId, array $confi
   if ($otp === '' || $otp !== (string) $del['otpCode']) {
     sendJson(400, false, null, ['code' => 'BAD_OTP', 'message' => 'Incorrect OTP. Ask the customer for the code shown in their app.']);
   }
+  // A proof photo is mandatory. Validate it's present BEFORE uploading anything,
+  // and only after the OTP checks pass — so a wrong code never stores a photo.
+  if (($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A proof-of-delivery photo is required to confirm delivery.']);
+  }
+
+  // Upload the photo (Firebase when configured, else local disk). storeUploadedFile
+  // validates the image and exits with a 400 on a bad file.
+  $proofUrl = storeUploadedFile($_FILES['file'], 'image');
 
   // The courier earns a flat fee per completed parcel — snapshot it now so a
   // later config change never rewrites past earnings.
@@ -281,8 +296,8 @@ function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId, array $confi
 
   try {
     $pdo->beginTransaction();
-    $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW(), courierFee = :fee WHERE deliveryId = :id")
-        ->execute(['fee' => $fee, 'id' => $deliveryId]);
+    $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW(), courierFee = :fee, proofOfDelivery = :proof WHERE deliveryId = :id")
+        ->execute(['fee' => $fee, 'proof' => $proofUrl, 'id' => $deliveryId]);
     // order becomes Delivered only once EVERY parcel is delivered
     recomputeOrderStatus($pdo, $del['orderId']);
     $pdo->commit();
@@ -291,7 +306,7 @@ function handleVerifyOtp(PDO $pdo, array $auth, string $deliveryId, array $confi
     sendJson(500, false, null, ['code' => 'DB_ERROR', 'message' => 'Could not confirm the delivery.']);
   }
 
-  sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => 'Delivered']);
+  sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => 'Delivered', 'proofOfDelivery' => $proofUrl]);
 }
 
 // POST /deliveries/{deliveryId}/proof — attach a proof-of-delivery photo.

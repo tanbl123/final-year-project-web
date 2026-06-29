@@ -37,15 +37,11 @@ class DeliveryService {
     return data['deliveryStatus']?.toString() ?? status;
   }
 
-  /// POST /deliveries/{id}/verify-otp — confirm delivery with the customer's OTP.
-  Future<void> verifyOtp(String deliveryId, String otp) async {
-    await api.post('/deliveries/$deliveryId/verify-otp', {'otpCode': otp});
-  }
-
-  /// POST /deliveries/{id}/proof — multipart upload of the proof photo.
-  Future<String> uploadProof(String deliveryId, File photo) async {
-    final data = await api.uploadFile('/deliveries/$deliveryId/proof', photo) as Map<String, dynamic>;
-    return data['proofOfDelivery']?.toString() ?? '';
+  /// POST /deliveries/{id}/verify-otp — confirm delivery with the customer's OTP
+  /// AND a proof-of-delivery photo, sent together in one multipart request. Both
+  /// are required: a parcel can't be marked Delivered without each.
+  Future<void> verifyOtp(String deliveryId, String otp, File photo) async {
+    await api.postMultipart('/deliveries/$deliveryId/verify-otp', {'otpCode': otp}, file: photo);
   }
 
   /// POST /deliveries/{id}/report-issue — structured reason (+ optional note/photo).
