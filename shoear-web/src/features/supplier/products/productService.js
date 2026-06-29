@@ -2,6 +2,17 @@ import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiUpload, getToken } fro
 
 // All product data now comes from the real PHP API (with the JWT token).
 
+// Supplier sidebar badge counts (e.g. { inventory: <items needing restock> }).
+export function getSupplierBadgeCounts() {
+  return apiGet('/supplier/badge-counts', getToken());
+}
+
+// Ask the sidebar to re-fetch its badge counts now (e.g. after a stock save),
+// instead of waiting for the next poll. The Sidebar listens for this event.
+export function refreshBadges() {
+  window.dispatchEvent(new Event('shoear:badges-refresh'));
+}
+
 export function fetchProducts() {
   return apiGet('/products', getToken());
 }

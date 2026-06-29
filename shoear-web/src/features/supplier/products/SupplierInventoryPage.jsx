@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useBlocker } from 'react-router-dom';
-import { getInventory, updateInventory } from './productService';
+import { getInventory, updateInventory, refreshBadges } from './productService';
 import { useUnsavedChangesWarning } from '../../../hooks/useUnsavedChangesWarning';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
@@ -160,6 +160,7 @@ function SupplierInventoryPage() {
       const saved = Object.fromEntries(updates.map((u) => [u.variantId, u.stock]));
       setRows((prev) => prev.map((r) => (saved[r.variantId] !== undefined ? { ...r, stock: saved[r.variantId] } : r)));
       setDraft((d) => { const n = { ...d }; updates.forEach((u) => delete n[u.variantId]); return n; });
+      refreshBadges();   // restock count may have changed → update the sidebar now
       setToast(`Stock updated for ${updates.length} ${updates.length === 1 ? 'size' : 'sizes'}.`);
     } catch (err) {
       setError(err.message);

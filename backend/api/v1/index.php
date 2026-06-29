@@ -865,6 +865,13 @@ if ($method === 'DELETE' && preg_match('#^/supplier/reviews/([^/]+)/reply$#', $p
   handleDeleteReviewReply($pdo, $auth, $m[1]);
 }
 
+// ── supplier sidebar badge counts (restock queue) ──
+if ($method === 'GET' && $path === '/supplier/badge-counts') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleSupplierBadgeCounts($pdo, $auth);
+}
+
 // ── supplier inventory (quick stock management) ──
 if ($path === '/supplier/inventory') {
   $auth = requireAuth($secret);

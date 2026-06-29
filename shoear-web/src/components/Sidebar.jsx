@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { getBadgeCounts } from '../features/admin/adminService';
+import { getSupplierBadgeCounts } from '../features/supplier/products/productService';
 
 // Grouped navigation per role. `end` marks links that should only be active on
 // an exact match (e.g. /admin, otherwise it'd light up for every /admin/* page).
@@ -39,7 +40,7 @@ const SUPPLIER_NAV = [
   ] },
   { group: 'Catalog', items: [
     { to: '/products', label: 'Products', icon: '👟' },
-    { to: '/inventory', label: 'Inventory', icon: '📦' },
+    { to: '/inventory', label: 'Inventory', icon: '📦', badge: 'inventory' },
   ] },
   { group: 'Sales', items: [
     { to: '/orders', label: 'Orders', icon: '🧾' },
@@ -64,14 +65,17 @@ function navFor(user) {
 // Poll the admin work-queue counts so sidebar badges stay roughly live without
 // a manual refresh. Returns {} for non-admins (and on error, so the nav still
 // renders — badges just won't show).
-function useBadgeCounts(isAdmin) {
+function useBadgeCounts(role) {
   const [counts, setCounts] = useState({});
   useEffect(() => {
-    if (!isAdmin) return;
+    const fetcher = role === 'Admin' ? getBadgeCounts
+                  : role === 'Supplier' ? getSupplierBadgeCounts
+                  : null;
+    if (!fetcher) return;
     let active = true;
     const load = async () => {
       try {
-        const res = await getBadgeCounts();
+        const res = await fetcher();
         if (active) setCounts(res?.counts ?? {});
       } catch {
         /* keep the last counts; the nav still works without badges */
@@ -79,17 +83,17 @@ function useBadgeCounts(isAdmin) {
     };
     load();
     const id = setInterval(load, 45000);
-    // let action pages (approve/reject/etc.) refresh the counts immediately
+    // let action pages (approve/reject/save stock/etc.) refresh counts immediately
     window.addEventListener('shoear:badges-refresh', load);
     return () => { active = false; clearInterval(id); window.removeEventListener('shoear:badges-refresh', load); };
-  }, [isAdmin]);
+  }, [role]);
   return counts;
 }
 
 function Sidebar({ user, collapsed }) {
   const groups = navFor(user);
   const isAdmin = user.role === 'Admin';
-  const counts = useBadgeCounts(isAdmin);
+  const counts = useBadgeCounts(user.role);
 
   return (
     <aside className={'app-sidebar d-flex flex-column' + (collapsed ? ' collapsed' : '')}>
