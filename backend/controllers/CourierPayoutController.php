@@ -86,8 +86,14 @@ function handleCourierStripeOnboard(PDO $pdo, array $config, array $auth): void 
 
   try {
     if (!$accountId) {
+      // Standard (full-dashboard) accounts require card_payments alongside
+      // transfers — Stripe rejects transfers-only. The courier only ever
+      // receives transfers; card_payments is just to satisfy that rule.
       $account = stripeApi($secret, 'POST', '/v1/accounts',
-        stripeConnectAccountParams(['transfers' => ['requested' => 'true']]));
+        stripeConnectAccountParams([
+          'transfers'     => ['requested' => 'true'],
+          'card_payments' => ['requested' => 'true'],
+        ]));
       $accountId = $account['id'];
       $pdo->prepare('UPDATE delivery_personnel SET stripeAccountId = :sid WHERE deliveryPersonnelId = :id')
           ->execute(['sid' => $accountId, 'id' => $row['deliveryPersonnelId']]);
