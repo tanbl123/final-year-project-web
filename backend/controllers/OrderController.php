@@ -182,8 +182,13 @@ function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId, array $c
   $dl->execute(['oid' => $orderId, 'sid' => $supplierId]);
   $order['myDelivery'] = $dl->fetch() ?: null;
 
-  // lets the seller centre offer "Book & ship automatically" for Standard parcels
-  $order['easyParcelEnabled'] = function_exists('easyParcelEnabled') && easyParcelEnabled($config);
+  // lets the seller centre offer "Book & ship automatically" for Standard parcels.
+  // Only when the platform account is actually CONNECTED (credentials configured
+  // AND the admin has completed the one-time OAuth consent) — otherwise the
+  // booking call would just fail and fall back to manual entry.
+  $order['easyParcelEnabled'] = function_exists('easyParcelEnabled')
+    && easyParcelEnabled($config)
+    && function_exists('easyParcelConnected') && easyParcelConnected($pdo);
 
   sendJson(200, true, $order);
 }

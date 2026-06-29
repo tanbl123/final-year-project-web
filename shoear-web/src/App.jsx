@@ -34,6 +34,7 @@ import AdminCommissionPage from './features/admin/commission/AdminCommissionPage
 import AdminCourierPayoutsPage from './features/admin/payouts/AdminCourierPayoutsPage';
 import AdminDeliveriesPage from './features/admin/deliveries/AdminDeliveriesPage';
 import AdminDeliveryIssuesPage from './features/admin/deliveries/AdminDeliveryIssuesPage';
+import AdminIntegrationsPage from './features/admin/integrations/AdminIntegrationsPage';
 import ProfilePage from './features/profile/ProfilePage';
 import PayoutsPage from './features/supplier/payouts/PayoutsPage';
 import Avatar from './components/Avatar';
@@ -195,6 +196,9 @@ const router = createBrowserRouter(
       } />
       <Route path="/admin/courier-payouts" element={
         <ProtectedRoute role="Admin"><AdminCourierPayoutsPage /></ProtectedRoute>
+      } />
+      <Route path="/admin/integrations" element={
+        <ProtectedRoute role="Admin"><AdminIntegrationsPage /></ProtectedRoute>
       } />
 
       {/* any signed-in user's own profile */}

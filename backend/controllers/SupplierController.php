@@ -410,7 +410,7 @@ function handleShipStandardDelivery(PDO $pdo, array $config, array $auth, string
       sendJson(409, false, null, ['code' => 'NOT_CONFIGURED', 'message' => 'Auto-booking is not set up. Enter the carrier and tracking number manually.']);
     }
     [$sender, $receiver, $parcel] = shipmentPartiesFor($pdo, $config, $deliveryId);
-    $booked = easyParcelBook($config, $sender, $receiver, $parcel);
+    $booked = easyParcelBook($pdo, $config, $sender, $receiver, $parcel);
     if (!$booked) {
       sendJson(502, false, null, ['code' => 'BOOKING_FAILED', 'message' => 'Could not auto-book the shipment. Please enter the carrier and tracking number manually.']);
     }

@@ -614,5 +614,29 @@ CREATE TABLE delivery_issue (
 ) ENGINE=InnoDB;
 
 -- =====================================================================
+--  10. INTEGRATIONS
+-- =====================================================================
+
+-- EasyParcel OAuth token store (Open API). ONE row (id = 1): the platform books
+-- all Standard (3PL) shipments through a single EasyParcel merchant account. The
+-- admin connects once (OAuth2 consent → code → tokens); the backend keeps the
+-- long-lived refresh token and swaps it for short-lived access tokens on demand.
+-- See migrations/2026_06_29_easyparcel_oauth.sql and backend/lib/easyparcel.php.
+CREATE TABLE easyparcel_oauth (
+    id               TINYINT UNSIGNED NOT NULL,
+    accessToken      TEXT         NULL,
+    accessExpiresAt  DATETIME     NULL,
+    refreshToken     TEXT         NULL,
+    refreshExpiresAt DATETIME     NULL,
+    accountId        VARCHAR(64)  NULL,
+    pendingState     VARCHAR(64)  NULL,                 -- one-time CSRF token during consent
+    pendingStateAt   DATETIME     NULL,
+    connectedAt      DATETIME     NULL,
+    updatedAt        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+INSERT INTO easyparcel_oauth (id) VALUES (1);
+
+-- =====================================================================
 --  END OF SCHEMA
 -- =====================================================================

@@ -38,6 +38,7 @@ require __DIR__ . '/../../controllers/NotificationController.php';
 require __DIR__ . '/../../controllers/VehicleController.php';
 require __DIR__ . '/../../controllers/DashboardController.php';
 require __DIR__ . '/../../controllers/CourierPayoutController.php';
+require __DIR__ . '/../../controllers/EasyParcelController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -408,6 +409,14 @@ if ($method === 'GET' && $path === '/places/autocomplete') {
 }
 if ($method === 'GET' && $path === '/places/details') {
   handlePlaceDetails($config);
+}
+
+// ── EasyParcel OAuth callback (PUBLIC: a browser redirect back from the consent
+// screen, so it carries no JWT — the one-time `state` is the CSRF guard). It
+// exchanges the code for tokens and 302s back to the admin web app. ──
+if ($method === 'GET' && $path === '/easyparcel/callback') {
+  $pdo = getPDO();
+  handleEasyParcelCallback($pdo, $config);
 }
 
 // ── own profile (any signed-in user) ──
@@ -822,6 +831,26 @@ if ($method === 'POST' && preg_match('#^/supplier/deliveries/([^/]+)/delivered$#
   $auth = requireAuth($secret);
   $pdo  = getPDO();
   handleDeliverStandardDelivery($pdo, $auth, $m[1]);
+}
+
+// ── EasyParcel integration (admin connects the platform's account once) ──
+if ($method === 'GET' && $path === '/easyparcel/status') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleEasyParcelStatus($pdo, $config);
+}
+if ($method === 'GET' && $path === '/easyparcel/connect') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleEasyParcelConnect($pdo, $config);
+}
+if ($method === 'POST' && $path === '/easyparcel/disconnect') {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleEasyParcelDisconnect($pdo);
 }
 
 // ── admin order oversight ──

@@ -33,13 +33,18 @@ $config = [
   // in config.local.php (it's gitignored). Same key the customer app uses.
   'google_places_api_key' => getenv('GOOGLE_PLACES_API_KEY') ?: '',
 
-  // EasyParcel (Malaysia) — auto-books a Standard (long-distance) parcel and
-  // returns a carrier + tracking number, like Shopee generating an airway bill.
-  // Leave empty to keep manual carrier + tracking entry (no booking, no cost).
-  // Uses the FREE demo sandbox by default; set easyparcel_live=true for real
-  // (paid) bookings. Put the key in config.local.php. Default parcel weight (kg)
-  // is used for the rate quote since we don't capture per-product weight.
-  'easyparcel_api_key'       => getenv('EASYPARCEL_API_KEY') ?: '',
+  // EasyParcel (Malaysia) Open API — auto-books a Standard (long-distance)
+  // parcel and returns a carrier + tracking number, like Shopee generating an
+  // airway bill. This is the OAuth2 "Open API": register an app in EasyParcel's
+  // Developer Hub to get a Client ID + Client Secret, put them in
+  // config.local.php, then the admin clicks "Connect EasyParcel" once. Leave the
+  // credentials empty to keep manual carrier + tracking entry (no booking, no
+  // cost). redirect_uri (optional) must match what you registered in the app —
+  // defaults to <this host>/shoear/api/v1/easyparcel/callback. Default parcel
+  // weight (kg) is used for the rate quote since we don't capture product weight.
+  'easyparcel_client_id'     => getenv('EASYPARCEL_CLIENT_ID') ?: '',
+  'easyparcel_client_secret' => getenv('EASYPARCEL_CLIENT_SECRET') ?: '',
+  'easyparcel_redirect_uri'  => getenv('EASYPARCEL_REDIRECT_URI') ?: '',
   'easyparcel_live'          => getenv('EASYPARCEL_LIVE') === '1',
   'easyparcel_default_weight'=> (float) (getenv('EASYPARCEL_WEIGHT') ?: 1.0),
 

@@ -32,6 +32,9 @@ const ADMIN_NAV = [
     { to: '/admin/commission', label: 'Commission', icon: '💰' },
     { to: '/admin/courier-payouts', label: 'Courier Pay', icon: '💸', badge: 'courierPayouts' },
   ] },
+  { group: 'System', items: [
+    { to: '/admin/integrations', label: 'Integrations', icon: '🔌' },
+  ] },
 ];
 
 const SUPPLIER_NAV = [

@@ -36,15 +36,23 @@ return [
   // Leave unset to keep manual entry + the offline postcode lookup (no cost).
   // 'google_places_api_key' => 'AIza...REPLACE_ME',
 
-  // OPTIONAL — EasyParcel (Malaysia) for AUTO-BOOKING long-distance (Standard)
-  // parcels: generates the carrier + tracking number for the supplier, like
-  // Shopee. Sign up free at easyparcel.com → Developer Hub → register an app →
-  // API key. Uses the FREE demo sandbox by default (no real charges); set
-  // 'easyparcel_live' => true only for real paid bookings. Leave unset to keep
-  // manual carrier + tracking entry (no booking, no cost).
-  // 'easyparcel_api_key' => 'EP-XXXXXXXX',
-  // 'easyparcel_live'    => false,
-  // 'easyparcel_default_weight' => 1.0,   // kg, used for the rate quote
+  // OPTIONAL — EasyParcel (Malaysia) Open API for AUTO-BOOKING long-distance
+  // (Standard) parcels: generates the carrier + tracking number for the supplier,
+  // like Shopee. This is the OAuth2 "Open API":
+  //   1) Sign up at easyparcel.com → open the Developer Hub → register an app.
+  //   2) Set the app's redirect/callback URL to your backend callback, e.g.
+  //      http://localhost/shoear/api/v1/easyparcel/callback  (it MUST match
+  //      'easyparcel_redirect_uri' below, or be left to the default).
+  //   3) Copy the app's Client ID + Client Secret into the two keys below.
+  //   4) In the admin web app → Integrations → click "Connect EasyParcel" once.
+  // Leave the credentials unset to keep manual carrier + tracking entry (no
+  // booking, no cost). Use a SANDBOX app first (free test credit, no real
+  // charges); set 'easyparcel_live' => true only when you switch to a live app.
+  // 'easyparcel_client_id'     => 'your-developer-hub-client-id',
+  // 'easyparcel_client_secret' => 'your-developer-hub-client-secret',
+  // 'easyparcel_redirect_uri'  => 'http://localhost/shoear/api/v1/easyparcel/callback',
+  // 'easyparcel_live'          => false,
+  // 'easyparcel_default_weight'=> 1.0,   // kg, used for the rate quote
 
   // Google Sign-In for the customer mobile app.
   // Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 client ID
