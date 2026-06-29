@@ -145,11 +145,22 @@ function handleRegister(PDO $pdo): void {
   $phoneNumber    = trim($body['phoneNumber'] ?? '');
   $companyName    = trim($body['companyName'] ?? '');
   $companyAddress = trim($body['companyAddress'] ?? '');
-  // operational (pickup) address — where couriers collect orders. Optional in
-  // the payload: when blank it defaults to the registered companyAddress (the
-  // SME case where they ship from their registered address).
-  $operationalAddress = trim($body['operationalAddress'] ?? '');
-  if ($operationalAddress === '') $operationalAddress = $companyAddress;
+  // operational (pickup) address — where couriers collect orders, and the basis
+  // for delivery routing (in-house vs standard shipping). The new client sends a
+  // STRUCTURED address (operationalLine1/…/operationalState); older clients send
+  // only the combined single line, which still works (defaults to companyAddress).
+  $opAddr = readStructuredAddress($body, 'operational');
+  $opStructured = hasStructuredAddress($opAddr);
+  if ($opStructured) {
+    $opErr = structuredAddressError($opAddr);
+    if ($opErr) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $opErr]);
+    }
+    $operationalAddress = composeAddress($opAddr);
+  } else {
+    $operationalAddress = trim($body['operationalAddress'] ?? '');
+    if ($operationalAddress === '') $operationalAddress = $companyAddress;
+  }
   $password       = $body['password'] ?? '';
 
   // business identity (supplier KYB). Bank/payout details are NOT collected
@@ -261,11 +272,17 @@ function handleRegister(PDO $pdo): void {
     $pdo->prepare(
       'INSERT INTO supplier
          (supplierId, userId, companyName, companyAddress, operationalAddress,
+          operationalLine1, operationalLine2, operationalPostcode, operationalCity, operationalState,
           businessRegNo, businessLicenseUrl, taxNumber)
-       VALUES (:sid, :uid, :cn, :ca, :oa, :brn, :blu, :tax)'
+       VALUES (:sid, :uid, :cn, :ca, :oa, :ol1, :ol2, :opc, :oc, :ost, :brn, :blu, :tax)'
     )->execute([
       'sid' => $supplierId, 'uid' => $userId, 'cn' => $companyName, 'ca' => $companyAddress,
       'oa' => $operationalAddress,
+      'ol1' => $opStructured ? $opAddr['line1'] : null,
+      'ol2' => $opStructured ? ($opAddr['line2'] !== '' ? $opAddr['line2'] : null) : null,
+      'opc' => $opStructured ? $opAddr['postcode'] : null,
+      'oc'  => $opStructured ? $opAddr['city'] : null,
+      'ost' => $opStructured ? $opAddr['state'] : null,
       'brn' => $businessRegNo, 'blu' => $businessLicenseUrl,
       'tax' => ($taxNumber === '' ? null : $taxNumber),
     ]);

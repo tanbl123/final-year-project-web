@@ -95,7 +95,12 @@ CREATE TABLE supplier (
     userId          VARCHAR(10)  NOT NULL,
     companyName     VARCHAR(150) NOT NULL,
     companyAddress  VARCHAR(255) NOT NULL,                -- registered business address (matches SSM)
-    operationalAddress VARCHAR(255) NOT NULL,             -- where couriers collect orders (pickup); defaults to companyAddress
+    operationalAddress VARCHAR(255) NOT NULL,             -- where couriers collect orders (pickup); combined single line, defaults to companyAddress
+    operationalLine1    VARCHAR(150) NULL,                -- structured pickup address (source of truth for routing + 3PL rates)
+    operationalLine2    VARCHAR(150) NULL,
+    operationalPostcode VARCHAR(10)  NULL,
+    operationalCity     VARCHAR(100) NULL,
+    operationalState    VARCHAR(50)  NULL,                -- Malaysian state — decides in-house vs standard shipping
     businessRegNo   VARCHAR(50)  NOT NULL,                -- SSM / company registration no.
     businessLicenseUrl VARCHAR(255) NOT NULL,             -- uploaded registration certificate
     taxNumber       VARCHAR(50)  NULL,                    -- SST / tax no. (optional)

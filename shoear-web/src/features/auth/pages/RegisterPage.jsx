@@ -4,6 +4,8 @@ import { register, sendRegisterCode, uploadRegistrationDoc } from '../authServic
 import EyeIcon from '../../../components/EyeIcon';
 import ClearableInput from '../../../components/ClearableInput';
 import BackButton from '../../../components/BackButton';
+import AddressFields from '../../../components/AddressFields';
+import { emptyAddress, validateAddress } from '../../../components/addressUtils';
 
 // Password policy: 8+ chars with at least one lowercase, uppercase, digit
 // and special character. Returns an error string, or '' when it's valid.
@@ -87,12 +89,13 @@ function applyFieldError(errors, name, form) {
 function RegisterPage() {
   const [form, setForm] = useState({
     companyName: '', email: '', phoneNumber: '',
-    companyAddress: '', operationalAddress: '', password: '', confirm: '',
+    companyAddress: '', password: '', confirm: '',
     businessRegNo: '', taxNumber: '', businessLicenseUrl: '',
   });
-  // the operational (pickup) address mirrors the business address until the
-  // supplier edits it — same "follow until touched" pattern.
-  const [operationalEdited, setOperationalEdited] = useState(false);
+  // structured operational (pickup) address — drives delivery routing, so it's
+  // collected as proper Malaysian address parts (its own required block).
+  const [operational, setOperational] = useState(emptyAddress());
+  const [opErrors, setOpErrors] = useState({});    // operational-address field errors
   const [errors, setErrors] = useState({});       // per-field messages
   const [formError, setFormError] = useState(''); // general/server fallback
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -150,10 +153,6 @@ function RegisterPage() {
   function handleChange(event) {
     const { name, value } = event.target;
     const nextForm = { ...form, [name]: value };
-    // while untouched, the operational address mirrors the business address
-    if (name === 'companyAddress' && !operationalEdited) {
-      nextForm.operationalAddress = value;
-    }
     setForm(nextForm);
 
     setErrors((prev) => {
@@ -178,22 +177,15 @@ function RegisterPage() {
     });
   }
 
-  // typing in the operational-address box detaches it from the business address
-  function handleOperationalChange(event) {
-    setOperationalEdited(true);
-    setForm((f) => ({ ...f, operationalAddress: event.target.value }));
-  }
-  // the ✕ empties the field (and detaches it, so it stops mirroring); left
-  // blank, it falls back to the business address on submit
-  function clearOperational() {
-    setOperationalEdited(true);
-    setForm((f) => ({ ...f, operationalAddress: '' }));
+  // update the structured operational address and clear any of its errors live
+  function handleOperationalChange(next) {
+    setOperational(next);
+    setOpErrors((prev) => (Object.keys(prev).length ? validateAddress(next) : prev));
   }
 
   // clear a field via its ✕ button (mirrors handleChange's live re-validation)
   function clearField(name) {
     const nextForm = { ...form, [name]: '' };
-    if (name === 'companyAddress' && !operationalEdited) nextForm.operationalAddress = '';
     setForm(nextForm);
     setErrors((prev) => {
       const next = { ...prev };
@@ -209,7 +201,11 @@ function RegisterPage() {
       phoneNumber: form.phoneNumber.trim(),
       companyName: form.companyName.trim(),
       companyAddress: form.companyAddress.trim(),
-      operationalAddress: form.operationalAddress.trim(),
+      operationalLine1: operational.line1.trim(),
+      operationalLine2: operational.line2.trim(),
+      operationalPostcode: operational.postcode.trim(),
+      operationalCity: operational.city.trim(),
+      operationalState: operational.state,
       businessRegNo: form.businessRegNo.trim(),
       businessLicenseUrl: form.businessLicenseUrl,
       taxNumber: form.taxNumber.trim(),
@@ -224,11 +220,14 @@ function RegisterPage() {
     setFormError('');
 
     const found = validateForm(form);
-    if (Object.keys(found).length > 0) {
+    const opFound = validateAddress(operational);
+    if (Object.keys(found).length > 0 || Object.keys(opFound).length > 0) {
       setErrors(found);
+      setOpErrors(opFound);
       return;
     }
     setErrors({});
+    setOpErrors({});
 
     setIsSubmitting(true);
     try {
@@ -370,28 +369,6 @@ function RegisterPage() {
     );
   }
 
-  // operational (pickup) address — mirrors the business address until edited
-  function operationalAddressField() {
-    return (
-      <div className="mb-3">
-        <label className="form-label">Operational (pickup) address</label>
-        <ClearableInput
-          type="text"
-          name="operationalAddress"
-          maxLength="255"
-          value={form.operationalAddress}
-          onChange={handleOperationalChange}
-          onClear={clearOperational}
-        />
-        <div className="form-text">
-          {operationalEdited
-            ? 'Where couriers collect your orders. Leave blank to use your business address.'
-            : 'Change it if you ship from elsewhere.'}
-        </div>
-      </div>
-    );
-  }
-
   // business document upload (replaces the file input with a badge once done)
   function licenseField() {
     return (
@@ -457,7 +434,16 @@ function RegisterPage() {
         <h6 className="text-muted text-uppercase small fw-bold">Company</h6>
         {field('companyName', 'Company name')}
         {field('companyAddress', 'Business address')}
-        {operationalAddressField()}
+
+        <div className="mb-1 mt-2">
+          <label className="form-label mb-1">Operational (pickup) address</label>
+          <div className="form-text mt-0 mb-2">
+            Where couriers collect your orders. The state decides whether an order ships
+            with our in-house courier (same state) or via standard shipping.
+          </div>
+          <AddressFields value={operational} onChange={handleOperationalChange}
+            errors={opErrors} idPrefix="op" />
+        </div>
 
         <hr className="my-3" />
         <h6 className="text-muted text-uppercase small fw-bold">Business verification</h6>

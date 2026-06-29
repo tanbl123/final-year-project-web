@@ -158,7 +158,9 @@ function handleGetBusinessDetails(PDO $pdo, array $auth): void {
   $supplierId = requireSupplierId($pdo, $auth);
 
   $cur = $pdo->prepare(
-    'SELECT companyName, companyAddress, operationalAddress, businessRegNo, taxNumber, businessLicenseUrl
+    'SELECT companyName, companyAddress, operationalAddress,
+            operationalLine1, operationalLine2, operationalPostcode, operationalCity, operationalState,
+            businessRegNo, taxNumber, businessLicenseUrl
        FROM supplier WHERE supplierId = :sid'
   );
   $cur->execute(['sid' => $supplierId]);
@@ -184,7 +186,36 @@ function handleGetBusinessDetails(PDO $pdo, array $auth): void {
 // supplier can change it freely with no admin review.
 function handleUpdateOperationalAddress(PDO $pdo, array $auth): void {
   $supplierId = requireSupplierId($pdo, $auth);
-  $body    = getJsonBody();
+  $body = getJsonBody();
+
+  // New client sends a STRUCTURED address; store the parts (routing source of
+  // truth) plus the composed single line. Older clients send only the combined
+  // string, which still works but leaves the structured columns untouched.
+  $opAddr = readStructuredAddress($body, 'operational');
+  if (hasStructuredAddress($opAddr)) {
+    $err = structuredAddressError($opAddr);
+    if ($err) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $err]);
+    }
+    $combined = composeAddress($opAddr);
+    $pdo->prepare(
+      'UPDATE supplier
+          SET operationalAddress = :oa, operationalLine1 = :ol1, operationalLine2 = :ol2,
+              operationalPostcode = :opc, operationalCity = :oc, operationalState = :ost
+        WHERE supplierId = :sid'
+    )->execute([
+      'oa'  => $combined,
+      'ol1' => $opAddr['line1'],
+      'ol2' => $opAddr['line2'] !== '' ? $opAddr['line2'] : null,
+      'opc' => $opAddr['postcode'],
+      'oc'  => $opAddr['city'],
+      'ost' => $opAddr['state'],
+      'sid' => $supplierId,
+    ]);
+    sendJson(200, true, array_merge(['operationalAddress' => $combined], $opAddr));
+  }
+
+  // ── legacy combined-only path ──
   $address = trim($body['operationalAddress'] ?? '');
   if ($address === '') {
     sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Operational address is required.']);

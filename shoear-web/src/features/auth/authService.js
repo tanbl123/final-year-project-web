@@ -83,9 +83,17 @@ export function getBusinessDetails() {
 }
 
 // Operational (pickup) address — where couriers collect orders. Logistics, not
-// verified identity, so it's editable freely (no admin review).
-export function updateOperationalAddress(operationalAddress) {
-  return apiPut('/supplier/operational-address', { operationalAddress }, getToken());
+// verified identity, so it's editable freely (no admin review). Takes the
+// structured address ({ line1, line2, postcode, city, state }) and sends it with
+// the `operational` field prefix the backend expects.
+export function updateOperationalAddress(addr) {
+  return apiPut('/supplier/operational-address', {
+    operationalLine1: addr.line1.trim(),
+    operationalLine2: addr.line2.trim(),
+    operationalPostcode: addr.postcode.trim(),
+    operationalCity: addr.city.trim(),
+    operationalState: addr.state,
+  }, getToken());
 }
 
 // Propose changes to the verified fields (company name, SSM, SST, document).

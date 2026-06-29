@@ -5,6 +5,8 @@ import {
 } from '../auth/authService';
 import ClearableInput from '../../components/ClearableInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import AddressFields from '../../components/AddressFields';
+import { emptyAddress, validateAddress } from '../../components/addressUtils';
 
 const SSM_RE = /^(\d{12}|\d{6,8}-?[A-Za-z])$/;
 const SST_RE = /^[A-Za-z0-9][A-Za-z0-9-]{6,18}[A-Za-z0-9]$/;
@@ -19,10 +21,10 @@ function BusinessDetailsCard({ onToast }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // free address edit (operational / pickup address)
+  // free address edit (operational / pickup address) — structured
   const [opEditing, setOpEditing] = useState(false);
-  const [opAddr, setOpAddr] = useState('');
-  const [opError, setOpError] = useState('');
+  const [opAddr, setOpAddr] = useState(emptyAddress());
+  const [opErrors, setOpErrors] = useState({});
   const [opSaving, setOpSaving] = useState(false);
 
   // change request form (verified fields)
@@ -57,19 +59,39 @@ function BusinessDetailsCard({ onToast }) {
   const pending = last && last.requestStatus === 'Pending';
 
   // ── operational (pickup) address (free edit) ──────────────────────
-  function startOp() { setOpAddr(cur.operationalAddress || cur.companyAddress || ''); setOpError(''); setOpEditing(true); }
+  // prefill from the structured columns (empty for legacy suppliers who only
+  // have the old combined line — they re-enter it once)
+  function opBaseline() {
+    return {
+      line1: cur.operationalLine1 || '',
+      line2: cur.operationalLine2 || '',
+      postcode: cur.operationalPostcode || '',
+      city: cur.operationalCity || '',
+      state: cur.operationalState || '',
+    };
+  }
+  function startOp() { setOpAddr(opBaseline()); setOpErrors({}); setOpEditing(true); }
   async function saveOp(e) {
     e.preventDefault();
-    if (!opAddr.trim()) { setOpError('Operational address is required.'); return; }
-    if (opAddr.trim() === (cur.operationalAddress || '')) { setOpEditing(false); return; }
+    const found = validateAddress(opAddr);
+    if (Object.keys(found).length) { setOpErrors(found); return; }
     setOpSaving(true);
     try {
-      const saved = await updateOperationalAddress(opAddr.trim());
-      setData((d) => ({ ...d, current: { ...d.current, ...saved } }));
+      const saved = await updateOperationalAddress(opAddr);
+      setData((d) => ({
+        ...d,
+        current: {
+          ...d.current,
+          operationalAddress: saved.operationalAddress,
+          operationalLine1: opAddr.line1.trim(), operationalLine2: opAddr.line2.trim(),
+          operationalPostcode: opAddr.postcode.trim(), operationalCity: opAddr.city.trim(),
+          operationalState: opAddr.state,
+        },
+      }));
       setOpEditing(false);
       onToast?.('Operational address updated.');
     } catch (err) {
-      setOpError(err.message);
+      setOpErrors({ form: err.message });
     } finally {
       setOpSaving(false);
     }
@@ -77,8 +99,7 @@ function BusinessDetailsCard({ onToast }) {
 
   // cancel the operational edit — confirm first if there are unsaved changes
   function cancelOp() {
-    const baseline = cur.operationalAddress || cur.companyAddress || '';
-    if (opAddr.trim() !== baseline) setDiscard('op');
+    if (JSON.stringify(opAddr) !== JSON.stringify(opBaseline())) setDiscard('op');
     else setOpEditing(false);
   }
 
@@ -247,12 +268,10 @@ function BusinessDetailsCard({ onToast }) {
           <dd className="col-sm-8">
             {opEditing ? (
               <form onSubmit={saveOp} className="d-flex flex-column gap-2">
-                <ClearableInput type="text" maxLength="255"
-                  className={opError ? 'is-invalid' : ''}
-                  value={opAddr}
-                  onChange={(e) => { setOpAddr(e.target.value); if (opError) setOpError(''); }}
-                  onClear={() => setOpAddr('')} />
-                {opError && <div className="invalid-feedback d-block">{opError}</div>}
+                <AddressFields value={opAddr}
+                  onChange={(next) => { setOpAddr(next); if (Object.keys(opErrors).length) setOpErrors(validateAddress(next)); }}
+                  errors={opErrors} idPrefix="op-edit" disabled={opSaving} />
+                {opErrors.form && <div className="invalid-feedback d-block">{opErrors.form}</div>}
                 <div className="d-flex gap-2">
                   <button type="submit" className="btn btn-primary btn-sm" disabled={opSaving}>
                     {opSaving ? 'Saving…' : 'Save'}
