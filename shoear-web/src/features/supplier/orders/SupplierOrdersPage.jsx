@@ -115,11 +115,23 @@ function SupplierOrdersPage() {
                         </span>
                       </div>
                     )}
-                    {o.myDeliveryMethod === 'Standard' && (
+                    {o.myDeliveryMethod === 'Standard' && o.myDeliveryStatus === 'Pending' && (
                       <div className="mt-1">
-                        <span className={'badge ' + (o.myDeliveryStatus === 'Pending' ? 'text-bg-warning' : 'text-bg-light border')}>
-                          📦 {o.myDeliveryStatus === 'Pending' ? 'Standard shipping — needs booking' : 'Standard shipping'}
+                        <span className="badge text-bg-warning" title="This parcel ships via standard (3PL) shipping — book a courier or enter a tracking number to ship it.">
+                          🚚 Action needed: ship this parcel
                         </span>
+                      </div>
+                    )}
+                    {o.myDeliveryMethod === 'Standard' && o.myDeliveryStatus === 'OutForDelivery' && (
+                      <div className="mt-1">
+                        <span className="badge text-bg-light border" title="Shipped via standard (3PL) shipping. Mark delivered once it arrives, or the customer can confirm receipt.">
+                          📦 Standard shipping — in transit
+                        </span>
+                      </div>
+                    )}
+                    {o.myDeliveryMethod === 'Standard' && !['Pending', 'OutForDelivery'].includes(o.myDeliveryStatus) && (
+                      <div className="mt-1">
+                        <span className="badge text-bg-light border">📦 Standard shipping</span>
                       </div>
                     )}
                     {o.refundStatus && (
