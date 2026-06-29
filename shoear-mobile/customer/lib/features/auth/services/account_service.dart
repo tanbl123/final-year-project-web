@@ -42,18 +42,25 @@ class AccountService {
   /// GET /auth/me — full profile (incl. role-specific profile block).
   Future<Map<String, dynamic>> me() async => await api.get('/auth/me') as Map<String, dynamic>;
 
-  /// PUT /auth/me — update editable profile fields (+ shipping address).
+  /// PUT /auth/me — update editable profile fields (+ structured shipping
+  /// address; the backend composes the combined single-line form).
   Future<void> updateProfile({
     required String fullName,
     required String phoneNumber,
     required String username,
-    String? shippingAddress,
+    String? addressLine1,
+    String? postcode,
+    String? city,
+    String? state,
   }) async {
     await api.put('/auth/me', {
       'fullName': fullName,
       'phoneNumber': phoneNumber,
       'username': username,
-      if (shippingAddress != null) 'shippingAddress': shippingAddress,
+      if (addressLine1 != null) 'addressLine1': addressLine1,
+      if (postcode != null) 'postcode': postcode,
+      if (city != null) 'city': city,
+      if (state != null) 'state': state,
     });
   }
 

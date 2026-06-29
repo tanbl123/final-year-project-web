@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'package:customer/core/widgets/profile_avatar.dart';
+import 'package:customer/core/widgets/address_fields.dart';
 import 'package:customer/core/utils/snackbar.dart';
 import 'package:customer/features/auth/services/account_service.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
@@ -15,7 +16,11 @@ class EditProfileScreen extends StatefulWidget {
   final String fullName;
   final String username;
   final String phone;
-  final String address;
+  // structured shipping address parts (the source of truth)
+  final String addressLine1;
+  final String postcode;
+  final String city;
+  final String? state;
   final String? avatarUrl;
 
   const EditProfileScreen({
@@ -23,7 +28,10 @@ class EditProfileScreen extends StatefulWidget {
     required this.fullName,
     required this.username,
     required this.phone,
-    required this.address,
+    required this.addressLine1,
+    required this.postcode,
+    required this.city,
+    required this.state,
     required this.avatarUrl,
   });
 
@@ -35,7 +43,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _name = TextEditingController(text: widget.fullName);
   late final TextEditingController _username = TextEditingController(text: widget.username);
   late final TextEditingController _phone = TextEditingController(text: widget.phone);
-  late final TextEditingController _address = TextEditingController(text: widget.address);
+  // structured shipping address (managed by the AddressFields widget)
+  late final AddressValue _initialAddr = AddressValue(
+    line1: widget.addressLine1,
+    postcode: widget.postcode,
+    city: widget.city,
+    state: (widget.state?.isNotEmpty ?? false) ? widget.state : null,
+  );
+  late AddressValue _addr = _initialAddr;
+  AddressFieldErrors _addrErrors = const AddressFieldErrors();
 
   // focus nodes so we can validate a field when it loses focus (like register)
   final _nameFocus = FocusNode();
@@ -55,7 +71,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     // rebuild as the user types so the Save button's enabled state (and the
     // unsaved-changes guard) stays in sync with the fields
-    for (final c in [_name, _username, _phone, _address]) {
+    for (final c in [_name, _username, _phone]) {
       c.addListener(_onFieldChanged);
     }
     // validate on blur
@@ -89,7 +105,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    for (final c in [_name, _username, _phone, _address]) {
+    for (final c in [_name, _username, _phone]) {
       c.dispose();
     }
     for (final f in [_nameFocus, _usernameFocus, _phoneFocus]) {
@@ -151,13 +167,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    final addrErrors = validateAddressValue(_addr);
     setState(() {
       _saving = true;
       _nameError = _validateName(_name.text);
       _usernameError = _validateUsername(_username.text);
       _phoneError = _validatePhone(_phone.text);
+      _addrErrors = addrErrors;
     });
-    if (_nameError != null || _usernameError != null || _phoneError != null) {
+    if (_nameError != null || _usernameError != null || _phoneError != null || addrErrors.any) {
       setState(() => _saving = false);
       return;
     }
@@ -166,7 +184,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             fullName: _name.text.trim(),
             phoneNumber: _phone.text.trim(),
             username: _username.text.trim(),
-            shippingAddress: _address.text.trim(),
+            addressLine1: _addr.line1.trim(),
+            postcode: _addr.postcode.trim(),
+            city: _addr.city.trim(),
+            state: _addr.state,
           );
       await context.read<AuthProvider>().applyProfile(fullName: _name.text.trim());
       if (mounted) Navigator.of(context).pop(true);
@@ -194,7 +215,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _name.text.trim() != widget.fullName.trim() ||
       _username.text.trim() != widget.username.trim() ||
       _phone.text.trim() != widget.phone.trim() ||
-      _address.text.trim() != widget.address.trim();
+      _addr.line1.trim() != _initialAddr.line1.trim() ||
+      _addr.postcode.trim() != _initialAddr.postcode.trim() ||
+      _addr.city.trim() != _initialAddr.city.trim() ||
+      (_addr.state ?? '') != (_initialAddr.state ?? '');
 
   // "Discard changes?" prompt — same wording as the web portal.
   Future<bool> _confirmDiscard() async {
@@ -246,8 +270,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 keyboard: TextInputType.phone,
                 error: _phoneError,
                 onChanged: (v) => setState(() => _phoneError = _validatePhone(v))),
-            _field(_address, 'Shipping address', maxLines: 2),
-            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8, left: 4),
+              child: Text('Shipping address',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black54)),
+            ),
+            AddressFields(
+              initial: _initialAddr,
+              errors: _addrErrors,
+              onChanged: (v) => setState(() {
+                _addr = v;
+                if (_addrErrors.any) _addrErrors = validateAddressValue(v);
+              }),
+            ),
+            const SizedBox(height: 16),
             FilledButton(
               // disabled until something actually changes (mirrors the web)
               onPressed: (_saving || !_dirty) ? null : _save,

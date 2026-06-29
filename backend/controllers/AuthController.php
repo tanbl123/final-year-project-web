@@ -1010,8 +1010,30 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
   $upd = $pdo->prepare('UPDATE `user` SET fullName = :fn, phoneNumber = :ph, username = :un WHERE userId = :id');
   $upd->execute(['fn' => $fullName, 'ph' => $phone, 'un' => $username, 'id' => $auth['userId']]);
 
-  // customers may also update their saved shipping address (no-op for others)
-  if (array_key_exists('shippingAddress', $body)) {
+  // customers may also update their saved shipping address (no-op for others).
+  // New client sends the STRUCTURED address (addressLine1/postcode/city/state);
+  // store the parts + the composed single line. Older clients sending a plain
+  // shippingAddress string still work (combined-only).
+  $addr = [
+    'line1'    => trim((string) ($body['addressLine1'] ?? '')),
+    'postcode' => trim((string) ($body['postcode'] ?? '')),
+    'city'     => trim((string) ($body['city'] ?? '')),
+    'state'    => trim((string) ($body['state'] ?? '')),
+  ];
+  if ($addr['line1'] !== '' || $addr['postcode'] !== '' || $addr['city'] !== '' || $addr['state'] !== '') {
+    $err = _validateAddressParts($addr);
+    if ($err !== null) {
+      sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => $err]);
+    }
+    $pdo->prepare(
+      'UPDATE customer SET shippingAddress = :sa, addressLine1 = :l1, postcode = :pc,
+                           city = :ct, state = :st
+         WHERE userId = :id'
+    )->execute([
+      'sa' => _formatAddress($addr), 'l1' => $addr['line1'], 'pc' => $addr['postcode'],
+      'ct' => $addr['city'], 'st' => $addr['state'], 'id' => $auth['userId'],
+    ]);
+  } elseif (array_key_exists('shippingAddress', $body)) {
     $pdo->prepare('UPDATE customer SET shippingAddress = :sa WHERE userId = :id')
         ->execute(['sa' => trim((string) $body['shippingAddress']), 'id' => $auth['userId']]);
   }
