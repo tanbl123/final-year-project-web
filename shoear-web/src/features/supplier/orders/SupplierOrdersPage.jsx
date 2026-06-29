@@ -115,6 +115,13 @@ function SupplierOrdersPage() {
                         </span>
                       </div>
                     )}
+                    {o.myDeliveryMethod === 'Standard' && (
+                      <div className="mt-1">
+                        <span className={'badge ' + (o.myDeliveryStatus === 'Pending' ? 'text-bg-warning' : 'text-bg-light border')}>
+                          📦 {o.myDeliveryStatus === 'Pending' ? 'Standard shipping — needs booking' : 'Standard shipping'}
+                        </span>
+                      </div>
+                    )}
                     {o.refundStatus && (
                       <div className="mt-1">
                         <span className="badge text-bg-light border">Refund: {o.refundStatus}</span>

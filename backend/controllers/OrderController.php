@@ -71,7 +71,7 @@ function handleListSupplierOrders(PDO $pdo, array $auth): void {
   $where  = ['p.supplierId = :sid'];
   // separate placeholder for the correlated subquery (emulation is off, so a
   // named param can't be reused across the statement)
-  $params = ['sid' => $supplierId, 'dsid' => $supplierId];
+  $params = ['sid' => $supplierId, 'dsid' => $supplierId, 'dmsid' => $supplierId];
   if ($status !== '' && in_array($status, $allowed, true)) {
     $where[] = 'o.orderStatus = :st';
     $params['st'] = $status;
@@ -84,6 +84,8 @@ function handleListSupplierOrders(PDO $pdo, array $auth): void {
             SUM(oi.orderSubtotal)  AS supplierSubtotal,
             (SELECT d.deliveryStatus FROM delivery d
               WHERE d.orderId = o.orderId AND d.supplierId = :dsid LIMIT 1) AS myDeliveryStatus,
+            (SELECT d.deliveryMethod FROM delivery d
+              WHERE d.orderId = o.orderId AND d.supplierId = :dmsid LIMIT 1) AS myDeliveryMethod,
             (SELECT rf.refundStatus FROM refund rf
               WHERE rf.orderId = o.orderId ORDER BY rf.requestDate DESC LIMIT 1) AS refundStatus
        FROM `order` o
