@@ -39,9 +39,11 @@ function handleListDeliveries(PDO $pdo): void {
        LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = d.deliveryPersonnelId
        LEFT JOIN `user` cu     ON cu.userId = dp.userId";
   if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
-  // Queue first (unassigned, then Pending), then most recent orders.
+  // Assignment queue first (IN-HOUSE parcels still waiting for a courier — the
+  // only rows that need the admin to act), then by status, then most recent.
+  // Standard (3PL) parcels have no courier but aren't a queue, so they don't lead.
   $sql .=
-    " ORDER BY (d.deliveryPersonnelId IS NULL) DESC,
+    " ORDER BY (d.deliveryPersonnelId IS NULL AND d.deliveryMethod = 'InHouse') DESC,
                FIELD(d.deliveryStatus, 'Pending','Assigned','PickedUp','OutForDelivery','Delivered','Failed'),
                o.orderDate DESC";
 

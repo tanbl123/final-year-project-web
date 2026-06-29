@@ -42,7 +42,9 @@ function AdminDeliveriesPage() {
   });
 
   const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
-  const queueCount = deliveries.filter((d) => !d.deliveryPersonnelId).length;
+  // Only IN-HOUSE parcels wait for a courier. Standard (3PL) parcels never get
+  // one, so they must NOT count toward the assignment queue.
+  const queueCount = deliveries.filter((d) => !d.deliveryPersonnelId && d.deliveryMethod === 'InHouse').length;
 
   function load() {
     setLoading(true);
@@ -162,7 +164,7 @@ function AdminDeliveriesPage() {
             </thead>
             <tbody>
               {pageItems.map((d) => (
-                <tr key={d.deliveryId} className={!d.deliveryPersonnelId ? 'table-warning' : undefined}>
+                <tr key={d.deliveryId} className={(!d.deliveryPersonnelId && d.deliveryMethod === 'InHouse') ? 'table-warning' : undefined}>
                   <td>
                     <div className="fw-semibold">{d.orderId}</div>
                     <div className="text-muted small">{new Date(d.orderDate).toLocaleDateString()}</div>
@@ -185,7 +187,13 @@ function AdminDeliveriesPage() {
                     </span>
                   </td>
                   <td>
-                    {d.deliveryPersonnelId ? (
+                    {d.deliveryMethod === 'Standard' ? (
+                      <>
+                        <span className="badge text-bg-light border">📦 Standard (3PL)</span>
+                        {d.trackingCarrier && <div className="text-muted small mt-1">{d.trackingCarrier}</div>}
+                        {d.trackingNumber && <div className="text-muted small">{d.trackingNumber}</div>}
+                      </>
+                    ) : d.deliveryPersonnelId ? (
                       <>
                         <div>{d.courierName}</div>
                         <div className="text-muted small">{d.deliveryPersonnelId}</div>
@@ -195,7 +203,8 @@ function AdminDeliveriesPage() {
                     )}
                   </td>
                   <td className="text-center">
-                    {isClosed(d.deliveryStatus) ? (
+                    {/* Standard parcels are handled by a 3PL — no courier to assign */}
+                    {d.deliveryMethod === 'Standard' || isClosed(d.deliveryStatus) ? (
                       <span className="text-muted">—</span>
                     ) : (
                       <button
