@@ -19,8 +19,8 @@ function handleListPendingSuppliers(PDO $pdo): void {
 
 // Shared: move a currently-Pending supplier to a new status. Optionally records
 // a rejection reason (shown to the supplier) — passing null clears any old one.
-function setSupplierStatus(PDO $pdo, string $userId, string $newStatus, ?string $reason = null): void {
-  $stmt = $pdo->prepare("SELECT status, role FROM `user` WHERE userId = :id");
+function setSupplierStatus(PDO $pdo, string $userId, string $newStatus, ?string $reason = null, array $config = []): void {
+  $stmt = $pdo->prepare("SELECT status, role, email, fullName FROM `user` WHERE userId = :id");
   $stmt->execute(['id' => $userId]);
   $row = $stmt->fetch();
 
@@ -35,18 +35,27 @@ function setSupplierStatus(PDO $pdo, string $userId, string $newStatus, ?string 
   $upd = $pdo->prepare("UPDATE `user` SET status = :s, rejectionReason = :r WHERE userId = :id");
   $upd->execute(['s' => $newStatus, 'r' => $reason, 'id' => $userId]);
 
+  // Email the supplier the decision (reliable for a web-portal applicant).
+  // Best-effort: a mail hiccup must not fail the admin's action.
+  if (function_exists('sendSupplierDecisionEmail') && function_exists('mailConfigured')
+      && mailConfigured($config) && !empty($row['email'])) {
+    try {
+      sendSupplierDecisionEmail($config, $row['email'], $row['fullName'] ?? '', $newStatus, $reason);
+    } catch (Throwable $e) { /* ignore — the status change still stands */ }
+  }
+
   sendJson(200, true, ['userId' => $userId, 'status' => $newStatus]);
 }
 
 // POST /admin/suppliers/{userId}/approve — clears any past rejection reason.
-function handleApproveSupplier(PDO $pdo, string $userId): void {
-  setSupplierStatus($pdo, $userId, 'Active', null);
+function handleApproveSupplier(PDO $pdo, string $userId, array $config = []): void {
+  setSupplierStatus($pdo, $userId, 'Active', null, $config);
 }
 
 // POST /admin/suppliers/{userId}/reject — body: { reason, terminal? }.
 // terminal=true bans the applicant permanently; otherwise they may fix the
 // stated reason and resubmit. A reason is required so the supplier knows why.
-function handleRejectSupplier(PDO $pdo, string $userId): void {
+function handleRejectSupplier(PDO $pdo, string $userId, array $config = []): void {
   $body     = getJsonBody();
   $reason   = trim($body['reason'] ?? '');
   $terminal = !empty($body['terminal']);
@@ -57,7 +66,7 @@ function handleRejectSupplier(PDO $pdo, string $userId): void {
   if (mb_strlen($reason) > 255) {
     $reason = mb_substr($reason, 0, 255);
   }
-  setSupplierStatus($pdo, $userId, $terminal ? 'Banned' : 'Rejected', $reason);
+  setSupplierStatus($pdo, $userId, $terminal ? 'Banned' : 'Rejected', $reason, $config);
 }
 
 // ── Courier (delivery personnel) approvals ───────────────────────────

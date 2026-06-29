@@ -569,14 +569,14 @@ if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/approve$#', $pa
   $auth = requireAuth($secret);
   requireAdmin($auth);
   $pdo  = getPDO();
-  handleApproveSupplier($pdo, $m[1]);
+  handleApproveSupplier($pdo, $m[1], $config);
 }
 
 if ($method === 'POST' && preg_match('#^/admin/suppliers/([^/]+)/reject$#', $path, $m)) {
   $auth = requireAuth($secret);
   requireAdmin($auth);
   $pdo  = getPDO();
-  handleRejectSupplier($pdo, $m[1]);
+  handleRejectSupplier($pdo, $m[1], $config);
 }
 
 // courier approval queue (self-applied delivery personnel awaiting approval)
