@@ -45,8 +45,33 @@ function storeToFirebase(string $tmpPath, string $objectPath, string $ext): ?str
   }
 
   $bytes = file_get_contents($tmpPath);
-  $url   = 'https://firebasestorage.googleapis.com/v0/b/' . rawurlencode($bucket)
-         . '/o?uploadType=media&name=' . rawurlencode($objectPath);
+  $mime  = contentTypeForExt($ext);
+
+  // Our own download token → lets the file be fetched via a public Firebase URL
+  // without making the whole bucket world-readable.
+  $dlToken = firebaseDownloadToken();
+
+  // IMPORTANT: upload through the Cloud Storage JSON API (storage.googleapis.com),
+  // NOT firebasestorage.googleapis.com. The Firebase endpoint enforces the
+  // bucket's Security Rules (which deny writes by default), whereas the Cloud
+  // Storage API authorises by IAM — our service account's Storage Admin role.
+  // A multipart request lets us attach the download token as object metadata.
+  $boundary = 'shoearbnd' . bin2hex(random_bytes(8));
+  $meta = json_encode([
+    'name'        => $objectPath,
+    'contentType' => $mime,
+    'metadata'    => ['firebaseStorageDownloadTokens' => $dlToken],
+  ]);
+  $body = "--{$boundary}\r\n"
+        . "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+        . $meta . "\r\n"
+        . "--{$boundary}\r\n"
+        . "Content-Type: {$mime}\r\n\r\n"
+        . $bytes . "\r\n"
+        . "--{$boundary}--";
+
+  $url = 'https://storage.googleapis.com/upload/storage/v1/b/' . rawurlencode($bucket)
+       . '/o?uploadType=multipart';
 
   $ch = curl_init($url);
   curl_setopt_array($ch, [
@@ -55,9 +80,9 @@ function storeToFirebase(string $tmpPath, string $objectPath, string $ext): ?str
     CURLOPT_TIMEOUT        => 30,
     CURLOPT_HTTPHEADER     => [
       'Authorization: Bearer ' . $token,
-      'Content-Type: ' . contentTypeForExt($ext),
+      'Content-Type: multipart/related; boundary=' . $boundary,
     ],
-    CURLOPT_POSTFIELDS     => $bytes,
+    CURLOPT_POSTFIELDS     => $body,
   ]);
   $res  = curl_exec($ch);
   $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -67,10 +92,17 @@ function storeToFirebase(string $tmpPath, string $objectPath, string $ext): ?str
   if ($code < 200 || $code >= 300 || !is_array($data)) {
     sendJson(500, false, null, ['code' => 'STORAGE', 'message' => 'Firebase upload failed.']);
   }
-  // build the public URL with the download token Firebase returns
-  $dlToken = $data['downloadTokens'] ?? '';
+
+  // Public download URL (served by Firebase using the token we set as metadata).
   return 'https://firebasestorage.googleapis.com/v0/b/' . rawurlencode($bucket)
-       . '/o/' . rawurlencode($objectPath) . '?alt=media' . ($dlToken !== '' ? '&token=' . $dlToken : '');
+       . '/o/' . rawurlencode($objectPath) . '?alt=media&token=' . $dlToken;
+}
+
+// A UUID-v4-ish token used as Firebase Storage's download token.
+function firebaseDownloadToken(): string {
+  return sprintf('%s-%s-%s-%s-%s',
+    bin2hex(random_bytes(4)), bin2hex(random_bytes(2)), bin2hex(random_bytes(2)),
+    bin2hex(random_bytes(2)), bin2hex(random_bytes(6)));
 }
 
 // What each kind of upload is allowed to be. Models are validated by

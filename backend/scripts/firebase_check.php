@@ -32,19 +32,33 @@ if (!$token) {
 }
 echo "ok\n";
 
-// Real test upload.
+// Real test upload — via the Cloud Storage JSON API (IAM-based), exactly like
+// storeToFirebase(). multipart so we can attach the Firebase download token.
 $objectPath = 'diagnostics/firebase_check.txt';
 $bytes      = 'ShoeAR Firebase Storage check — ok';
-$uploadUrl  = 'https://firebasestorage.googleapis.com/v0/b/' . rawurlencode($bucket)
-            . '/o?uploadType=media&name=' . rawurlencode($objectPath);
+$dl         = sprintf('%s-%s-%s-%s-%s',
+  bin2hex(random_bytes(4)), bin2hex(random_bytes(2)), bin2hex(random_bytes(2)),
+  bin2hex(random_bytes(2)), bin2hex(random_bytes(6)));
+
+$boundary = 'shoearbnd' . bin2hex(random_bytes(8));
+$meta = json_encode([
+  'name'        => $objectPath,
+  'contentType' => 'text/plain',
+  'metadata'    => ['firebaseStorageDownloadTokens' => $dl],
+]);
+$multipart = "--{$boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"
+           . $meta . "\r\n--{$boundary}\r\nContent-Type: text/plain\r\n\r\n"
+           . $bytes . "\r\n--{$boundary}--";
+
+$uploadUrl = 'https://storage.googleapis.com/upload/storage/v1/b/' . rawurlencode($bucket) . '/o?uploadType=multipart';
 
 $ch = curl_init($uploadUrl);
 curl_setopt_array($ch, [
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_POST           => true,
   CURLOPT_TIMEOUT        => 30,
-  CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token, 'Content-Type: text/plain'],
-  CURLOPT_POSTFIELDS     => $bytes,
+  CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token, 'Content-Type: multipart/related; boundary=' . $boundary],
+  CURLOPT_POSTFIELDS     => $multipart,
 ]);
 $res  = curl_exec($ch);
 $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -56,12 +70,11 @@ $data = json_decode((string) $res, true);
 if ($code < 200 || $code >= 300 || !is_array($data)) {
   echo "=> Upload FAILED: " . ($err !== '' ? $err : $res) . "\n";
   echo "   Common causes: wrong bucket name (.appspot.com vs .firebasestorage.app),\n";
-  echo "   or the service account lacks Storage permissions.\n";
+  echo "   or the service account lacks the Storage Admin IAM role.\n";
   exit(1);
 }
 
-$dl = $data['downloadTokens'] ?? '';
 $publicUrl = 'https://firebasestorage.googleapis.com/v0/b/' . rawurlencode($bucket)
-           . '/o/' . rawurlencode($objectPath) . '?alt=media' . ($dl !== '' ? '&token=' . $dl : '');
+           . '/o/' . rawurlencode($objectPath) . '?alt=media&token=' . $dl;
 
 echo "\n✅ Firebase Storage works! Open this URL in your browser to confirm:\n$publicUrl\n";
