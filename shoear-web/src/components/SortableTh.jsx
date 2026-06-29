@@ -6,7 +6,7 @@ function SortableTh({ label, columnKey, sort, className = '', style }) {
   return (
     <th role="button" className={className}
       onClick={() => toggleSort(columnKey)}
-      style={{ cursor: 'pointer', userSelect: 'none', ...style }}>
+      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', ...style }}>
       {label}<span className="text-muted small">{arrow}</span>
     </th>
   );
