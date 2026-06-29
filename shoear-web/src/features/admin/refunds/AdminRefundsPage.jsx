@@ -3,7 +3,9 @@ import { getRefunds, setRefundStatus, refundProofUrls } from '../../supplier/ref
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 const STATUSES = ['Pending', 'Approved', 'Rejected', 'Completed'];
@@ -20,7 +22,17 @@ function AdminRefundsPage() {
 
   const [status, setStatus] = useState('');
 
-  const { page, setPage, totalPages, pageItems } = usePagination(refunds, PAGE_SIZE);
+  // Click any column header to sort; Amount compares numerically.
+  const sort = useTableSort(refunds, {
+    initialKey: 'orderId',
+    initialDir: 'desc',
+    getValue: (r, k) => {
+      if (k === 'refundAmount') return Number(r.refundAmount);
+      return r[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   function load() {
     setLoading(true);
@@ -110,11 +122,11 @@ function AdminRefundsPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Reason</th>
-                <th className="text-end" style={{ width: 110 }}>Amount</th>
-                <th className="text-center" style={{ width: 110 }}>Status</th>
+                <SortableTh label="Order" columnKey="orderId" sort={sort} />
+                <SortableTh label="Customer" columnKey="customerName" sort={sort} />
+                <SortableTh label="Reason" columnKey="refundReason" sort={sort} />
+                <SortableTh label="Amount" columnKey="refundAmount" sort={sort} className="text-end" style={{ width: 110 }} />
+                <SortableTh label="Status" columnKey="refundStatus" sort={sort} className="text-center" style={{ width: 110 }} />
                 <th style={{ width: 70 }}>Proof</th>
                 <th className="text-center" style={{ width: 180 }}>Action</th>
               </tr>

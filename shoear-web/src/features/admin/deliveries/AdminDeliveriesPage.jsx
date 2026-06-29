@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { getDeliveries, getCouriers, assignDelivery } from '../adminService';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 const STATUSES = ['Pending', 'Assigned', 'PickedUp', 'OutForDelivery', 'Delivered', 'Failed'];
@@ -29,7 +31,17 @@ function AdminDeliveriesPage() {
   const [chosenCourier, setChosenCourier] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const { page, setPage, totalPages, pageItems } = usePagination(deliveries, PAGE_SIZE);
+  // Click any column header to sort; Amount compares numerically.
+  const sort = useTableSort(deliveries, {
+    initialKey: 'orderId',
+    initialDir: 'desc',
+    getValue: (d, k) => {
+      if (k === 'orderTotalAmount') return Number(d.orderTotalAmount);
+      return d[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
   const queueCount = deliveries.filter((d) => !d.deliveryPersonnelId).length;
 
   function load() {
@@ -138,12 +150,12 @@ function AdminDeliveriesPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Order</th>
-                <th>Customer</th>
+                <SortableTh label="Order" columnKey="orderId" sort={sort} />
+                <SortableTh label="Customer" columnKey="customerName" sort={sort} />
                 <th>Pickup → Deliver to</th>
-                <th className="text-end" style={{ width: 110 }}>Amount</th>
-                <th className="text-center" style={{ width: 140 }}>Status</th>
-                <th style={{ width: 180 }}>Courier</th>
+                <SortableTh label="Amount" columnKey="orderTotalAmount" sort={sort} className="text-end" style={{ width: 110 }} />
+                <SortableTh label="Status" columnKey="deliveryStatus" sort={sort} className="text-center" style={{ width: 140 }} />
+                <SortableTh label="Courier" columnKey="courierName" sort={sort} style={{ width: 180 }} />
                 <th className="text-center" style={{ width: 130 }}>Action</th>
               </tr>
             </thead>

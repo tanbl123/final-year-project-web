@@ -5,7 +5,9 @@ import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import Pagination from '../../../components/Pagination';
 import ClearableInput from '../../../components/ClearableInput';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 
@@ -20,7 +22,17 @@ function AdminReviewsPage() {
   const [filters, setFilters] = useState({ status: '', rating: '', search: '' });
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { page, setPage, totalPages, pageItems } = usePagination(reviews, PAGE_SIZE);
+  // Click any column header to sort; Rating compares numerically.
+  const sort = useTableSort(reviews, {
+    initialKey: 'reviewDate',
+    initialDir: 'desc',
+    getValue: (r, k) => {
+      if (k === 'ratingScore') return Number(r.ratingScore);
+      return r[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 300);
@@ -106,11 +118,11 @@ function AdminReviewsPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Product / Supplier</th>
-                <th style={{ width: 120 }}>Rating</th>
+                <SortableTh label="Product / Supplier" columnKey="productName" sort={sort} />
+                <SortableTh label="Rating" columnKey="ratingScore" sort={sort} style={{ width: 120 }} />
                 <th>Review</th>
-                <th style={{ width: 140 }}>Customer</th>
-                <th className="text-center" style={{ width: 110 }}>Status</th>
+                <SortableTh label="Customer" columnKey="customerName" sort={sort} style={{ width: 140 }} />
+                <SortableTh label="Status" columnKey="reviewStatus" sort={sort} className="text-center" style={{ width: 110 }} />
                 <th className="text-center" style={{ width: 130 }}>Action</th>
               </tr>
             </thead>

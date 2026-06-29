@@ -2,7 +2,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getSupplierRefunds, refundProofUrls } from './refundService';
 import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 const TABS = ['All', 'Pending', 'Approved', 'Rejected', 'Completed'];
@@ -15,7 +17,17 @@ function SupplierRefundsPage() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState('All');
 
-  const { page, setPage, totalPages, pageItems } = usePagination(refunds, PAGE_SIZE);
+  // Click any column header to sort; Amount compares numerically.
+  const sort = useTableSort(refunds, {
+    initialKey: 'requestDate',
+    initialDir: 'desc',
+    getValue: (r, k) => {
+      if (k === 'refundAmount') return Number(r.refundAmount);
+      return r[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   function load() {
     setLoading(true);
@@ -73,11 +85,11 @@ function SupplierRefundsPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th style={{ width: 140 }}>Order</th>
-                <th>Reason</th>
-                <th className="text-end" style={{ width: 120 }}>Amount</th>
-                <th className="text-center" style={{ width: 120 }}>Status</th>
-                <th style={{ width: 120 }}>Requested</th>
+                <SortableTh label="Order" columnKey="orderId" sort={sort} style={{ width: 140 }} />
+                <SortableTh label="Reason" columnKey="refundReason" sort={sort} />
+                <SortableTh label="Amount" columnKey="refundAmount" sort={sort} className="text-end" style={{ width: 120 }} />
+                <SortableTh label="Status" columnKey="refundStatus" sort={sort} className="text-center" style={{ width: 120 }} />
+                <SortableTh label="Requested" columnKey="requestDate" sort={sort} style={{ width: 120 }} />
                 <th className="text-center" style={{ width: 70 }}>Proof</th>
               </tr>
             </thead>

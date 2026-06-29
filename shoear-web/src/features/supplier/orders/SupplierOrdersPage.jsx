@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSupplierOrders } from './orderService';
 import Pagination from '../../../components/Pagination';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 const STATUSES = ['Placed', 'Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed', 'Cancelled'];
@@ -25,7 +27,18 @@ function SupplierOrdersPage() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
-  const { page, setPage, totalPages, pageItems } = usePagination(orders, PAGE_SIZE);
+  // Click any column header to sort; Your items/Your subtotal compare numerically.
+  const sort = useTableSort(orders, {
+    initialKey: 'orderId',
+    initialDir: 'desc',
+    getValue: (o, k) => {
+      if (k === 'itemCount') return Number(o.itemCount);
+      if (k === 'supplierSubtotal') return Number(o.supplierSubtotal);
+      return o[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   function load() {
     setLoading(true);
@@ -75,11 +88,11 @@ function SupplierOrdersPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th className="text-center" style={{ width: 150 }}>Status</th>
-                <th className="text-center" style={{ width: 90 }}>Your items</th>
-                <th className="text-end" style={{ width: 130 }}>Your subtotal</th>
+                <SortableTh label="Order" columnKey="orderId" sort={sort} />
+                <SortableTh label="Customer" columnKey="customerName" sort={sort} />
+                <SortableTh label="Status" columnKey="orderStatus" sort={sort} className="text-center" style={{ width: 150 }} />
+                <SortableTh label="Your items" columnKey="itemCount" sort={sort} className="text-center" style={{ width: 90 }} />
+                <SortableTh label="Your subtotal" columnKey="supplierSubtotal" sort={sort} className="text-end" style={{ width: 130 }} />
                 <th className="text-center" style={{ width: 90 }}>Detail</th>
               </tr>
             </thead>

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { getAdminInventory } from '../adminService';
 import Pagination from '../../../components/Pagination';
 import ClearableInput from '../../../components/ClearableInput';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 12;
 const LOW_STOCK = 10;
@@ -15,7 +17,18 @@ function AdminInventoryPage() {
   const [filters, setFilters] = useState({ status: '', search: '' });
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { page, setPage, totalPages, pageItems } = usePagination(rows, PAGE_SIZE);
+  // Click any column header to sort; Sizes/Total stock compare numerically.
+  const sort = useTableSort(rows, {
+    initialKey: 'productName',
+    initialDir: 'asc',
+    getValue: (r, k) => {
+      if (k === 'sizeCount') return Number(r.sizeCount);
+      if (k === 'totalStock') return Number(r.totalStock);
+      return r[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 300);
@@ -80,12 +93,12 @@ function AdminInventoryPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Product</th>
-                <th>Supplier</th>
-                <th className="text-center" style={{ width: 90 }}>Sizes</th>
-                <th className="text-end" style={{ width: 110 }}>Total stock</th>
+                <SortableTh label="Product" columnKey="productName" sort={sort} />
+                <SortableTh label="Supplier" columnKey="supplierName" sort={sort} />
+                <SortableTh label="Sizes" columnKey="sizeCount" sort={sort} className="text-center" style={{ width: 90 }} />
+                <SortableTh label="Total stock" columnKey="totalStock" sort={sort} className="text-end" style={{ width: 110 }} />
                 <th className="text-center" style={{ width: 110 }}>Stock</th>
-                <th className="text-center" style={{ width: 110 }}>Status</th>
+                <SortableTh label="Status" columnKey="status" sort={sort} className="text-center" style={{ width: 110 }} />
               </tr>
             </thead>
             <tbody>

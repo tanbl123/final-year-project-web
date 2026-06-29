@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getCourierPayouts, payCourier, getCourierPayoutHistory, remindCourierPayout } from '../adminService';
+import SortableTh from '../../../components/SortableTh';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 // Courier payouts — each active courier's accrued per-delivery earnings, with a
 // one-click Stripe payout of their pending balance. A courier must have finished
@@ -20,6 +22,7 @@ function AdminCourierPayoutsPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
 
   async function pay(courier) {
@@ -76,6 +79,14 @@ function AdminCourierPayoutsPage() {
     return <span className={`badge ${cls}`}>{s}</span>;
   }
 
+  // Click a header to sort; default = who is owed the most first.
+  const sort = useTableSort(couriers, {
+    initialKey: 'pendingBalance',
+    initialDir: 'desc',
+    getValue: (c, k) =>
+      (k === 'pendingBalance' || k === 'pendingDeliveries') ? Number(c[k]) : (c[k] ?? ''),
+  });
+
   return (
     <div className="container py-4">
       <h1 className="mb-1">💸 Courier Payouts</h1>
@@ -107,15 +118,15 @@ function AdminCourierPayoutsPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Courier</th>
-                <th>Payout account</th>
-                <th className="text-end">Pending</th>
-                <th className="text-end">Deliveries</th>
+                <SortableTh label="Courier" columnKey="fullName" sort={sort} />
+                <SortableTh label="Payout account" columnKey="payoutsEnabled" sort={sort} />
+                <SortableTh label="Pending" columnKey="pendingBalance" sort={sort} className="text-end" />
+                <SortableTh label="Deliveries" columnKey="pendingDeliveries" sort={sort} className="text-end" />
                 <th className="text-end">Action</th>
               </tr>
             </thead>
             <tbody>
-              {couriers.map((c) => {
+              {sort.sorted.map((c) => {
                 const ready = c.connected && c.payoutsEnabled;
                 const canPay = ready && c.pendingBalance > 0;
                 return (
@@ -164,7 +175,7 @@ function AdminCourierPayoutsPage() {
                   </tr>
                 );
               }).flatMap((row, i) => {
-                const c = couriers[i];
+                const c = sort.sorted[i];
                 const out = [row];
                 if (openId === c.deliveryPersonnelId) {
                   const h = history[c.deliveryPersonnelId];
