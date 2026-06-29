@@ -171,7 +171,9 @@ function handleGetSupplierOrder(PDO $pdo, array $auth, string $orderId): void {
   // status, the courier collecting from them, and the ETA. Null until the order
   // is paid and dispatched. The customer's address/contact is still withheld.
   $dl = $pdo->prepare(
-    "SELECT d.deliveryStatus, d.estimatedDeliveryTime, cu.fullName AS courierName
+    "SELECT d.deliveryId, d.deliveryStatus, d.deliveryMethod,
+            d.trackingCarrier, d.trackingNumber,
+            d.estimatedDeliveryTime, cu.fullName AS courierName
        FROM delivery d
        LEFT JOIN delivery_personnel dp ON dp.deliveryPersonnelId = d.deliveryPersonnelId
        LEFT JOIN `user` cu ON cu.userId = dp.userId

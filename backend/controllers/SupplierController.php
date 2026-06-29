@@ -326,3 +326,79 @@ function handleSubmitChangeRequest(PDO $pdo, array $auth): void {
   sendJson(201, true, ['requestId' => $requestId, 'status' => 'Pending',
     'message' => 'Your changes were submitted for admin review.']);
 }
+
+// ── standard shipping (3PL) — supplier ships the parcel themselves ──────────
+// Carriers a supplier can pick when shipping a Standard parcel.
+const STANDARD_CARRIERS = ['J&T Express', 'Pos Laju', 'Ninja Van', 'DHL eCommerce', 'GDEX', 'City-Link', 'Other'];
+
+// Load one of this supplier's Standard deliveries (or 404/409). Returns the row.
+function requireSupplierStandardDelivery(PDO $pdo, string $supplierId, string $deliveryId): array {
+  $stmt = $pdo->prepare(
+    'SELECT deliveryId, orderId, deliveryMethod, deliveryStatus
+       FROM delivery WHERE deliveryId = :id AND supplierId = :sid'
+  );
+  $stmt->execute(['id' => $deliveryId, 'sid' => $supplierId]);
+  $del = $stmt->fetch();
+  if (!$del) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Delivery not found.']);
+  }
+  if ($del['deliveryMethod'] !== 'Standard') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This parcel is handled by an in-house courier, not standard shipping.']);
+  }
+  return $del;
+}
+
+// POST /supplier/deliveries/{deliveryId}/ship — body: { carrier, trackingNumber }.
+// The supplier has shipped a Standard parcel via a 3PL; record the carrier +
+// tracking number and move it Pending → OutForDelivery (in transit).
+function handleShipStandardDelivery(PDO $pdo, array $auth, string $deliveryId): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+  $del = requireSupplierStandardDelivery($pdo, $supplierId, $deliveryId);
+  if ($del['deliveryStatus'] !== 'Pending') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'This parcel has already been shipped.']);
+  }
+
+  $body     = getJsonBody();
+  $carrier  = trim($body['carrier'] ?? '');
+  $tracking = trim($body['trackingNumber'] ?? '');
+  if (!in_array($carrier, STANDARD_CARRIERS, true)) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'Please choose a valid courier.']);
+  }
+  if ($tracking === '' || mb_strlen($tracking) > 64) {
+    sendJson(400, false, null, ['code' => 'VALIDATION', 'message' => 'A tracking number is required (max 64 characters).']);
+  }
+
+  $pdo->prepare(
+    "UPDATE delivery
+        SET trackingCarrier = :c, trackingNumber = :t, deliveryStatus = 'OutForDelivery'
+      WHERE deliveryId = :id"
+  )->execute(['c' => $carrier, 't' => $tracking, 'id' => $deliveryId]);
+
+  if (function_exists('recomputeOrderStatus')) { recomputeOrderStatus($pdo, $del['orderId']); }
+  if (function_exists('notifyOrderCustomer')) {
+    notifyOrderCustomer($pdo, (string) $del['orderId'], 'shipped', 'Your order has shipped 📦',
+      "Shipped via {$carrier}. Tracking number: {$tracking}.");
+  }
+
+  sendJson(200, true, [
+    'deliveryId' => $deliveryId, 'deliveryStatus' => 'OutForDelivery',
+    'trackingCarrier' => $carrier, 'trackingNumber' => $tracking,
+  ]);
+}
+
+// POST /supplier/deliveries/{deliveryId}/delivered — supplier confirms a shipped
+// Standard parcel has arrived (their 3PL tracking shows delivered). In production
+// this would be driven by a carrier webhook or the customer's "order received".
+function handleDeliverStandardDelivery(PDO $pdo, array $auth, string $deliveryId): void {
+  $supplierId = requireSupplierId($pdo, $auth);
+  $del = requireSupplierStandardDelivery($pdo, $supplierId, $deliveryId);
+  if ($del['deliveryStatus'] !== 'OutForDelivery') {
+    sendJson(409, false, null, ['code' => 'CONFLICT', 'message' => 'Only a shipped parcel can be marked delivered.']);
+  }
+
+  $pdo->prepare("UPDATE delivery SET deliveryStatus = 'Delivered', deliveryDate = NOW() WHERE deliveryId = :id")
+      ->execute(['id' => $deliveryId]);
+  if (function_exists('recomputeOrderStatus')) { recomputeOrderStatus($pdo, $del['orderId']); }
+
+  sendJson(200, true, ['deliveryId' => $deliveryId, 'deliveryStatus' => 'Delivered']);
+}

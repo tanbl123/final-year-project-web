@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getSupplierOrder } from './orderService';
+import { getSupplierOrder, shipStandardParcel, markStandardDelivered, STANDARD_CARRIERS } from './orderService';
 import BackButton from '../../../components/BackButton';
+import Toast from '../../../components/Toast';
 
 const STATUS_COLORS = {
   Placed: 'secondary', Paid: 'info', Processing: 'primary', Shipped: 'primary',
@@ -22,14 +23,54 @@ function SupplierOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // standard-shipping ship form
+  const [carrier, setCarrier] = useState('');
+  const [tracking, setTracking] = useState('');
+  const [shipBusy, setShipBusy] = useState(false);
+  const [shipErr, setShipErr] = useState('');
+  const [toast, setToast] = useState('');
+
+  function load() {
     setLoading(true);
     getSupplierOrder(orderId)
       .then((data) => setOrder(data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  }
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
+
+  async function ship() {
+    if (!carrier) { setShipErr('Please choose a courier.'); return; }
+    if (!tracking.trim()) { setShipErr('Enter the tracking number.'); return; }
+    setShipBusy(true); setShipErr('');
+    try {
+      await shipStandardParcel(order.myDelivery.deliveryId, carrier, tracking.trim());
+      setCarrier(''); setTracking('');
+      setToast('Parcel marked as shipped.');
+      load();
+    } catch (err) {
+      setShipErr(err.message);
+    } finally {
+      setShipBusy(false);
+    }
+  }
+
+  async function markDelivered() {
+    setShipBusy(true); setShipErr('');
+    try {
+      await markStandardDelivered(order.myDelivery.deliveryId);
+      setToast('Parcel marked as delivered.');
+      load();
+    } catch (err) {
+      setShipErr(err.message);
+    } finally {
+      setShipBusy(false);
+    }
+  }
 
   if (loading) {
     return <div className="container py-4"><p className="text-muted">Loading…</p></div>;
@@ -146,7 +187,62 @@ function SupplierOrderDetailPage() {
       <div className="card mt-4">
         <div className="card-header bg-white fw-semibold">Your parcel delivery</div>
         <div className="card-body">
-          {order.myDelivery ? (
+          {!order.myDelivery ? (
+            <p className="text-muted mb-0">Not dispatched yet — fulfilment starts once the order is paid.</p>
+          ) : order.myDelivery.deliveryMethod === 'Standard' ? (
+            // ── standard shipping (3PL): the supplier ships it themselves ──
+            <>
+              <div className="d-flex align-items-center gap-2 mb-3">
+                <span className={`badge text-bg-${DELIV_COLORS[order.myDelivery.deliveryStatus] || 'secondary'}`}>
+                  {label(order.myDelivery.deliveryStatus)}
+                </span>
+                <span className="badge text-bg-light border">📦 Standard shipping</span>
+              </div>
+              <p className="text-muted small">
+                This order ships to a different state, so it goes via standard shipping —
+                send it with a courier and enter the tracking number below.
+              </p>
+
+              {order.myDelivery.deliveryStatus === 'Pending' && (
+                <div className="row g-2 align-items-end" style={{ maxWidth: 560 }}>
+                  <div className="col-sm-5">
+                    <label className="form-label small mb-1">Courier</label>
+                    <select className="form-select" value={carrier} onChange={(e) => setCarrier(e.target.value)} disabled={shipBusy}>
+                      <option value="">Select a courier…</option>
+                      {STANDARD_CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-sm-5">
+                    <label className="form-label small mb-1">Tracking number</label>
+                    <input className="form-control" value={tracking} maxLength={64}
+                      onChange={(e) => setTracking(e.target.value)} disabled={shipBusy} placeholder="e.g. 630123456789" />
+                  </div>
+                  <div className="col-sm-2 d-grid">
+                    <button className="btn btn-primary" onClick={ship} disabled={shipBusy}>
+                      {shipBusy ? '…' : 'Ship'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {order.myDelivery.deliveryStatus !== 'Pending' && (
+                <dl className="row mb-0">
+                  <dt className="col-sm-3">Courier</dt>
+                  <dd className="col-sm-9">{order.myDelivery.trackingCarrier || <span className="text-muted">—</span>}</dd>
+                  <dt className="col-sm-3">Tracking no.</dt>
+                  <dd className="col-sm-9">{order.myDelivery.trackingNumber || <span className="text-muted">—</span>}</dd>
+                </dl>
+              )}
+
+              {order.myDelivery.deliveryStatus === 'OutForDelivery' && (
+                <button className="btn btn-outline-success btn-sm mt-3" onClick={markDelivered} disabled={shipBusy}>
+                  {shipBusy ? 'Saving…' : 'Mark as delivered'}
+                </button>
+              )}
+              {shipErr && <div className="alert alert-danger py-2 mt-3 mb-0">{shipErr}</div>}
+            </>
+          ) : (
+            // ── in-house courier ──
             <dl className="row mb-0">
               <dt className="col-sm-3">Status</dt>
               <dd className="col-sm-9">
@@ -163,8 +259,6 @@ function SupplierOrderDetailPage() {
                   : <span className="text-muted">—</span>}
               </dd>
             </dl>
-          ) : (
-            <p className="text-muted mb-0">Not dispatched yet — a courier is assigned once the order is paid.</p>
           )}
         </div>
       </div>
@@ -199,6 +293,8 @@ function SupplierOrderDetailPage() {
           </div>
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast('')} />
     </div>
   );
 }

@@ -811,6 +811,18 @@ if ($method === 'GET' && preg_match('#^/supplier/orders/([^/]+)$#', $path, $m)) 
   handleGetSupplierOrder($pdo, $auth, $m[1]);
 }
 
+// supplier ships a Standard (3PL) parcel + records tracking, then marks delivered
+if ($method === 'POST' && preg_match('#^/supplier/deliveries/([^/]+)/ship$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleShipStandardDelivery($pdo, $auth, $m[1]);
+}
+if ($method === 'POST' && preg_match('#^/supplier/deliveries/([^/]+)/delivered$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleDeliverStandardDelivery($pdo, $auth, $m[1]);
+}
+
 // ── admin order oversight ──
 if ($method === 'GET' && $path === '/admin/orders') {
   $auth = requireAuth($secret);
