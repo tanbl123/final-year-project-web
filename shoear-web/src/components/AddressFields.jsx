@@ -8,19 +8,28 @@
 // Constants/helpers (MY_STATES, emptyAddress, validateAddress) live in
 // ./addressUtils so this file only exports the component (fast-refresh safe).
 // Typing a 5-digit postcode auto-fills city + state from the offline Malaysian
-// postcode dataset (postcodeLookup), mirroring the customer's address form.
+// postcode dataset (postcodeLookup). Typing line 1 also shows Google Places
+// suggestions when the backend has a Places key (else it's a plain field) —
+// both mirror the customer's address form.
 import { useEffect, useRef, useState } from 'react';
 import { MY_STATES } from './addressUtils';
 import { lookupPostcode } from './postcodeLookup';
+import { placesAutocomplete, placeDetails, newSessionToken } from './placesService';
 
 function AddressFields({ value, onChange, errors = {}, disabled = false, idPrefix = 'addr' }) {
-  // keep the freshest value for the async postcode lookup callback
+  // keep the freshest value for the async lookup callbacks
   const latest = useRef(value);
   useEffect(() => { latest.current = value; }, [value]);
   const [autofilled, setAutofilled] = useState(false);
 
+  // Places autocomplete state
+  const [suggestions, setSuggestions] = useState([]);
+  const sessionRef = useRef('');     // current Places billing session token
+  const debounceRef = useRef(null);  // line-1 typing debounce
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
   const cls = (key) => 'form-control' + (errors[key] ? ' is-invalid' : '');
-  // editing line 1 keeps the hint; editing city/state by hand clears it
+  // editing city/state by hand clears the "filled from postcode" hint
   const set = (key) => (e) => {
     if (key === 'city' || key === 'state') setAutofilled(false);
     onChange({ ...value, [key]: e.target.value });
@@ -41,13 +50,56 @@ function AddressFields({ value, onChange, errors = {}, disabled = false, idPrefi
     }
   };
 
+  // line 1 → debounced Places suggestions (no-op when Places is disabled)
+  const onLine1 = (e) => {
+    const line1 = e.target.value;
+    onChange({ ...value, line1 });
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (line1.trim().length < 3) { setSuggestions([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      if (!sessionRef.current) sessionRef.current = newSessionToken();
+      setSuggestions(await placesAutocomplete(line1, sessionRef.current));
+    }, 300);
+  };
+
+  // user picked a suggestion → resolve it and fill the structured fields
+  const pickSuggestion = async (s) => {
+    setSuggestions([]);
+    const session = sessionRef.current || newSessionToken();
+    const addr = await placeDetails(s.placeId, session);
+    sessionRef.current = '';   // closes the billing session
+    const line1 = (addr && addr.line1) || s.mainText || s.description || latest.current.line1;
+    onChange({
+      ...latest.current,
+      line1,
+      postcode: (addr && addr.postcode) || latest.current.postcode,
+      city: (addr && addr.city) || latest.current.city,
+      state: (addr && addr.state) || latest.current.state,
+    });
+    setAutofilled(!!(addr && (addr.city || addr.state)));
+  };
+
   return (
     <div className="row g-2">
-      <div className="col-12">
+      <div className="col-12 position-relative">
         <label htmlFor={`${idPrefix}-line1`} className="form-label small mb-1">Address line 1</label>
         <input id={`${idPrefix}-line1`} className={cls('line1')} value={value.line1}
-          onChange={set('line1')} disabled={disabled}
+          onChange={onLine1} disabled={disabled} autoComplete="off"
+          onBlur={() => setTimeout(() => setSuggestions([]), 150)}
           placeholder="Unit, street, building, area" maxLength={150} />
+        {suggestions.length > 0 && (
+          <ul className="list-group position-absolute w-100 shadow-sm"
+            style={{ zIndex: 1000, maxHeight: 240, overflowY: 'auto' }}>
+            {suggestions.map((s) => (
+              <li key={s.placeId} className="list-group-item list-group-item-action py-2"
+                style={{ cursor: 'pointer' }}
+                onMouseDown={(ev) => { ev.preventDefault(); pickSuggestion(s); }}>
+                <div className="small fw-semibold">{s.mainText || s.description}</div>
+                {s.mainText && <div className="text-muted" style={{ fontSize: 12 }}>{s.description}</div>}
+              </li>
+            ))}
+          </ul>
+        )}
         {errors.line1 && <div className="invalid-feedback d-block">{errors.line1}</div>}
       </div>
 

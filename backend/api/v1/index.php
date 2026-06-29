@@ -14,6 +14,7 @@ require __DIR__ . '/../../lib/mail.php';
 require __DIR__ . '/../../lib/delivery.php';
 require __DIR__ . '/../../lib/notifications.php';
 require __DIR__ . '/../../lib/push.php';
+require __DIR__ . '/../../lib/places.php';
 require __DIR__ . '/../../lib/sweeps.php';
 require __DIR__ . '/../../controllers/AuthController.php';
 require __DIR__ . '/../../controllers/AdminController.php';
@@ -397,6 +398,15 @@ if ($method === 'POST' && $path === '/auth/reset-password') {
 if ($method === 'GET' && $path === '/auth/username-available') {
   $pdo = getPDO();
   handleUsernameAvailable($pdo);
+}
+
+// ── Google Places address autocomplete proxy (public: used by the logged-out
+// supplier registration form; key stays server-side). No-op when no key set. ──
+if ($method === 'GET' && $path === '/places/autocomplete') {
+  handlePlacesAutocomplete($config);
+}
+if ($method === 'GET' && $path === '/places/details') {
+  handlePlaceDetails($config);
 }
 
 // ── own profile (any signed-in user) ──

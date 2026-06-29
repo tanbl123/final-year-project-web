@@ -30,6 +30,12 @@ return [
   // 'your-project-id.appspot.com' (or '...firebasestorage.app').
   // 'firebase_storage_bucket' => 'your-project-id.appspot.com',
 
+  // OPTIONAL — Google Places API key for ADDRESS AUTOCOMPLETE on the web supplier
+  // form (the browser hits our /places/* proxy, so the key stays server-side).
+  // Google Cloud Console → enable "Places API (New)" → Credentials → API key.
+  // Leave unset to keep manual entry + the offline postcode lookup (no cost).
+  // 'google_places_api_key' => 'AIza...REPLACE_ME',
+
   // Google Sign-In for the customer mobile app.
   // Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 client ID
   // (Android client, package name com.example.customer). Paste the client ID here so

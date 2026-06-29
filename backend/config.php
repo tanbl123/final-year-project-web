@@ -26,6 +26,13 @@ $config = [
   // Where Stripe sends the supplier back after hosted onboarding.
   'app_url' => getenv('APP_URL') ?: 'http://localhost:5173',
 
+  // Google Places (New) API key for address autocomplete on the web supplier
+  // form. Kept server-side (the browser hits our /places/* proxy, never Google
+  // directly). Leave empty to disable autocomplete — the form still works with
+  // manual entry + the offline postcode → city/state lookup. Put the real key
+  // in config.local.php (it's gitignored). Same key the customer app uses.
+  'google_places_api_key' => getenv('GOOGLE_PLACES_API_KEY') ?: '',
+
   // Flat fee (MYR) a courier earns per completed (Delivered) parcel. Snapshotted
   // onto each delivery when it's confirmed, so changing this never alters past
   // earnings. Couriers are paid out their accrued balance via Stripe Connect.
