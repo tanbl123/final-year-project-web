@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { getAdminOrders } from '../adminService';
 import Pagination from '../../../components/Pagination';
 import ClearableInput from '../../../components/ClearableInput';
+import SortableTh from '../../../components/SortableTh';
 import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 const STATUSES = ['Placed', 'Paid', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Completed', 'Cancelled'];
@@ -22,7 +24,18 @@ function AdminOrdersPage() {
   const [filters, setFilters] = useState({ status: '', search: '' });
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { page, setPage, totalPages, pageItems } = usePagination(orders, PAGE_SIZE);
+  // Click any column header to sort; Total/Items compare numerically.
+  const sort = useTableSort(orders, {
+    initialKey: 'orderId',
+    initialDir: 'desc',
+    getValue: (o, k) => {
+      if (k === 'orderTotalAmount') return Number(o.orderTotalAmount);
+      if (k === 'itemCount') return Number(o.itemCount);
+      return o[k] ?? '';
+    },
+  });
+
+  const { page, setPage, totalPages, pageItems } = usePagination(sort.sorted, PAGE_SIZE);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 300);
@@ -81,12 +94,12 @@ function AdminOrdersPage() {
           <table className="table align-middle">
             <thead>
               <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th className="text-end" style={{ width: 110 }}>Total</th>
-                <th className="text-center" style={{ width: 70 }}>Items</th>
-                <th className="text-center" style={{ width: 130 }}>Status</th>
-                <th className="text-center" style={{ width: 110 }}>Payment</th>
+                <SortableTh label="Order" columnKey="orderId" sort={sort} />
+                <SortableTh label="Customer" columnKey="customerName" sort={sort} />
+                <SortableTh label="Total" columnKey="orderTotalAmount" sort={sort} className="text-end" style={{ width: 110 }} />
+                <SortableTh label="Items" columnKey="itemCount" sort={sort} className="text-center" style={{ width: 70 }} />
+                <SortableTh label="Status" columnKey="orderStatus" sort={sort} className="text-center" style={{ width: 130 }} />
+                <SortableTh label="Payment" columnKey="paymentStatus" sort={sort} className="text-center" style={{ width: 110 }} />
                 <th className="text-center" style={{ width: 80 }}>Detail</th>
               </tr>
             </thead>
