@@ -27,7 +27,9 @@ function SupplierOrderDetailPage() {
   const [carrier, setCarrier] = useState('');
   const [tracking, setTracking] = useState('');
   const [shipBusy, setShipBusy] = useState(false);
-  const [shipErr, setShipErr] = useState('');
+  const [shipErr, setShipErr] = useState('');       // action/API errors (alert)
+  const [carrierErr, setCarrierErr] = useState(''); // per-field validation
+  const [trackingErr, setTrackingErr] = useState('');
   const [toast, setToast] = useState('');
 
   function load() {
@@ -44,8 +46,11 @@ function SupplierOrderDetailPage() {
   }, [orderId]);
 
   async function ship() {
-    if (!carrier) { setShipErr('Please choose a courier.'); return; }
-    if (!tracking.trim()) { setShipErr('Enter the tracking number.'); return; }
+    // per-field validation shown inline under each field
+    const cErr = carrier ? '' : 'Please choose a courier.';
+    const tErr = tracking.trim() ? '' : 'Enter the tracking number.';
+    setCarrierErr(cErr); setTrackingErr(tErr);
+    if (cErr || tErr) return;
     setShipBusy(true); setShipErr('');
     try {
       await shipStandardParcel(order.myDelivery.deliveryId, carrier, tracking.trim());
@@ -60,7 +65,7 @@ function SupplierOrderDetailPage() {
   }
 
   async function bookAuto() {
-    setShipBusy(true); setShipErr('');
+    setShipBusy(true); setShipErr(''); setCarrierErr(''); setTrackingErr('');
     try {
       const res = await bookStandardParcel(order.myDelivery.deliveryId);
       setToast(`Booked with ${res.trackingCarrier} — tracking ${res.trackingNumber}.`);
@@ -231,20 +236,24 @@ function SupplierOrderDetailPage() {
               )}
 
               {order.myDelivery.deliveryStatus === 'Pending' && (
-                <div className="row g-2 align-items-end" style={{ maxWidth: 560 }}>
+                <div className="row g-2 align-items-start" style={{ maxWidth: 560 }}>
                   <div className="col-sm-5">
                     <label className="form-label small mb-1">Courier</label>
-                    <select className="form-select" value={carrier} onChange={(e) => setCarrier(e.target.value)} disabled={shipBusy}>
+                    <select className={'form-select' + (carrierErr ? ' is-invalid' : '')} value={carrier}
+                      onChange={(e) => { setCarrier(e.target.value); setCarrierErr(''); }} disabled={shipBusy}>
                       <option value="">Select a courier…</option>
                       {STANDARD_CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
+                    {carrierErr && <div className="invalid-feedback d-block">{carrierErr}</div>}
                   </div>
                   <div className="col-sm-5">
                     <label className="form-label small mb-1">Tracking number</label>
-                    <input className="form-control" value={tracking} maxLength={64}
-                      onChange={(e) => setTracking(e.target.value)} disabled={shipBusy} placeholder="e.g. 630123456789" />
+                    <input className={'form-control' + (trackingErr ? ' is-invalid' : '')} value={tracking} maxLength={64}
+                      onChange={(e) => { setTracking(e.target.value); setTrackingErr(''); }} disabled={shipBusy} placeholder="e.g. 630123456789" />
+                    {trackingErr && <div className="invalid-feedback d-block">{trackingErr}</div>}
                   </div>
                   <div className="col-sm-2 d-grid">
+                    <label className="form-label small mb-1 d-none d-sm-block">&nbsp;</label>
                     <button className="btn btn-primary" onClick={ship} disabled={shipBusy}>
                       {shipBusy ? '…' : 'Ship'}
                     </button>
