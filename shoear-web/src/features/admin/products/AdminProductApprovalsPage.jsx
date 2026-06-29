@@ -108,7 +108,7 @@ function AdminProductApprovalsPage() {
                 <SortableTh label="Category" columnKey="categoryName" sort={sort} className="text-center" style={{ width: 130 }} />
                 <SortableTh label="Price" columnKey="productPrice" sort={sort} className="text-end" style={{ width: 120 }} />
                 <SortableTh label="Submitted" columnKey="created_at" sort={sort} className="text-center" style={{ width: 120 }} />
-                <th className="text-end" style={{ width: 230 }}>Actions</th>
+                <th className="text-center" style={{ width: 230 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -125,7 +125,7 @@ function AdminProductApprovalsPage() {
                   <td className="text-center"><span className="badge text-bg-light">{p.categoryName}</span></td>
                   <td className="text-end">RM {p.productPrice.toFixed(2)}</td>
                   <td className="text-center text-muted small">{new Date(p.created_at).toLocaleDateString()}</td>
-                  <td className="text-end text-nowrap">
+                  <td className="text-center text-nowrap">
                     <button
                       className="btn btn-outline-secondary btn-sm me-2"
                       onClick={() => setReviewId(p.productId)}
