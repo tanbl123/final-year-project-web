@@ -26,9 +26,16 @@ function SupplierOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [needsActionOnly, setNeedsActionOnly] = useState(false);
+
+  // "Needs my action" = a Standard (3PL) parcel still Pending → the supplier
+  // has to ship it. In-house parcels are handled by a courier, so they're excluded.
+  const visibleOrders = needsActionOnly
+    ? orders.filter((o) => o.myDeliveryMethod === 'Standard' && o.myDeliveryStatus === 'Pending')
+    : orders;
 
   // Click any column header to sort; Your items/Your subtotal compare numerically.
-  const sort = useTableSort(orders, {
+  const sort = useTableSort(visibleOrders, {
     initialKey: 'orderId',
     initialDir: 'desc',
     getValue: (o, k) => {
@@ -76,6 +83,16 @@ function SupplierOrdersPage() {
               {STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
             </select>
           </div>
+          <div className="col-md-auto">
+            <div className="form-check">
+              <input className="form-check-input" type="checkbox" id="needsActionOnly"
+                checked={needsActionOnly}
+                onChange={(e) => { setNeedsActionOnly(e.target.checked); setPage(1); }} />
+              <label className="form-check-label" htmlFor="needsActionOnly">
+                🚚 Needs my action only <span className="text-muted">(parcels to ship)</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -83,6 +100,8 @@ function SupplierOrdersPage() {
         <p className="text-muted">Loading…</p>
       ) : orders.length === 0 ? (
         <div className="card card-body text-center text-muted">No orders yet for your products.</div>
+      ) : visibleOrders.length === 0 ? (
+        <div className="card card-body text-center text-muted">🎉 No parcels need your action right now.</div>
       ) : (
         <div className="table-responsive">
           <table className="table align-middle">
@@ -153,7 +172,7 @@ function SupplierOrdersPage() {
           </table>
 
           <Pagination page={page} totalPages={totalPages} onChange={setPage}
-            summary={`Page ${page} of ${totalPages} · ${orders.length} orders`} />
+            summary={`Page ${page} of ${totalPages} · ${visibleOrders.length} order${visibleOrders.length === 1 ? '' : 's'}`} />
         </div>
       )}
     </div>
