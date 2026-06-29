@@ -679,6 +679,15 @@ if ($method === 'POST' && preg_match('#^/admin/products/([^/]+)/reject$#', $path
   handleRejectProduct($pdo, $m[1]);
 }
 
+// full product detail for the admin (any status) — to review before approving.
+// Declared after /pending + /approve + /reject so those specific routes win.
+if ($method === 'GET' && preg_match('#^/admin/products/([^/]+)$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleGetAdminProduct($pdo, $m[1]);
+}
+
 // ── category routes (require a valid token) ──
 if ($method === 'GET' && $path === '/categories') {
   // public: the category list is public taxonomy used by the catalog filters

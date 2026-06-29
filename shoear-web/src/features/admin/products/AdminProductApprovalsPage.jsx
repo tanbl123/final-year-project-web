@@ -4,6 +4,7 @@ import ConfirmDialog from '../../../components/ConfirmDialog';
 import Pagination from '../../../components/Pagination';
 import Toast from '../../../components/Toast';
 import { usePagination } from '../../../hooks/usePagination';
+import ProductReviewModal from './ProductReviewModal';
 
 const PAGE_SIZE = 10;
 
@@ -14,6 +15,7 @@ function AdminProductApprovalsPage() {
   const [notice, setNotice] = useState('');        // transient success message
   const [busyId, setBusyId] = useState('');         // productId currently being actioned
   const [rejecting, setRejecting] = useState(null); // product pending reject confirmation
+  const [reviewId, setReviewId] = useState('');     // product being previewed in the modal
 
   const { page, setPage, totalPages, pageItems } = usePagination(products, PAGE_SIZE);
 
@@ -77,7 +79,10 @@ function AdminProductApprovalsPage() {
               {pageItems.map((p) => (
                 <tr key={p.productId}>
                   <td>
-                    <div className="fw-semibold">{p.productName}</div>
+                    <button type="button" className="btn btn-link p-0 fw-semibold text-start text-decoration-none"
+                      onClick={() => setReviewId(p.productId)}>
+                      {p.productName}
+                    </button>
                     <div className="text-muted small">{p.productBrand}</div>
                   </td>
                   <td>{p.companyName}</td>
@@ -85,6 +90,12 @@ function AdminProductApprovalsPage() {
                   <td className="text-end">RM {p.productPrice.toFixed(2)}</td>
                   <td className="text-muted small">{new Date(p.created_at).toLocaleDateString()}</td>
                   <td className="text-end text-nowrap">
+                    <button
+                      className="btn btn-outline-secondary btn-sm me-2"
+                      onClick={() => setReviewId(p.productId)}
+                    >
+                      View
+                    </button>
                     <button
                       className="btn btn-success btn-sm me-2"
                       disabled={busyId === p.productId}
@@ -109,6 +120,14 @@ function AdminProductApprovalsPage() {
             summary={`Page ${page} of ${totalPages} · ${products.length} pending`} />
         </div>
       )}
+
+      <ProductReviewModal
+        productId={reviewId}
+        busy={busyId === reviewId}
+        onClose={() => setReviewId('')}
+        onApprove={(prod) => { setReviewId(''); act({ productId: prod.id, productName: prod.name }, 'approve'); }}
+        onReject={(prod) => { setReviewId(''); setRejecting({ productId: prod.id, productName: prod.name }); }}
+      />
 
       <ConfirmDialog
         isOpen={!!rejecting}

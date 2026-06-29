@@ -213,6 +213,49 @@ function handleGetProduct(PDO $pdo, array $auth, string $id): void {
   sendJson(200, true, $row);
 }
 
+// GET /admin/products/{id} — full product detail for the ADMIN (any product,
+// any status, any supplier) so they can actually SEE a product — images,
+// description, sizes/stock, 3D model — before approving or rejecting it.
+function handleGetAdminProduct(PDO $pdo, string $id): void {
+  $stmt = $pdo->prepare(
+    'SELECT p.productId AS id, p.productName AS name, p.productBrand AS brand,
+            p.productDescription AS description, p.productPrice AS price,
+            p.productStatus AS status, p.virtualTryOnEnable AS virtualTryOnEnable,
+            p.categoryId AS categoryId, c.categoryName AS categoryName,
+            s.companyName AS supplierName
+     FROM product p
+     JOIN category c ON c.categoryId = p.categoryId
+     JOIN supplier s ON s.supplierId = p.supplierId
+     WHERE p.productId = :id'
+  );
+  $stmt->execute(['id' => $id]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Product not found.']);
+  }
+  $row['price']              = (float) $row['price'];
+  $row['virtualTryOnEnable'] = (bool) $row['virtualTryOnEnable'];
+
+  $imgs = $pdo->prepare('SELECT productImageUrl FROM product_image WHERE productId = :id ORDER BY productImageId');
+  $imgs->execute(['id' => $id]);
+  $row['images'] = array_column($imgs->fetchAll(), 'productImageUrl');
+
+  $mdl = $pdo->prepare('SELECT productModelUrl FROM product_model WHERE productId = :id ORDER BY productModelId LIMIT 1');
+  $mdl->execute(['id' => $id]);
+  $modelRow = $mdl->fetch();
+  $row['modelUrl'] = $modelRow ? $modelRow['productModelUrl'] : null;
+
+  $vars = $pdo->prepare('SELECT size, stockQuantity AS stock FROM product_variant WHERE productId = :id ORDER BY productVariantId');
+  $vars->execute(['id' => $id]);
+  $row['variants'] = array_map(
+    fn ($v) => ['size' => $v['size'], 'stock' => (int) $v['stock']],
+    $vars->fetchAll()
+  );
+  $row['totalStock'] = array_sum(array_column($row['variants'], 'stock'));
+
+  sendJson(200, true, $row);
+}
+
 // PUT /products/{id}  — edit one of this supplier's products. Mirrors create:
 // same validation, same one-transaction write. Two behaviours worth noting:
 //

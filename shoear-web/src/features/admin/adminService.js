@@ -88,6 +88,12 @@ export function getPendingProducts() {
   return apiGet('/admin/products/pending', getToken());
 }
 
+// Full product detail (images, description, sizes, 3D model) for review before
+// approving/rejecting. Works for any status, unlike the customer catalog.
+export function getAdminProduct(productId) {
+  return apiGet(`/admin/products/${productId}`, getToken());
+}
+
 // Approve a pending product (status → Approved, so it's visible on the platform).
 export function approveProduct(productId) {
   return apiPost(`/admin/products/${productId}/approve`, {}, getToken());

@@ -1,0 +1,127 @@
+import { useEffect, useState } from 'react';
+import { getAdminProduct } from '../adminService';
+
+const rm = (n) => 'RM ' + Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Full-product preview the admin opens from the approval queue, so they can SEE
+// the product (images, description, sizes/stock, 3D model) before deciding.
+// Approve / Reject live in the footer and call back to the parent.
+function ProductReviewModal({ productId, onClose, onApprove, onReject, busy }) {
+  const [product, setProduct] = useState(null);
+  const [error, setError] = useState('');
+  const [activeImage, setActiveImage] = useState('');
+
+  useEffect(() => {
+    if (!productId) return undefined;
+    let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProduct(null);
+    setError('');
+    getAdminProduct(productId)
+      .then((p) => {
+        if (!active) return;
+        setProduct(p);
+        setActiveImage(p.images?.[0] || '');
+      })
+      .catch((err) => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, [productId]);
+
+  if (!productId) return null;
+
+  return (
+    <>
+      <div className="modal-backdrop fade show"></div>
+      <div className="modal d-block" tabIndex="-1" role="dialog">
+        <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Review product</h5>
+              <button type="button" className="btn-close" onClick={onClose}></button>
+            </div>
+
+            <div className="modal-body">
+              {error ? (
+                <div className="alert alert-danger mb-0">{error}</div>
+              ) : !product ? (
+                <p className="text-muted mb-0">Loading…</p>
+              ) : (
+                <>
+                  <div className="row g-3">
+                    {/* images */}
+                    <div className="col-md-5">
+                      <div className="ratio ratio-1x1 bg-light rounded overflow-hidden mb-2">
+                        {activeImage
+                          ? <img src={activeImage} alt={product.name} style={{ objectFit: 'cover' }} className="w-100 h-100" />
+                          : <div className="d-flex align-items-center justify-content-center text-muted h-100">No image</div>}
+                      </div>
+                      {product.images?.length > 1 && (
+                        <div className="d-flex gap-2 flex-wrap">
+                          {product.images.map((url) => (
+                            <img key={url} src={url} alt="" onClick={() => setActiveImage(url)}
+                              className={'rounded border' + (url === activeImage ? ' border-primary' : '')}
+                              style={{ width: 56, height: 56, objectFit: 'cover', cursor: 'pointer' }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* details */}
+                    <div className="col-md-7">
+                      <h4 className="mb-1">{product.name}</h4>
+                      <div className="text-muted mb-2">{product.brand}</div>
+                      <div className="fs-5 fw-semibold mb-2">{rm(product.price)}</div>
+                      <div className="mb-2">
+                        <span className="badge text-bg-light border me-1">{product.categoryName}</span>
+                        <span className="badge text-bg-light border">{product.supplierName}</span>
+                        {product.virtualTryOnEnable && <span className="badge text-bg-info ms-1">AR try-on</span>}
+                      </div>
+                      {product.description
+                        ? <p className="mb-2" style={{ whiteSpace: 'pre-wrap' }}>{product.description}</p>
+                        : <p className="text-muted fst-italic mb-2">No description provided.</p>}
+
+                      <div className="fw-semibold small text-uppercase text-muted mt-3 mb-1">Sizes &amp; stock</div>
+                      {product.variants?.length ? (
+                        <div className="d-flex flex-wrap gap-1">
+                          {product.variants.map((v) => (
+                            <span key={v.size} className="badge text-bg-light border">
+                              {v.size}: {v.stock}
+                            </span>
+                          ))}
+                        </div>
+                      ) : <span className="text-muted small">No sizes.</span>}
+                      <div className="text-muted small mt-1">Total stock: {product.totalStock}</div>
+                    </div>
+                  </div>
+
+                  {/* 3D model */}
+                  {product.modelUrl && (
+                    <div className="mt-3">
+                      <div className="fw-semibold small text-uppercase text-muted mb-1">3D model (AR try-on)</div>
+                      <model-viewer
+                        src={product.modelUrl}
+                        camera-controls
+                        auto-rotate
+                        shadow-intensity="1"
+                        style={{ width: '100%', height: '320px', background: '#f8f9fa', borderRadius: '0.5rem' }}
+                      ></model-viewer>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline-danger" disabled={busy || !product}
+                onClick={() => onReject(product)}>Reject</button>
+              <button type="button" className="btn btn-success" disabled={busy || !product}
+                onClick={() => onApprove(product)}>{busy ? '…' : 'Approve'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default ProductReviewModal;
