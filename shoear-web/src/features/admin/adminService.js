@@ -71,6 +71,11 @@ export function getCourierPayoutHistory(deliveryPersonnelId) {
   return apiGet(`/admin/couriers/${deliveryPersonnelId}/payouts`, getToken());
 }
 
+// Nudge an approved courier who hasn't connected their bank account yet.
+export function remindCourierPayout(deliveryPersonnelId) {
+  return apiPost(`/admin/couriers/${deliveryPersonnelId}/remind-payout`, {}, getToken());
+}
+
 // Products awaiting approval.
 export function getPendingProducts() {
   return apiGet('/admin/products/pending', getToken());

@@ -725,6 +725,12 @@ if ($method === 'GET' && preg_match('#^/admin/couriers/([^/]+)/payouts$#', $path
   $pdo  = getPDO();
   handleCourierPayoutHistory($pdo, $m[1]);
 }
+if ($method === 'POST' && preg_match('#^/admin/couriers/([^/]+)/remind-payout$#', $path, $m)) {
+  $auth = requireAuth($secret);
+  requireAdmin($auth);
+  $pdo  = getPDO();
+  handleRemindCourierPayout($pdo, $m[1]);
+}
 if ($method === 'POST' && preg_match('#^/admin/couriers/([^/]+)/payout$#', $path, $m)) {
   $auth = requireAuth($secret);
   requireAdmin($auth);

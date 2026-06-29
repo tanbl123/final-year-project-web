@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getCourierPayouts, payCourier, getCourierPayoutHistory } from '../adminService';
+import { getCourierPayouts, payCourier, getCourierPayoutHistory, remindCourierPayout } from '../adminService';
 
 // Courier payouts — each active courier's accrued per-delivery earnings, with a
 // one-click Stripe payout of their pending balance. A courier must have finished
@@ -40,7 +40,21 @@ function AdminCourierPayoutsPage() {
     }
   }
 
+  async function remind(courier) {
+    setBusyId(courier.deliveryPersonnelId);
+    setError('');
+    try {
+      const res = await remindCourierPayout(courier.deliveryPersonnelId);
+      setNotice(res.message || `Reminder sent to ${courier.fullName}.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
   const fmt = (n) => `RM ${Number(n || 0).toFixed(2)}`;
+  const notSetUp = couriers.filter((c) => !(c.connected && c.payoutsEnabled));
 
   async function toggleHistory(courierId) {
     if (openId === courierId) { setOpenId(''); return; }
@@ -76,6 +90,13 @@ function AdminCourierPayoutsPage() {
         </div>
       )}
       {error && <div className="alert alert-danger py-2">{error}</div>}
+
+      {!loading && notSetUp.length > 0 && (
+        <div className="alert alert-warning py-2">
+          <strong>{notSetUp.length}</strong> approved courier{notSetUp.length > 1 ? 's have' : ' has'} not
+          set up a bank account yet, so they can't be paid. Use <em>Remind</em> to nudge them.
+        </div>
+      )}
 
       {loading ? (
         <p className="text-muted">Loading…</p>
@@ -119,6 +140,16 @@ function AdminCourierPayoutsPage() {
                       >
                         {openId === c.deliveryPersonnelId ? 'Hide' : 'History'}
                       </button>
+                      {!ready && (
+                        <button
+                          className="btn btn-outline-warning btn-sm me-2"
+                          disabled={busyId === c.deliveryPersonnelId}
+                          title="Send a reminder to set up their bank account"
+                          onClick={() => remind(c)}
+                        >
+                          {busyId === c.deliveryPersonnelId ? '…' : 'Remind'}
+                        </button>
+                      )}
                       <button
                         className="btn btn-primary btn-sm"
                         disabled={!canPay || busyId === c.deliveryPersonnelId}

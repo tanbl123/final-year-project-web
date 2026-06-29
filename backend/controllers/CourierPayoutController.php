@@ -168,6 +168,33 @@ function handleListCourierBalances(PDO $pdo): void {
   sendJson(200, true, ['couriers' => $rows]);
 }
 
+// POST /admin/couriers/{deliveryPersonnelId}/remind-payout — nudge an approved
+// courier who hasn't connected a payout account yet to finish setting it up.
+function handleRemindCourierPayout(PDO $pdo, string $courierId): void {
+  $stmt = $pdo->prepare(
+    'SELECT dp.payoutsEnabled, u.userId, u.fullName
+       FROM delivery_personnel dp JOIN `user` u ON u.userId = dp.userId
+      WHERE dp.deliveryPersonnelId = :id'
+  );
+  $stmt->execute(['id' => $courierId]);
+  $courier = $stmt->fetch();
+  if (!$courier) {
+    sendJson(404, false, null, ['code' => 'NOT_FOUND', 'message' => 'Courier not found.']);
+  }
+  if ((int) $courier['payoutsEnabled'] === 1) {
+    sendJson(409, false, null, ['code' => 'ALREADY_SET', 'message' => 'This courier has already set up payouts.']);
+  }
+
+  createNotification(
+    $pdo,
+    $courier['userId'],
+    'PayoutSetup',
+    'Set up your bank account',
+    'Your courier account is approved. Add your bank account in Profile → My earnings so we can pay your delivery earnings.'
+  );
+  sendJson(200, true, ['message' => 'Reminder sent to ' . $courier['fullName'] . '.']);
+}
+
 // GET /admin/couriers/{deliveryPersonnelId}/payouts — that courier's payout history.
 function handleCourierPayoutHistory(PDO $pdo, string $courierId): void {
   $stmt = $pdo->prepare(
