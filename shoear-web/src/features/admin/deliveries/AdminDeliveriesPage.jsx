@@ -69,7 +69,8 @@ function AdminDeliveriesPage() {
     setAssignTarget(delivery);
     setChosenCourier(delivery.deliveryPersonnelId || '');
     setCouriersLoading(true);
-    getCouriers()
+    // pass the parcel's delivery state so couriers covering that area rank first
+    getCouriers(delivery.deliveryState)
       .then((data) => setCouriers(data.couriers))
       .catch((err) => setError(err.message))
       .finally(() => setCouriersLoading(false));
@@ -238,8 +239,9 @@ function AdminDeliveriesPage() {
               </div>
               <div className="modal-body">
                 <p className="text-muted small mb-2">
-                  Couriers are ranked by current workload (fewest in-progress deliveries first) —
-                  the same scoring the system uses to auto-assign.
+                  {assignTarget.deliveryState
+                    ? <>Couriers who <strong>cover {assignTarget.deliveryState}</strong> are listed first, then by lightest workload. You can still assign anyone.</>
+                    : 'Couriers are ranked by current workload (fewest in-progress deliveries first) — the same scoring the system uses to auto-assign.'}
                 </p>
                 {couriersLoading ? (
                   <p className="text-muted mb-0">Loading couriers…</p>
@@ -258,9 +260,17 @@ function AdminDeliveriesPage() {
                           <span className="fw-semibold">{c.fullName}</span>
                           <span className="text-muted small"> · {c.deliveryPersonnelId}</span>
                           {c.vehicleType && c.vehicleBrand && <div className="text-muted small">{`${c.vehicleType} • ${c.vehicleBrand} ${c.vehicleModel} — ${c.vehiclePlate}`}</div>}
+                          <div className="text-muted small">
+                            Covers: {c.coverageZones?.length ? c.coverageZones.join(', ') : <span className="fst-italic">no areas set</span>}
+                          </div>
                         </span>
+                        {assignTarget.deliveryState && (
+                          c.coversZone
+                            ? <span className="badge text-bg-success">✓ Covers {assignTarget.deliveryState}</span>
+                            : <span className="badge text-bg-light border text-muted">Outside area</span>
+                        )}
                         {i === 0 && c.deliveryPersonnelId !== assignTarget.deliveryPersonnelId && (
-                          <span className="badge text-bg-success">Suggested</span>
+                          <span className="badge text-bg-primary">Suggested</span>
                         )}
                         <span className="badge text-bg-light">
                           {c.activeLoad} active

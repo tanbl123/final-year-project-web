@@ -30,7 +30,7 @@ function handleListDeliveries(PDO $pdo): void {
             cu.fullName  AS courierName,
             s.companyName AS supplierName, s.operationalAddress AS pickupAddress,
             o.orderDate, o.orderStatus, o.orderTotalAmount, o.orderDeliveryAddress,
-            buyer.fullName AS customerName
+            o.deliveryState, buyer.fullName AS customerName
        FROM delivery d
        JOIN `order` o          ON o.orderId = d.orderId
        JOIN supplier s         ON s.supplierId = d.supplierId
@@ -56,11 +56,14 @@ function handleListDeliveries(PDO $pdo): void {
   sendJson(200, true, ['deliveries' => $rows]);
 }
 
-// GET /admin/couriers — the Active courier roster, ranked best-first by the
-// same scoring function the auto-assigner uses, each with its current load.
-// Powers the manual-assign dropdown (admin sees who is least loaded).
+// GET /admin/couriers[?state=Selangor] — the Active courier roster, ranked
+// best-first by the same scoring function the auto-assigner uses. When ?state is
+// given (the parcel's delivery state), couriers who COVER that area are ranked
+// first and flagged (coversZone), so the admin sees the closest match on top —
+// but can still assign anyone (admin override).
 function handleListCouriers(PDO $pdo): void {
-  $couriers = scoreCouriers($pdo);
+  $state = trim((string) ($_GET['state'] ?? ''));
+  $couriers = scoreCouriers($pdo, $state !== '' ? $state : null);
   sendJson(200, true, ['couriers' => $couriers]);
 }
 

@@ -165,9 +165,11 @@ export function getDeliveries(filters = {}) {
 }
 
 // The Active courier roster, ranked best-first by current load (same scoring
-// the auto-assigner uses) — powers the manual-assign dropdown.
-export function getCouriers() {
-  return apiGet('/admin/couriers', getToken());
+// the auto-assigner uses) — powers the manual-assign dropdown. Pass the parcel's
+// delivery state to rank couriers who COVER that area first (and flag them).
+export function getCouriers(state) {
+  const qs = state ? `?state=${encodeURIComponent(state)}` : '';
+  return apiGet(`/admin/couriers${qs}`, getToken());
 }
 
 // Manually (re)assign a courier to a delivery.
