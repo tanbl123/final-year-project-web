@@ -129,7 +129,7 @@ function AdminRefundsPage() {
                 <SortableTh label="Reason" columnKey="refundReason" sort={sort} />
                 <SortableTh label="Amount" columnKey="refundAmount" sort={sort} className="text-end" style={{ width: 110 }} />
                 <SortableTh label="Status" columnKey="refundStatus" sort={sort} className="text-center" style={{ width: 110 }} />
-                <th style={{ width: 70 }}>Proof</th>
+                <th style={{ width: 90 }}>Proof</th>
                 <th className="text-center" style={{ width: 180 }}>Action</th>
               </tr>
             </thead>
@@ -150,9 +150,11 @@ function AdminRefundsPage() {
                     {(() => {
                       const urls = refundProofUrls(r.refundProof);
                       if (urls.length === 0) return <span className="text-muted">—</span>;
-                      if (urls.length === 1) return <a href={urls[0]} target="_blank" rel="noreferrer">View</a>;
+                      if (urls.length === 1) {
+                        return <a href={urls[0]} target="_blank" rel="noreferrer" className="btn btn-outline-secondary btn-sm">View</a>;
+                      }
                       return urls.map((u, i) => (
-                        <a key={i} href={u} target="_blank" rel="noreferrer" className="me-2">#{i + 1}</a>
+                        <a key={i} href={u} target="_blank" rel="noreferrer" className="btn btn-outline-secondary btn-sm me-1">#{i + 1}</a>
                       ));
                     })()}
                   </td>
