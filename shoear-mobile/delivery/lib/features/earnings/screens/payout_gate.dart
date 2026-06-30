@@ -24,7 +24,27 @@ class _PayoutGateState extends State<PayoutGate> {
     _future ??= context.read<EarningsService>().stripeStatus();
   }
 
-  void _recheck() => setState(() => _future = context.read<EarningsService>().stripeStatus());
+  // Re-check payout status (after the courier taps "I've finished — continue").
+  // If Stripe still doesn't report payouts enabled, the gate stays on the setup
+  // screen — so tell them why instead of silently re-showing the same page.
+  Future<void> _recheck() async {
+    final future = context.read<EarningsService>().stripeStatus();
+    setState(() => _future = future);
+    Map<String, dynamic> d;
+    try {
+      d = await future;
+    } catch (_) {
+      return; // a transient error lets them through (see build) — no nag needed
+    }
+    if (!mounted) return;
+    final configured = d['configured'] == true;
+    final enabled = d['payoutsEnabled'] == true;
+    if (configured && !enabled) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Payout setup not detected yet — finish the Stripe steps first.'),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
