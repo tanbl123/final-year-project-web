@@ -374,6 +374,7 @@ function BusinessDetailsCard({ onToast }) {
                   onChange={handleDoc} disabled={uploadingDoc} />
               )}
               {uploadingDoc && <div className="form-text">Uploading…</div>}
+              <div className="form-text">Upload an updated document for the <strong>same SSM number</strong> — a different company&apos;s document will be rejected.</div>
               {reqErrors.businessLicenseUrl && <div className="invalid-feedback d-block">{reqErrors.businessLicenseUrl}</div>}
             </div>
             <div className="d-flex gap-2">

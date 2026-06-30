@@ -120,6 +120,11 @@ function AdminBusinessChangesPage() {
                     The SSM number is unchanged — confirm this is a genuine rebrand of the same registered company, not a different business.
                   </div>
                 )}
+                {r.newBusinessLicenseUrl && r.newBusinessLicenseUrl !== r.curBusinessLicenseUrl && (
+                  <div className="alert alert-info py-2 small mb-2">
+                    📄 <strong>Document updated</strong> — confirm it&apos;s a valid certificate for SSM <strong>{r.curBusinessRegNo}</strong> (the locked registration number), not a different company&apos;s.
+                  </div>
+                )}
 
                 <div className="row g-2 small text-muted fw-semibold border-bottom pb-1">
                   <div className="col-4">Field</div>
