@@ -101,11 +101,21 @@ function handleStripeStatus(PDO $pdo, array $config, array $auth): void {
     $pdo->prepare('UPDATE supplier SET payoutsEnabled = :e WHERE supplierId = :id')
         ->execute(['e' => $enabled ? 1 : 0, 'id' => $row['supplierId']]);
 
+    // Surface WHY payouts aren't enabled yet: what Stripe still needs, whether
+    // it's just under review, and any blocking reason — so the UI can show it
+    // instead of a vague "incomplete".
+    $req = $account['requirements'] ?? [];
+    $due = array_values(array_unique(array_merge(
+      $req['currently_due'] ?? [], $req['past_due'] ?? []
+    )));
     sendJson(200, true, [
-      'connected'       => true,
-      'payoutsEnabled'  => $enabled,
-      'detailsSubmitted' => !empty($account['details_submitted']),
-      'configured'      => true,
+      'connected'           => true,
+      'payoutsEnabled'      => $enabled,
+      'detailsSubmitted'    => !empty($account['details_submitted']),
+      'requirementsDue'     => $due,
+      'pendingVerification' => !empty($req['pending_verification']),
+      'disabledReason'      => $req['disabled_reason'] ?? null,
+      'configured'          => true,
     ]);
   } catch (Throwable $e) {
     sendJson(502, false, null, ['code' => 'STRIPE_ERROR', 'message' => $e->getMessage()]);

@@ -48,6 +48,35 @@ function PayoutsPage() {
     }
   }
 
+  // Re-poll Stripe (verification can finish a moment after submitting).
+  async function recheck() {
+    setWorking(true);
+    setError('');
+    setNotice('');
+    try {
+      const data = await getPayoutStatus();
+      setStatus(data);
+      if (data.configured && !data.payoutsEnabled) {
+        setNotice('Stripe still hasn’t enabled payouts — see the details below.');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  // Human-friendly label for a Stripe requirement key.
+  const reqLabel = (k) => ({
+    'individual.verification.document': 'Identity document (upload an ID)',
+    'individual.id_number': 'ID / IC number',
+    'individual.verification.additional_document': 'Additional ID document',
+    'external_account': 'Bank account',
+    'business_profile.url': 'Business website',
+    'business_profile.mcc': 'Industry',
+    'tos_acceptance.date': 'Accept Stripe’s terms',
+  }[k] || k);
+
   // Open the Stripe Express dashboard so the supplier can change their bank.
   async function manage() {
     setWorking(true);
@@ -106,14 +135,37 @@ function PayoutsPage() {
         </div>
       ) : status.connected ? (
         <div className="card card-body border-warning">
-          <h5 className="mb-1">⏳ Onboarding incomplete</h5>
-          <p className="text-muted">
-            You've started connecting Stripe but a few details are still pending verification.
-            Continue where you left off to enable payouts.
-          </p>
-          <button className="btn btn-primary" onClick={connect} disabled={working}>
-            {working ? 'Opening Stripe…' : 'Continue onboarding'}
-          </button>
+          {status.detailsSubmitted && !(status.requirementsDue?.length) ? (
+            <>
+              <h5 className="mb-1">⏳ Submitted — under review</h5>
+              <p className="text-muted mb-2">
+                You've completed onboarding and Stripe is verifying your details. Payouts
+                activate automatically once verified — this can take a moment (and in test
+                mode some account types stay pending). Tap “Check again” to refresh.
+              </p>
+            </>
+          ) : (
+            <>
+              <h5 className="mb-1">⏳ A few details still needed</h5>
+              <p className="text-muted mb-1">Stripe needs a bit more before payouts can be enabled:</p>
+              {status.requirementsDue?.length > 0 && (
+                <ul className="small text-muted">
+                  {status.requirementsDue.map((k) => <li key={k}>{reqLabel(k)}</li>)}
+                </ul>
+              )}
+            </>
+          )}
+          {status.disabledReason && (
+            <p className="small text-muted mb-2">Stripe status: {status.disabledReason}</p>
+          )}
+          <div className="d-flex gap-2">
+            <button className="btn btn-primary" onClick={connect} disabled={working}>
+              {working ? 'Opening Stripe…' : 'Continue onboarding'}
+            </button>
+            <button className="btn btn-outline-secondary" onClick={recheck} disabled={working}>
+              Check again
+            </button>
+          </div>
         </div>
       ) : (
         <div className="card card-body">
