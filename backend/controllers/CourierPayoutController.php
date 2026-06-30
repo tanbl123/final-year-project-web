@@ -125,11 +125,14 @@ function handleCourierStripeOnboard(PDO $pdo, array $config, array $auth): void 
 // no JWT); outputs HTML, not JSON.
 function handleStripeReturnPage(): void {
   $refresh = (($_GET['state'] ?? '') === 'refresh');
-  $emoji = $refresh ? '⚠️' : '✅';
-  $title = $refresh ? 'Setup not finished' : 'Bank account setup complete';
+  // NOTE: this page is a plain browser redirect with no account context, so it
+  // can't verify payouts are actually enabled (Stripe may still need ID docs).
+  // Keep the wording neutral and let the APP confirm the real status.
+  $emoji = $refresh ? '⚠️' : '📱';
+  $title = $refresh ? 'Setup not finished' : 'Almost done';
   $msg   = $refresh
     ? 'Your session expired before setup finished. Please return to the ShoeAR Express app and tap “Set up bank account” again.'
-    : 'Your payout account is set up. You can close this tab and return to the ShoeAR Express app — your earnings will be paid here.';
+    : 'Return to the ShoeAR Express app and tap “I’ve finished — continue”. It will confirm your payout setup — if Stripe still needs anything (like ID verification), the app will let you finish.';
   header('Content-Type: text/html; charset=utf-8');
   echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
      . '<meta name="viewport" content="width=device-width, initial-scale=1">'
