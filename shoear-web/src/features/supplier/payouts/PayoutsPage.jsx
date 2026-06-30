@@ -6,21 +6,31 @@ function PayoutsPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [working, setWorking] = useState(false);
   const [params, setParams] = useSearchParams();
 
   // fetch status on mount. Returning from Stripe-hosted onboarding is a full
   // page load back to /payouts?done=1, so this also picks up the new status;
-  // we just tidy the query string away afterwards.
+  // we just tidy the query string away afterwards. If they came back from
+  // onboarding but Stripe doesn't report payouts enabled yet, say so (mirrors
+  // the courier app's "finish the Stripe steps first" feedback).
   useEffect(() => {
     let active = true;
+    const cameBack = !!(params.get('done') || params.get('refresh'));
     getPayoutStatus()
-      .then((data) => { if (active) setStatus(data); })
+      .then((data) => {
+        if (!active) return;
+        setStatus(data);
+        if (cameBack && data.configured && !data.payoutsEnabled) {
+          setNotice('Payout setup not detected yet — finish the Stripe steps first.');
+        }
+      })
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => {
         if (!active) return;
         setLoading(false);
-        if (params.get('done') || params.get('refresh')) setParams({}, { replace: true });
+        if (cameBack) setParams({}, { replace: true });
       });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,6 +70,13 @@ function PayoutsPage() {
         <div className="alert alert-danger py-2 d-flex justify-content-between align-items-center">
           <span>{error}</span>
           <button type="button" className="btn-close" onClick={() => setError('')}></button>
+        </div>
+      )}
+
+      {notice && (
+        <div className="alert alert-warning py-2 d-flex justify-content-between align-items-center">
+          <span>{notice}</span>
+          <button type="button" className="btn-close" onClick={() => setNotice('')}></button>
         </div>
       )}
 
