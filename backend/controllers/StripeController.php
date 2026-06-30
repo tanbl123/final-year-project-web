@@ -55,9 +55,10 @@ function handleStripeOnboard(PDO $pdo, array $config, array $auth): void {
   }
 }
 
-// POST /supplier/stripe/dashboard — one-time link to the supplier's Stripe
-// Express dashboard, where they can review/update their payout bank account.
-// Only works once onboarding is complete (the account has a dashboard).
+// POST /supplier/stripe/dashboard — where the supplier reviews/updates their
+// payout bank account. The accounts are Standard (full dashboard), so they log
+// in at dashboard.stripe.com with their own Stripe credentials — login_links are
+// Express-only and would error here, so we just return the dashboard URL.
 function handleStripeDashboard(PDO $pdo, array $config, array $auth): void {
   requireSupplierId($pdo, $auth);
   if (!stripeConfigured($config)) {
@@ -68,13 +69,9 @@ function handleStripeDashboard(PDO $pdo, array $config, array $auth): void {
     sendJson(409, false, null, ['code' => 'NOT_CONNECTED', 'message' => 'Connect a Stripe account first.']);
   }
 
-  try {
-    $link = stripeApi($config['stripe_secret'], 'POST',
-      '/v1/accounts/' . $row['stripeAccountId'] . '/login_links');
-    sendJson(200, true, ['url' => $link['url']]);
-  } catch (Throwable $e) {
-    sendJson(502, false, null, ['code' => 'STRIPE_ERROR', 'message' => $e->getMessage()]);
-  }
+  // Test-mode accounts live in the /test workspace of the Stripe dashboard.
+  $test = strpos((string) ($config['stripe_secret'] ?? ''), 'sk_test_') === 0;
+  sendJson(200, true, ['url' => $test ? 'https://dashboard.stripe.com/test/' : 'https://dashboard.stripe.com/']);
 }
 
 // GET /supplier/stripe/status — report the supplier's payout status, syncing

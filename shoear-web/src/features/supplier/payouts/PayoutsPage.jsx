@@ -99,8 +99,9 @@ function PayoutsPage() {
           </p>
           <div>
             <button className="btn btn-outline-secondary btn-sm" onClick={manage} disabled={working}>
-              {working ? 'Opening Stripe…' : 'Manage / change bank account'}
+              {working ? 'Opening Stripe…' : 'Manage bank account on Stripe ↗'}
             </button>
+            <div className="form-text">Opens your Stripe dashboard — sign in with your Stripe account to update your bank details.</div>
           </div>
         </div>
       ) : status.connected ? (
