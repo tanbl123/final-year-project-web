@@ -75,6 +75,7 @@ function ProductDetailPage() {
   }, [location, navigate]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     fetchProductById(id)
       .then((data) => {
@@ -320,10 +321,10 @@ function ProductDetailPage() {
                       <p className="mb-1">{r.supplierReply}</p>
                       <div className="d-flex align-items-center gap-2">
                         {r.supplierReplyDate && (
-                          <span className="text-muted small">{new Date(r.supplierReplyDate).toLocaleDateString()}</span>
+                          <span className="text-muted small me-1">{new Date(r.supplierReplyDate).toLocaleDateString()}</span>
                         )}
-                        <button className="btn btn-link btn-sm p-0" onClick={() => startReply(r)}>Edit</button>
-                        <button className="btn btn-link btn-sm p-0 text-danger" onClick={() => setRemovingReply(r)}>Delete</button>
+                        <button className="btn btn-outline-secondary btn-sm" onClick={() => startReply(r)}>Edit</button>
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => setRemovingReply(r)}>Delete</button>
                       </div>
                     </div>
                   ) : (
