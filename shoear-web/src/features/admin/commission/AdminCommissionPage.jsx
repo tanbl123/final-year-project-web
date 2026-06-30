@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getCommissionReport, getCommission, setCommission } from '../adminService';
 import { useAuth } from '../../auth/AuthContext';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Toast from '../../../components/Toast';
 import ReportPeriodBar from '../../../components/ReportPeriodBar';
 import ReportPreviewModal from '../../../components/ReportPreviewModal';
+import ClearableInput from '../../../components/ClearableInput';
+import SortableTh from '../../../components/SortableTh';
+import Pagination from '../../../components/Pagination';
+import { usePagination } from '../../../hooks/usePagination';
+import { useTableSort } from '../../../hooks/useTableSort';
+
+const SUPPLIER_PAGE_SIZE = 10;
 
 const rm = (n) => 'RM ' + Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ALL_TIME = { from: null, to: null, label: 'All time' };
@@ -22,6 +29,20 @@ function AdminCommissionPage() {
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState('');
+
+  // per-supplier table: search + sort + paginate (totals row stays the full sum)
+  const bySupplier = data?.bySupplier ?? [];
+  const filteredSuppliers = useMemo(() => {
+    const q = supplierSearch.trim().toLowerCase();
+    return q ? bySupplier.filter((s) => String(s.companyName).toLowerCase().includes(q)) : bySupplier;
+  }, [bySupplier, supplierSearch]);
+  const supplierSort = useTableSort(filteredSuppliers, {
+    initialKey: 'gross',
+    initialDir: 'desc',
+    getValue: (s, k) => (['units', 'gross', 'commission'].includes(k) ? Number(s[k]) : s[k] ?? ''),
+  });
+  const supPage = usePagination(supplierSort.sorted, SUPPLIER_PAGE_SIZE);
 
   function load(r = range) {
     setLoading(true);
@@ -216,36 +237,50 @@ function AdminCommissionPage() {
                 </div>
               </div>
 
-              <div className="table-responsive">
-                <table className="table align-middle">
-                  <thead>
-                    <tr>
-                      <th>Supplier</th>
-                      <th className="text-end" style={{ width: 110 }}>Units</th>
-                      <th className="text-end" style={{ width: 160 }}>Gross sales</th>
-                      <th className="text-end" style={{ width: 180 }}>Commission ({data.commissionRate}%)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.bySupplier.map((s) => (
-                      <tr key={s.supplierId}>
-                        <td className="fw-semibold">{s.companyName}</td>
-                        <td className="text-end">{s.units}</td>
-                        <td className="text-end">{rm(s.gross)}</td>
-                        <td className="text-end text-success">{rm(s.commission)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="fw-semibold border-top">
-                      <td>Total</td>
-                      <td className="text-end">—</td>
-                      <td className="text-end">{rm(data.summary.grossSales)}</td>
-                      <td className="text-end text-success">{rm(data.summary.totalCommission)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <div className="mb-3" style={{ maxWidth: 360 }}>
+                <ClearableInput type="text" placeholder="Search supplier"
+                  value={supplierSearch}
+                  onChange={(e) => { setSupplierSearch(e.target.value); supPage.setPage(1); }}
+                  onClear={() => { setSupplierSearch(''); supPage.setPage(1); }} />
               </div>
+
+              {filteredSuppliers.length === 0 ? (
+                <div className="card card-body text-center text-muted">No suppliers match your search.</div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table align-middle">
+                    <thead>
+                      <tr>
+                        <SortableTh label="Supplier" columnKey="companyName" sort={supplierSort} />
+                        <SortableTh label="Units" columnKey="units" sort={supplierSort} className="text-end" style={{ width: 110 }} />
+                        <SortableTh label="Gross sales" columnKey="gross" sort={supplierSort} className="text-end" style={{ width: 160 }} />
+                        <SortableTh label={`Commission (${data.commissionRate}%)`} columnKey="commission" sort={supplierSort} className="text-end" style={{ width: 180 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {supPage.pageItems.map((s) => (
+                        <tr key={s.supplierId}>
+                          <td className="fw-semibold">{s.companyName}</td>
+                          <td className="text-end">{s.units}</td>
+                          <td className="text-end">{rm(s.gross)}</td>
+                          <td className="text-end text-success">{rm(s.commission)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="fw-semibold border-top">
+                        <td>Total (all suppliers)</td>
+                        <td className="text-end">—</td>
+                        <td className="text-end">{rm(data.summary.grossSales)}</td>
+                        <td className="text-end text-success">{rm(data.summary.totalCommission)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  <Pagination page={supPage.page} totalPages={supPage.totalPages} onChange={supPage.setPage}
+                    summary={`Page ${supPage.page} of ${supPage.totalPages} · ${filteredSuppliers.length} supplier${filteredSuppliers.length === 1 ? '' : 's'}`} />
+                </div>
+              )}
             </>
           )}
         </>
