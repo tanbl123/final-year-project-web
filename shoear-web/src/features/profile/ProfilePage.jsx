@@ -287,15 +287,29 @@ function ProfilePage() {
 
           {editing ? (
             <form onSubmit={save}>
-              <div className="mb-3">
-                <label className="form-label">Full name</label>
-                <ClearableInput type="text" maxLength="100" required autoFocus
-                  className={fieldErrors.fullName ? 'is-invalid' : ''}
-                  value={form.fullName}
-                  onChange={(e) => setField('fullName', e.target.value)}
-                  onClear={() => setField('fullName', '')} />
-                {fieldErrors.fullName && <div className="invalid-feedback d-block">{fieldErrors.fullName}</div>}
-              </div>
+              {me.role === 'Supplier' ? (
+                // A supplier's account name IS their verified company name (set at
+                // registration, changed only via Business details → admin review).
+                // Show it read-only here so it can't silently diverge.
+                <div className="mb-3">
+                  <label className="form-label">Store name</label>
+                  <input type="text" className="form-control" value={form.fullName} disabled readOnly />
+                  <div className="form-text">
+                    This is your company name, shown to customers. To change it, use
+                    {' '}<strong>Business details</strong> below — it needs admin review.
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-3">
+                  <label className="form-label">Full name</label>
+                  <ClearableInput type="text" maxLength="100" required autoFocus
+                    className={fieldErrors.fullName ? 'is-invalid' : ''}
+                    value={form.fullName}
+                    onChange={(e) => setField('fullName', e.target.value)}
+                    onClear={() => setField('fullName', '')} />
+                  {fieldErrors.fullName && <div className="invalid-feedback d-block">{fieldErrors.fullName}</div>}
+                </div>
+              )}
               <div className="mb-3">
                 <label className="form-label">Username</label>
                 <ClearableInput type="text" maxLength="20"

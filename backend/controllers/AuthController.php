@@ -1024,6 +1024,15 @@ function handleUpdateMe(PDO $pdo, array $auth): void {
     sendJson(409, false, null, ['code' => 'DUPLICATE', 'message' => 'That username is already taken.']);
   }
 
+  // A supplier's display name IS their verified company name — it may only change
+  // through the business-details change-request → admin approval flow, never here.
+  // Ignore any submitted fullName for suppliers and keep the current value.
+  if (($auth['role'] ?? '') === 'Supplier') {
+    $cur = $pdo->prepare('SELECT fullName FROM `user` WHERE userId = :id');
+    $cur->execute(['id' => $auth['userId']]);
+    $fullName = (string) ($cur->fetchColumn() ?: $fullName);
+  }
+
   $upd = $pdo->prepare('UPDATE `user` SET fullName = :fn, phoneNumber = :ph, username = :un WHERE userId = :id');
   $upd->execute(['fn' => $fullName, 'ph' => $phone, 'un' => $username, 'id' => $auth['userId']]);
 
