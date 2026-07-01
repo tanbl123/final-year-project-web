@@ -39,13 +39,12 @@ class CourierApp extends StatelessWidget {
         Provider<DeliveryService>.value(value: DeliveryService(api)),
         Provider<AccountService>.value(value: AccountService(api)),
         Provider<EarningsService>.value(value: EarningsService(api)),
-        // registers FCM token on login, clears on logout
-        ChangeNotifierProxyProvider<AuthProvider, PushService>(
-          create: (_) => pushService,
-          update: (_, auth, push) => push!..syncWithAuth(auth.isLoggedIn),
-        ),
-        // in-app notification bell: loads on login, clears on logout; a
-        // foreground push refreshes it (via pushService.onMessageCallback)
+        // in-app notification bell + FCM registration: loads on login, clears
+        // on logout, registers this device's push token on login, and refreshes
+        // when a foreground push arrives (via pushService.onMessageCallback).
+        // NOTE: registration lives here (not in a PushService proxy) because
+        // this provider is actually read by the bell — a lazy PushService proxy
+        // that nothing reads would never fire.
         ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
           create: (_) => NotificationProvider(NotificationService(api), pushService),
           update: (_, auth, notif) => notif!..syncWithAuth(auth.isLoggedIn),

@@ -10,10 +10,9 @@ import 'package:delivery/features/notification/services/notification_service.dar
 /// Best-effort + graceful: if Firebase isn't configured on this build (no
 /// google-services.json), [init] catches the error and every method becomes a
 /// no-op — the app keeps working without push.
-class PushService extends ChangeNotifier {
+class PushService {
   final NotificationService _notifications;
   bool _available = false;
-  bool? _wasLoggedIn;
 
   /// Called when a push arrives (or is tapped) while the app is running — wired
   /// to refresh the in-app bell so the badge stays in sync.
@@ -37,13 +36,6 @@ class PushService extends ChangeNotifier {
       _available = false;
       if (kDebugMode) debugPrint('[Push] Firebase init FAILED: $e');
     }
-  }
-
-  /// Called by ChangeNotifierProxyProvider when auth state changes.
-  void syncWithAuth(bool isLoggedIn) {
-    if (_wasLoggedIn == isLoggedIn) return;
-    _wasLoggedIn = isLoggedIn;
-    if (isLoggedIn) registerDevice();
   }
 
   /// Register this device's FCM token for the signed-in courier.

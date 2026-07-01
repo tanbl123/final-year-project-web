@@ -10,8 +10,9 @@ import 'package:delivery/features/notification/services/push_service.dart';
 /// registration itself stays in PushService (driven by AuthProvider).
 class NotificationProvider extends ChangeNotifier {
   final NotificationService _service;
-  NotificationProvider(this._service, [PushService? push]) {
-    push?.onMessageCallback = refresh;
+  final PushService? _push;
+  NotificationProvider(this._service, [this._push]) {
+    _push?.onMessageCallback = refresh;
   }
 
   List<AppNotification> _items = [];
@@ -31,6 +32,7 @@ class NotificationProvider extends ChangeNotifier {
     _wasLoggedIn = loggedIn;
     if (loggedIn) {
       Future.microtask(refresh);
+      _push?.registerDevice(); // register this device for FCM push on login
     } else {
       _items = [];
       _unread = 0;
