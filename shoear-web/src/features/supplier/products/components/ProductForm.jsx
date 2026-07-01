@@ -348,7 +348,7 @@ function ProductForm({ onAdd, onCancel, initialValues = null, mode = 'create' })
         </div>
         <div className="col-md-3">
           <label className="form-label">Price (RM)</label>
-          <input type="number" min="0.01" max="100000" step="0.01" placeholder="0.00"
+          <input type="number" min="0.01" max="100000" step="0.01" placeholder="e.g. 199.90"
             className={'form-control' + (showError('price') ? ' is-invalid' : '')}
             value={price} onChange={(e) => changeField('price', setPrice, e.target.value)}
             onBlur={() => blurField('price')} />
