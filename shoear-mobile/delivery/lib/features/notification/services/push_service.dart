@@ -28,12 +28,14 @@ class PushService extends ChangeNotifier {
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       _available = true;
+      if (kDebugMode) debugPrint('[Push] Firebase initialised — FCM available');
       // FCM shows tray notifications itself when backgrounded; in the foreground
       // we refresh the bell so the new notification appears immediately.
       FirebaseMessaging.onMessage.listen((_) => onMessageCallback?.call());
       FirebaseMessaging.onMessageOpenedApp.listen((_) => onMessageCallback?.call());
-    } catch (_) {
+    } catch (e) {
       _available = false;
+      if (kDebugMode) debugPrint('[Push] Firebase init FAILED: $e');
     }
   }
 
@@ -46,19 +48,26 @@ class PushService extends ChangeNotifier {
 
   /// Register this device's FCM token for the signed-in courier.
   Future<void> registerDevice() async {
-    if (!_available) return;
+    if (!_available) {
+      if (kDebugMode) debugPrint('[Push] registerDevice skipped — Firebase not available');
+      return;
+    }
     try {
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission();
+      final settings = await messaging.requestPermission();
+      if (kDebugMode) debugPrint('[Push] permission: ${settings.authorizationStatus}');
       final token = await messaging.getToken();
+      if (kDebugMode) debugPrint('[Push] FCM token: ${token ?? "(null)"}');
       if (token != null && token.isNotEmpty) {
         await _notifications.registerDevice(token);
+        if (kDebugMode) debugPrint('[Push] token registered with backend ✓');
       }
       messaging.onTokenRefresh.listen((t) {
         if (t.isNotEmpty) _notifications.registerDevice(t);
       });
-    } catch (_) {
+    } catch (e) {
       // best-effort — never block login on push registration
+      if (kDebugMode) debugPrint('[Push] registerDevice FAILED: $e');
     }
   }
 }
