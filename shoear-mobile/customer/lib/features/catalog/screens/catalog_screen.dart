@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 import 'package:customer/features/catalog/models/category.dart';
 import 'package:customer/features/catalog/models/product.dart';
 import 'package:customer/features/catalog/services/catalog_service.dart';
+import 'package:customer/features/catalog/services/recommendation_service.dart';
+import 'package:customer/features/catalog/widgets/recommendation_carousel.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
 import 'package:customer/features/auth/screens/login_screen.dart';
 import 'package:customer/features/catalog/screens/product_detail_screen.dart';
@@ -187,6 +189,26 @@ class _CatalogScreenState extends State<CatalogScreen> {
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          // Recommendation rails — only on the clean home view (not while
+          // searching/filtering), like Shopee/Lazada. Each rail self-hides when
+          // it has nothing to show. "Recommended for you" needs a login.
+          if (_search.isEmpty && !_filtersActive)
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (context.watch<AuthProvider>().isLoggedIn)
+                    RecommendationCarousel(
+                      title: 'Recommended for you',
+                      loader: () => context.read<RecommendationService>().forYou(),
+                    ),
+                  RecommendationCarousel(
+                    title: 'Trending now',
+                    loader: () => context.read<RecommendationService>().trending(),
+                  ),
+                ],
+              ),
+            ),
           if (_items.isEmpty)
             const SliverFillRemaining(
               hasScrollBody: false,

@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:customer/features/catalog/models/product.dart';
 import 'package:customer/features/review/models/review.dart';
 import 'package:customer/features/catalog/services/catalog_service.dart';
+import 'package:customer/features/catalog/services/recommendation_service.dart';
+import 'package:customer/features/catalog/widgets/recommendation_carousel.dart';
 import 'package:customer/features/review/services/review_service.dart';
 import 'package:customer/features/review/widgets/review_sheet.dart';
 import 'package:customer/features/auth/state/auth_provider.dart';
@@ -366,6 +368,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                         ],
                       ),
+                    ),
+
+                    // ── You may also like (content-based recommendations) ─────
+                    RecommendationCarousel(
+                      title: 'You may also like',
+                      loader: () => context.read<RecommendationService>().similar(widget.productId),
                     ),
 
                     // bottom padding so content clears the add-to-cart bar

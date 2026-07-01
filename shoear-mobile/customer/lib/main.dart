@@ -5,6 +5,7 @@ import 'package:customer/core/api/api_client.dart';
 import 'package:customer/features/auth/services/account_service.dart';
 import 'package:customer/features/auth/services/auth_service.dart';
 import 'package:customer/features/catalog/services/catalog_service.dart';
+import 'package:customer/features/catalog/services/recommendation_service.dart';
 import 'package:customer/features/cart/services/cart_service.dart';
 import 'package:customer/features/order/services/order_service.dart';
 import 'package:customer/features/review/services/review_service.dart';
@@ -42,6 +43,7 @@ class ShoeArApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         Provider<CatalogService>.value(value: CatalogService(api)),
+        Provider<RecommendationService>.value(value: RecommendationService(api)),
         Provider<AccountService>.value(value: AccountService(api)),
         Provider<OrderService>.value(value: OrderService(api)),
         Provider<ReviewService>.value(value: ReviewService(api)),
