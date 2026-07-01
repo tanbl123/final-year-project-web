@@ -285,6 +285,13 @@ function BusinessDetailsCard({ onToast }) {
           <dd className="col-sm-8">
             {opEditing ? (
               <form onSubmit={saveOp} className="d-flex flex-column gap-2">
+                {/* Legacy suppliers stored only a combined pickup address — surface it
+                    as a reference so the structured fields aren't confusingly blank. */}
+                {!cur.operationalLine1 && !cur.operationalPostcode && !cur.operationalCity && !cur.operationalState && cur.operationalAddress && (
+                  <div className="form-text">
+                    Current address on file: <strong>{cur.operationalAddress}</strong> — please re-enter it in the fields below.
+                  </div>
+                )}
                 <AddressFields value={opAddr}
                   onChange={(next) => { setOpAddr(next); if (Object.keys(opErrors).length) setOpErrors(validateAddress(next)); }}
                   errors={opErrors} idPrefix="op-edit" disabled={opSaving} />
