@@ -1,0 +1,10 @@
+# ShoeAR recommender ML service (Flask + scikit-surprise + scikit-learn).
+# scikit-surprise needs numpy<2 and a C build toolchain — on Windows install
+# via a prebuilt wheel if pip build fails (see README).
+Flask==3.0.3
+PyMySQL==1.1.1
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.1
+scikit-learn==1.5.2
+scikit-surprise==1.1.4
