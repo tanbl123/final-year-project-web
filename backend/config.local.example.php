@@ -30,6 +30,12 @@ return [
   // 'your-project-id.appspot.com' (or '...firebasestorage.app').
   // 'firebase_storage_bucket' => 'your-project-id.appspot.com',
 
+  // OPTIONAL — URL of the Python Flask recommender service (see ml-service/).
+  // When set, /catalog/products/{id}/similar and /recommendations/* proxy to it
+  // for the weighted-hybrid (SVD + TF-IDF) recommendations. Leave unset to fall
+  // back to a simple SQL recommendation (same-category / best-sellers).
+  // 'ml_service_url' => 'http://127.0.0.1:5001',
+
   // OPTIONAL — Google Places API key for ADDRESS AUTOCOMPLETE on the web supplier
   // form (the browser hits our /places/* proxy, so the key stays server-side).
   // Google Cloud Console → enable "Places API (New)" → Credentials → API key.

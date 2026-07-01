@@ -40,6 +40,7 @@ require __DIR__ . '/../../controllers/DashboardController.php';
 require __DIR__ . '/../../controllers/CourierPayoutController.php';
 require __DIR__ . '/../../controllers/EasyParcelController.php';
 require __DIR__ . '/../../controllers/CourierController.php';
+require __DIR__ . '/../../controllers/RecommendationController.php';
 
 // ── Always answer with JSON, even on a PHP error ──
 // A stray warning/notice or an uncaught error would otherwise print into the
@@ -378,6 +379,23 @@ if ($method === 'GET' && $path === '/catalog/products') {
 if ($method === 'GET' && preg_match('#^/catalog/products/([^/]+)$#', $path, $m)) {
   $pdo = getPDO();
   handleGetCatalogProduct($pdo, $m[1]);
+}
+
+// ── recommendations (proxy the Python ML service; SQL fallback) ──────────────
+if ($method === 'GET' && preg_match('#^/catalog/products/([^/]+)/similar$#', $path, $m)) {
+  $pdo = getPDO();
+  handleSimilarProducts($pdo, $config, $m[1]);
+}
+
+if ($method === 'GET' && $path === '/recommendations/trending') {
+  $pdo = getPDO();
+  handleTrendingProducts($pdo, $config);
+}
+
+if ($method === 'GET' && $path === '/recommendations/for-you') {
+  $auth = requireAuth($secret);
+  $pdo  = getPDO();
+  handleRecommendedForYou($pdo, $config, $auth);
 }
 
 // email a verification code before the account is created (public)
