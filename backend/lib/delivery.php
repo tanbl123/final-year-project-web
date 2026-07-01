@@ -144,13 +144,20 @@ function assignDelivery(PDO $pdo, string $orderId, string $supplierId): array {
   $stSup->execute(['s' => $supplierId]);
   $supState = trim((string) ($stSup->fetchColumn() ?: ''));
 
+  // In-house dispatch requires a POSITIVE same-state match (one local rider does
+  // both pickup and drop). Cross-state → Standard shipping. If EITHER state is
+  // unknown we can't confirm the parcel is local, so we must NOT auto-assign a
+  // courier — doing so could strand a courier with an inter-state pickup (e.g. a
+  // Penang rider sent to collect in KL). Unknown-state parcels are left Pending
+  // for the admin to route by hand, and the supplier should set their
+  // operational state so future orders route correctly.
+  $sameState  = $custState !== '' && $supState !== '' && $custState === $supState;
   $isStandard = $custState !== '' && $supState !== '' && $custState !== $supState;
 
-  // Standard parcels never get an in-house courier — they wait for the supplier
-  // to ship them. Only in-house parcels are scored against the courier roster.
+  // Only same-state parcels are scored against the courier roster.
   $best = null;
-  if (!$isStandard) {
-    $candidates = scoreCouriers($pdo, $custState !== '' ? $custState : null);
+  if ($sameState) {
+    $candidates = scoreCouriers($pdo, $custState);
     foreach ($candidates as $c) {         // ranked online-first, covering-first, then load
       if ($c['coversZone'] && $c['available']) { $best = $c; break; }
     }
